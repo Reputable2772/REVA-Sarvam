@@ -21,7 +21,12 @@ data class HarvestDeclaration(
     val expectedDateTime: String = "2026-11-14 09:00 AM",
     val sellImmediately: Boolean = true,
     val quantityKg: Double = 200.0,
-    val qualityGrade: String = "Grade A"
+    val qualityGrade: String = "Grade A",
+    val hasStorageAccess: Boolean = true,
+    val storageRequirementNeeded: Boolean = false,
+    val farmerLatitude: Double = 13.133,
+    val farmerLongitude: Double = 78.133,
+    val locationSource: String = "GPS (Verified)"
 )
 
 object UserSession {

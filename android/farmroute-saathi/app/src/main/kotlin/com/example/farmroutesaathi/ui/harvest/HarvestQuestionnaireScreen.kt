@@ -33,7 +33,7 @@ import org.json.JSONObject
 
 @Composable
 fun HarvestQuestionnaireScreen(
-    onHarvestSubmitted: (String) -> Unit,
+    onHarvestSubmitted: (harvestId: String, needsStorage: Boolean, crop: String, qty: Double) -> Unit,
     onSkip: () -> Unit
 ) {
     var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
@@ -45,6 +45,9 @@ fun HarvestQuestionnaireScreen(
     var expectedDateTime by remember { mutableStateOf("2026-11-14 09:00 AM") }
     var sellImmediately by remember { mutableStateOf(true) }
     var quantityKg by remember { mutableStateOf("200") }
+    var hasStorageAccess by remember { mutableStateOf(false) } // Default false to prompt smart cold storage discovery
+    var locationPinCode by remember { mutableStateOf("563101") }
+    var isGpsGranted by remember { mutableStateOf(true) }
 
     // Voice / STT Recording State
     var isRecordingAudio by remember { mutableStateOf(false) }
@@ -780,6 +783,127 @@ fun HarvestQuestionnaireScreen(
                         SuggestionChip(onClick = { quantityKg = "300" }, label = { Text("300 kg", fontSize = 10.sp) })
                         SuggestionChip(onClick = { quantityKg = "500" }, label = { Text("500 kg", fontSize = 10.sp) })
                     }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // ==========================================
+                    // 7. STORAGE ACCESS (CORE REQUIREMENT)
+                    // ==========================================
+                    Text(
+                        text = if (isKannada) "7. ಸಂಗ್ರಹಣಾ ಸೌಲಭ್ಯ (Storage Access)" else "7. Storage Access",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = ForestGreenDeep
+                    )
+                    Text(
+                        text = if (isKannada)
+                            "ನಿಮ್ಮ ಕೊಯ್ಲು ಮಾಡಿದ ಉತ್ಪನ್ನಕ್ಕೆ ಸಂಗ್ರಹಣಾ ವ್ಯವಸ್ಥೆ ಇದೆಯೇ?"
+                        else
+                            "Do you have access to storage for your harvested produce?",
+                        fontSize = 12.sp,
+                        color = Color.DarkGray,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (hasStorageAccess) ForestGreenDeep else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.5.dp, if (hasStorageAccess) ForestGreenDeep else Color.LightGray),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { hasStorageAccess = true }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("🏠", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isKannada) "ಹೌದು, ಸಂಗ್ರಹವಿದೆ" else "Yes, I have storage",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (hasStorageAccess) Color.White else Color.Black
+                                )
+                                Text(
+                                    text = if (isKannada) "ಆನ್‌ಫಾರ್ಮ್ ಶೆಡ್" else "On-farm shade / room",
+                                    fontSize = 10.sp,
+                                    color = if (hasStorageAccess) Color.White.copy(alpha = 0.8f) else Color.Gray
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (!hasStorageAccess) ForestGreenDeep else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.5.dp, if (!hasStorageAccess) ForestGreenDeep else Color.LightGray),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { hasStorageAccess = false }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("❄️", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (isKannada) "ಇಲ್ಲ, ಶೀತಲಾಗಾರ ಬೇಕು" else "No, need Storage",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!hasStorageAccess) Color.White else Color.Black
+                                )
+                                Text(
+                                    text = if (isKannada) "ಶೀತಲಾಗಾರ ಶೋಧಿಸಿ" else "Find Cold Storage",
+                                    fontSize = 10.sp,
+                                    color = if (!hasStorageAccess) Color.White.copy(alpha = 0.8f) else Color.Gray
+                                )
+                            }
+                        }
+                    }
+
+                    // If NO storage access: show location permission & fallback guidance
+                    AnimatedVisibility(visible = !hasStorageAccess) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = HarvestGoldLight.copy(alpha = 0.25f),
+                                border = BorderStroke(1.dp, HarvestGold)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("📍", fontSize = 14.sp)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (isKannada) "ಸ್ಥಳ ಗುರುತಿಸುವಿಕೆ (Location Selection)" else "Smart Location Detection",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp,
+                                            color = ForestGreenDeep
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = if (isKannada)
+                                            "ಜಿಪಿಎಸ್ ಸಕ್ರಿಯವಾಗಿದೆ: ಕೋಲಾರ (13.133° N, 78.133° E). ಸಮೀಪದ ಎನ್‌ಎಚ್‌ಬಿ ಶೀತಲಾಗಾರಗಳನ್ನು ರಸ್ತೆ ದೂರದಿಂದ ಶ್ರೇಣೀಕರಿಸಲಾಗುವುದು."
+                                        else
+                                            "GPS active: Kolar (13.133° N, 78.133° E). Nearby NHB facilities will be ranked with road distances to Mandi A, B, and C.",
+                                        fontSize = 10.sp,
+                                        color = Color.DarkGray,
+                                        lineHeight = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -829,12 +953,17 @@ fun HarvestQuestionnaireScreen(
                                     harvestTime = harvestTime,
                                     expectedDateTime = expectedDateTime,
                                     sellImmediately = sellImmediately,
-                                    quantityKg = qVal
+                                    quantityKg = qVal,
+                                    hasStorageAccess = hasStorageAccess,
+                                    storageRequirementNeeded = !hasStorageAccess,
+                                    farmerLatitude = 13.133,
+                                    farmerLongitude = 78.133,
+                                    locationSource = if (isGpsGranted) "GPS (Verified)" else "PIN: $locationPinCode"
                                 )
                             )
 
-                            // Navigate to Main!
-                            onHarvestSubmitted(uniqueHarvestId)
+                            // Navigate with needsStorage parameter
+                            onHarvestSubmitted(uniqueHarvestId, !hasStorageAccess, crop, qVal)
                         }
                     },
                     modifier = Modifier
@@ -848,8 +977,14 @@ fun HarvestQuestionnaireScreen(
                         CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
                         Text(
-                            text = if (isKannada) "🌾 ಕೊಯ್ಲು ದೃಢೀಕರಿಸಿ (DECLARE HARVEST)" else "🌾 CONFIRM & DECLARE HARVEST",
-                            fontSize = 15.sp,
+                            text = if (isKannada) {
+                                if (!hasStorageAccess) "❄️ ಕೊಯ್ಲು ಮತ್ತು ಶೀತಲಾಗಾರ ಶೋಧನೆ (CONFIRM & DISCOVER STORAGE)"
+                                else "🌾 ಕೊಯ್ಲು ದೃಢೀಕರಿಸಿ (DECLARE HARVEST)"
+                            } else {
+                                if (!hasStorageAccess) "❄️ CONFIRM & FIND COLD STORAGE"
+                                else "🌾 CONFIRM & DECLARE HARVEST"
+                            },
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )

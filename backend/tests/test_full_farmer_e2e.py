@@ -386,8 +386,9 @@ class TestSarvamVoiceSttTtsIntegration:
         assert "audio_base64" in summary
         assert len(summary["audio_base64"]) > 0
 
-    def test_sarvam_key_rotation_resiliency(self):
+    def test_sarvam_key_rotation_resiliency(self, monkeypatch):
         """Verifies multi-key cycling for Sarvam API."""
+        monkeypatch.setenv("SARVAM_API_KEYS", "sarvam-key-1,sarvam-key-2")
         keys = SarvamService.get_api_keys()
         assert len(keys) >= 1
         k1 = SarvamService.get_api_key()

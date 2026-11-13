@@ -6,6 +6,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.auth.LoginScreen
+import com.example.farmroutesaathi.ui.harvest.ColdStorageDiscoveryScreen
 import com.example.farmroutesaathi.ui.harvest.HarvestQuestionnaireScreen
 import com.example.farmroutesaathi.ui.harvest.MandiComparisonScreen
 import com.example.farmroutesaathi.ui.main.MainScreen
@@ -30,10 +31,14 @@ fun MainNavigation() {
         }
         entry<HarvestQuestionnaire> {
           HarvestQuestionnaireScreen(
-            onHarvestSubmitted = { harvestId ->
+            onHarvestSubmitted = { harvestId, needsStorage, crop, qty ->
               backStack.clear()
               backStack.add(Main)
-              backStack.add(MandiComparison(harvestId))
+              if (needsStorage) {
+                backStack.add(ColdStorageDiscovery(harvestId = harvestId, crop = crop, quantityKg = qty))
+              } else {
+                backStack.add(MandiComparison(harvestId))
+              }
             },
             onSkip = {
               backStack.clear()
@@ -47,11 +52,25 @@ fun MainNavigation() {
             onBackClick = { backStack.removeLastOrNull() }
           )
         }
+        entry<ColdStorageDiscovery> { key ->
+          ColdStorageDiscoveryScreen(
+            harvestId = key.harvestId,
+            crop = key.crop,
+            quantityKg = key.quantityKg,
+            farmerLat = key.farmerLat,
+            farmerLon = key.farmerLon,
+            locationText = key.locationText,
+            onBackClick = { backStack.removeLastOrNull() }
+          )
+        }
         entry<Main> {
           MainScreen(
             onItemClick = { navKey -> backStack.add(navKey) },
             onDeclareHarvestClick = { backStack.add(HarvestQuestionnaire) },
             onMandiComparisonClick = { hId -> backStack.add(MandiComparison(hId)) },
+            onColdStorageClick = { hId, crop, qty ->
+              backStack.add(ColdStorageDiscovery(harvestId = hId, crop = crop, quantityKg = qty))
+            },
             onLogout = {
               UserSession.logout()
               backStack.clear()

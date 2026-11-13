@@ -39,6 +39,7 @@ fun MainScreen(
     onLogout: (() -> Unit)? = null,
     onDeclareHarvestClick: (() -> Unit)? = null,
     onMandiComparisonClick: ((String) -> Unit)? = null,
+    onColdStorageClick: ((String, String, Double) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isKannada by remember { mutableStateOf(false) }
@@ -86,7 +87,10 @@ fun MainScreen(
                         when (act) {
                             "HISTORY", "PAST_HARVESTS", "LOTS" -> selectedTab = RoleTab.HISTORY
                             "WEATHER" -> selectedTab = RoleTab.FARMER
-                            "COLD_STORAGE" -> selectedTab = RoleTab.FARMER
+                            "COLD_STORAGE" -> {
+                                selectedTab = RoleTab.FARMER
+                                onColdStorageClick?.invoke(UserSession.activeHarvestId, "Tomato", 500.0)
+                            }
                             "NAVIGATE_SCHEMES", "SCHEMES", "BENEFITS" -> selectedTab = RoleTab.BENEFITS
                             "HARVEST" -> onDeclareHarvestClick?.invoke()
                         }
@@ -141,6 +145,7 @@ fun MainScreen(
                                 isKannada = isKannada,
                                 onDeclareHarvestClick = onDeclareHarvestClick,
                                 onMandiComparisonClick = onMandiComparisonClick,
+                                onColdStorageClick = onColdStorageClick,
                                 onViewBenefitsClick = { selectedTab = RoleTab.BENEFITS },
                                 onViewHistoryClick = { selectedTab = RoleTab.HISTORY }
                             )
@@ -166,6 +171,7 @@ fun FarmerDashboardView(
     isKannada: Boolean,
     onDeclareHarvestClick: (() -> Unit)? = null,
     onMandiComparisonClick: ((String) -> Unit)? = null,
+    onColdStorageClick: ((String, String, Double) -> Unit)? = null,
     onViewBenefitsClick: (() -> Unit)? = null,
     onViewHistoryClick: (() -> Unit)? = null
 ) {
@@ -356,6 +362,40 @@ fun FarmerDashboardView(
                                 }
                             }
                             Text("➔", color = HarvestGoldDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    // Smart Cold Storage & Weather Protection Quick CTA
+                    Surface(
+                        color = Color(0xFFE8F5E9),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onColdStorageClick?.invoke(currentLot, "Tomato", 500.0) }
+                            .padding(top = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("❄️", fontSize = 14.sp)
+                                Column {
+                                    Text(
+                                        text = if (isKannada) "ಸ್ಮಾರ್ಟ್ ಶೀತಲಾಗಾರ & ಹವಾಮಾನ ರಕ್ಷಣೆ" else "Smart Cold Storage & Weather Protection",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = ForestGreenDeep
+                                    )
+                                    Text(
+                                        text = if (isKannada) "ಎನ್‌ಎಚ್‌ಬಿ ಶೀತಲಾಗಾರ ಶೋಧನೆ • ಮಳೆ ಎಚ್ಚರಿಕೆ ರಕ್ಷಣೆ (4.2 ಕಿ.ಮೀ)" else "NHB Facility Discovery • IMD Rain Advisory (4.2 km Hub)",
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text("➔", color = ForestGreenDeep, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }
