@@ -354,15 +354,16 @@ fun ColdStorageDiscoveryScreen(
             // WEATHER RISK HARVEST PROTECTION ALERT
             // ==========================================
             weatherAlert?.let { alert ->
-                ElevatedCard(
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.elevatedCardColors(
+                    colors = CardDefaults.cardColors(
                         containerColor = AmberWarning.copy(alpha = 0.12f)
                     ),
-                    border = BorderStroke(1.5.dp, AmberWarning)
+                    border = BorderStroke(1.5.dp, AmberWarning),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {

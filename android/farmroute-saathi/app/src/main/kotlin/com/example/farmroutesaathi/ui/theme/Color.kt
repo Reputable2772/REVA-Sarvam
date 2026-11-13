@@ -23,10 +23,15 @@ val SoilFieldPaper        = Color(0xFFF4F0E5) // Warm organic field paper backgr
 // 🌿 Core Brand & Nature Spectrum
 val ForestGreenDeep       = Color(0xFF14472D) // Deep evergreen anchor (headers, major CTAs)
 val ForestGreenPrimary    = Color(0xFF1B5E20) // Vibrant foliage green
+val ForestGreenLight      = Color(0xFFE8F5E9) // Light foliage green tint
 val FreshLeafGreen        = Color(0xFF32834A) // Crop vitality and positive growth
 val FreshLimeAccent       = Color(0xFF84CC16) // Modern energy & live status pulses
 val HarvestGold           = Color(0xFFE5A928) // Solar harvest gold (FPO recommendation highlight)
 val HarvestGoldDark       = Color(0xFFB45309) // High-contrast gold text / borders
+val HarvestGoldLight      = Color(0xFFFEF3C7) // Soft amber / gold tint
+val AmberWarning          = Color(0xFFF59E0B) // Amber alert warning
+val AmberWarningDark      = Color(0xFFB45309) // Deep high-contrast amber brown
+val CreamBackgroundLight  = Color(0xFFFBF8F1) // Warm cream background
 
 // 🌾 Canvas & Card Surfaces — Light Theme (Warm Natural Parchment)
 val WarmIvoryBackground   = Color(0xFFF7F4E9) // Organic natural canvas
