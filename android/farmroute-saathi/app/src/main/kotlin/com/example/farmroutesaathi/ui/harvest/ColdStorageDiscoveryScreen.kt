@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.components.LanguageSelectionDialog
 import com.example.farmroutesaathi.ui.theme.*
