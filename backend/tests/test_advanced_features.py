@@ -4,26 +4,30 @@ from backend.app.main import app
 
 client = TestClient(app)
 
-def test_auth_request_and_verify_otp():
-    # 1. Request OTP
-    req = client.post("/api/auth/request-otp", json={"email": "farmer.kolar@example.com", "role": "farmer"})
-    assert req.status_code == 200
-    data = req.json()
-    assert data["success"] is True
-    dev_otp = data["dev_otp"]
-    assert len(dev_otp) == 6
+def test_mobile_mpin_auth_flow():
+    # 1. Check account for new phone
+    check_new = client.post("/api/auth/check-account", json={"phone": "9845077777"})
+    assert check_new.status_code == 200
+    assert check_new.json()["exists"] is False
 
-    # 2. Verify with wrong OTP -> should fail
-    verify_bad = client.post("/api/auth/verify-otp", json={"email": "farmer.kolar@example.com", "otp_code": "000000"})
-    assert verify_bad.status_code == 400
+    # 2. Register new farmer with AGMARKNET verified location
+    reg = client.post("/api/auth/register", json={
+        "phone": "9845077777",
+        "mpin": "4321",
+        "name": "Kolar Test Farmer",
+        "state": "Karnataka",
+        "district": "Kolar",
+        "pincode": "563101"
+    })
+    assert reg.status_code == 200
+    reg_data = reg.json()
+    assert reg_data["status"] == "registered"
+    assert "token" in reg_data
 
-    # 3. Verify with correct OTP -> should succeed
-    verify_ok = client.post("/api/auth/verify-otp", json={"email": "farmer.kolar@example.com", "otp_code": dev_otp})
-    assert verify_ok.status_code == 200
-    ver_data = verify_ok.json()
-    assert ver_data["success"] is True
-    assert "session_token" in ver_data
-    assert "farmer_id" in ver_data
+    # 3. Login with MPIN
+    login = client.post("/api/auth/login", json={"phone": "9845077777", "mpin": "4321"})
+    assert login.status_code == 200
+    assert login.json()["status"] == "authenticated"
 
 def test_weather_wttr_in_service():
     res = client.get("/api/weather/Kolar")

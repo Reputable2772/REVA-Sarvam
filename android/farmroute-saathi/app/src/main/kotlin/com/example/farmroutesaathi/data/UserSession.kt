@@ -13,11 +13,29 @@ data class FarmerProfile(
     val token: String = "sim-token-001"
 )
 
+data class HarvestDeclaration(
+    val harvestId: String = "FR-KLR-20261113-0001",
+    val crop: String = "Tomato",
+    val harvestDate: String = "2026-11-13",
+    val harvestTime: String = "07:00 AM",
+    val expectedDateTime: String = "2026-11-14 09:00 AM",
+    val sellImmediately: Boolean = true,
+    val quantityKg: Double = 200.0,
+    val qualityGrade: String = "Grade A"
+)
+
 object UserSession {
     var currentFarmer by mutableStateOf<FarmerProfile?>(
         FarmerProfile() // Pre-seeded with demo farmer, can be logged out
     )
-    
+
+    var activeHarvest by mutableStateOf<HarvestDeclaration?>(
+        HarvestDeclaration() // Pre-seeded default harvest lot
+    )
+
+    val activeHarvestId: String
+        get() = activeHarvest?.harvestId ?: "FR-KLR-20261113-0001"
+
     val isLoggedIn: Boolean
         get() = currentFarmer != null
 
@@ -25,7 +43,12 @@ object UserSession {
         currentFarmer = farmer
     }
 
+    fun setHarvest(declaration: HarvestDeclaration) {
+        activeHarvest = declaration
+    }
+
     fun logout() {
         currentFarmer = null
+        activeHarvest = null
     }
 }

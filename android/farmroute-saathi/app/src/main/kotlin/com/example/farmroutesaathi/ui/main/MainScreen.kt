@@ -36,6 +36,7 @@ enum class RoleTab(val labelEn: String, val labelKn: String, val icon: String) {
 fun MainScreen(
     onItemClick: (NavKey) -> Unit = {},
     onLogout: (() -> Unit)? = null,
+    onDeclareHarvestClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isKannada by remember { mutableStateOf(false) }
@@ -45,6 +46,7 @@ fun MainScreen(
     var lastApiResponse by remember { mutableStateOf("No checkpoint executed yet. Click 'Demo Reset' to initialize.") }
     var isLoading by remember { mutableStateOf(false) }
     var voiceState by remember { mutableStateOf(SaathiVoiceState.IDLE) }
+    var showVoiceAssistantDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
@@ -61,7 +63,9 @@ fun MainScreen(
                     backendStatus = backendStatus,
                     onLanguageToggle = { isKannada = !isKannada },
                     onThemeToggle = { isDarkTheme = !isDarkTheme },
-                    onLogout = onLogout
+                    onLogout = onLogout,
+                    onHarvestClick = { onDeclareHarvestClick?.invoke() },
+                    onVoiceAssistantClick = { showVoiceAssistantDialog = true }
                 )
             },
             floatingActionButton = {
@@ -69,20 +73,31 @@ fun MainScreen(
                     isKannada = isKannada,
                     voiceState = voiceState,
                     onVoiceFabClick = {
-                        scope.launch {
-                            voiceState = SaathiVoiceState.LISTENING
-                            delay(1800)
-                            voiceState = SaathiVoiceState.PROCESSING
-                            delay(1200)
-                            voiceState = SaathiVoiceState.IDLE
-                            lastApiResponse = if (isKannada) 
-                                "ಧ್ವನಿ ಗುರುತಿಸುವಿಕೆ (Sarvam AI): '100 ಕೆಜಿ ಟೊಮ್ಯಾಟೊ ನೋಂದಾಯಿಸಲಾಗಿದೆ' (Lot FR-KLR-00251)"
-                                else "Voice Transcription (Sarvam AI Saaras): 'Registered 100 kg Tomato' (Lot FR-KLR-00251)"
-                        }
+                        showVoiceAssistantDialog = true
                     }
                 )
             }
         ) { innerPadding ->
+            if (showVoiceAssistantDialog) {
+                com.example.farmroutesaathi.ui.components.SarvamVoiceAssistantDialog(
+                    isKannada = isKannada,
+                    onDismiss = { showVoiceAssistantDialog = false },
+                    onNavigateAction = { act ->
+                        when (act) {
+                            "MARKETPLACE" -> selectedTab = RoleTab.BUYER
+                            "WEATHER" -> selectedTab = RoleTab.FARMER
+                            "COLD_STORAGE" -> selectedTab = RoleTab.FARMER
+                            "DEMO_RESET" -> {
+                                scope.launch {
+                                    ApiClient.postDemoReset()
+                                    lastApiResponse = "Demo scenario reset via Voice AI."
+                                }
+                            }
+                            "HARVEST" -> onDeclareHarvestClick?.invoke()
+                        }
+                    }
+                )
+            }
             Column(
                 modifier = modifier
                     .fillMaxSize()

@@ -30,8 +30,12 @@ fun KisanTopBar(
     onLanguageToggle: () -> Unit,
     onThemeToggle: () -> Unit,
     onLogout: (() -> Unit)? = null,
+    onHarvestClick: (() -> Unit)? = null,
+    onVoiceAssistantClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    var showInternalVoiceDialog by remember { mutableStateOf(false) }
+
     val gradientBrush = if (isDarkTheme) {
         Brush.horizontalGradient(listOf(ForestGreenDeep, Color(0xFF163824), OledBackgroundDark))
     } else {
@@ -39,6 +43,8 @@ fun KisanTopBar(
     }
 
     val currentFarmer = UserSession.currentFarmer
+    val activeHarvest = UserSession.activeHarvest
+    val activeHarvestId = UserSession.activeHarvestId
 
     Surface(
         modifier = modifier
@@ -55,9 +61,9 @@ fun KisanTopBar(
                 .fillMaxWidth()
                 .background(gradientBrush)
                 .statusBarsPadding()
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 14.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 12.dp)
         ) {
-            // Main Branding & Action Bar
+            // Main Branding & Top-Right Interactive Actions
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -67,15 +73,15 @@ fun KisanTopBar(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
                         shape = CircleShape,
                         color = Color.White.copy(alpha = 0.20f),
-                        modifier = Modifier.size(40.dp)
+                        modifier = Modifier.size(38.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = "🌱", fontSize = 20.sp)
+                            Text(text = "🌱", fontSize = 18.sp)
                         }
                     }
 
@@ -87,72 +93,114 @@ fun KisanTopBar(
                         ) { kn ->
                             Text(
                                 text = if (kn) "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ" else "FarmRoute Saathi",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.2.sp
                             )
                         }
                         Text(
                             text = if (isKannada) "ರೈತ-ಮೊದಲ ಲಿವಿಂಗ್ ಇಂಟೆಲಿಜೆನ್ಸ್" else "Living Intelligence Virtual FPO",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 11.sp
+                            fontSize = 10.sp
                         )
                     }
                 }
 
-                // Interactive Controls (Language Switcher + Theme Toggle)
+                // ==========================================
+                // TOP RIGHT ACTION GROUP (HARVEST ID + VOICE + LANG + THEME)
+                // ==========================================
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // UNIQUE HARVEST ID BADGE (PROMINENT TOP-RIGHT)
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = HarvestGold,
+                        shadowElevation = 3.dp,
+                        border = BorderStroke(1.dp, Color(0xFFB45309)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .clickable { onHarvestClick?.invoke() }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Text("🌾", fontSize = 11.sp)
+                            Text(
+                                text = activeHarvestId,
+                                color = ForestGreenDeep,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+
+                    // UNIVERSAL SARVAM STT MIC BUTTON
+                    Surface(
+                        shape = CircleShape,
+                        color = HarvestGold,
+                        shadowElevation = 3.dp,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                if (onVoiceAssistantClick != null) {
+                                    onVoiceAssistantClick()
+                                } else {
+                                    showInternalVoiceDialog = true
+                                }
+                            }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🎙️", fontSize = 16.sp)
+                        }
+                    }
+
                     // Theme Switch Pill
                     Surface(
                         shape = CircleShape,
                         color = Color.White.copy(alpha = 0.20f),
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(34.dp)
                             .clip(CircleShape)
                             .clickable { onThemeToggle() }
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text(
                                 text = if (isDarkTheme) "🌙" else "☀️",
-                                fontSize = 16.sp
+                                fontSize = 14.sp
                             )
                         }
                     }
 
                     // High-Visibility Language Switcher Pill
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = HarvestGold,
-                        shadowElevation = 2.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.22f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .clickable { onLanguageToggle() }
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
-                        ) {
-                            Text("🌐", fontSize = 12.sp)
-                            Text(
-                                text = if (isKannada) "ಕನ್ನಡ (KN)" else "English (EN)",
-                                color = Color(0xFF1E293B),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        Text(
+                            text = if (isKannada) "KN" else "EN",
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Sub-bar: Server Status Pill & Farmer Session / Logout
+            // Sub-bar: Server Status Pill & Active Harvest Lot Brief
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -160,48 +208,64 @@ fun KisanTopBar(
             ) {
                 // Live backend connectivity badge
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = Color.Black.copy(alpha = 0.28f)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(6.dp)
                                 .background(Color(0xFF4ADE80), CircleShape)
                         )
                         Text(
                             text = backendStatus,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             color = Color.White,
                             fontWeight = FontWeight.Medium
                         )
                     }
                 }
 
-                // Official Prototype Compliance Label
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = Color.White.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
-                ) {
-                    Text(
-                        text = "SIMULATED PROTOTYPE",
-                        color = HarvestGold,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                // Active Harvest Declaration Summary Chip
+                if (activeHarvest != null) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.30f)),
+                        modifier = Modifier.clickable { onHarvestClick?.invoke() }
+                    ) {
+                        Text(
+                            text = "${activeHarvest.crop} (${activeHarvest.quantityKg.toInt()}kg) • ${if (activeHarvest.sellImmediately) "⚡ Immediate" else "❄️ Cold Storage"}",
+                            color = HarvestGold,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                } else {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
+                    ) {
+                        Text(
+                            text = "SIMULATED PROTOTYPE",
+                            color = HarvestGold,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
                 }
             }
 
             // Farmer Profile & Logout Row (if logged in)
             if (currentFarmer != null) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -211,17 +275,13 @@ fun KisanTopBar(
                         shape = RoundedCornerShape(10.dp),
                         color = Color.White.copy(alpha = 0.14f)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        ) {
-                            Text(
-                                text = "👤 ${currentFarmer.name} (${currentFarmer.district})",
-                                fontSize = 11.sp,
-                                color = Color.White,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+                        Text(
+                            text = "👤 ${currentFarmer.name} (${currentFarmer.district})",
+                            fontSize = 10.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                        )
                     }
 
                     if (onLogout != null) {
@@ -233,15 +293,23 @@ fun KisanTopBar(
                         ) {
                             Text(
                                 text = if (isKannada) "🚪 ನಿರ್ಗಮಿಸಿ" else "🚪 Logout",
-                                fontSize = 11.sp,
+                                fontSize = 10.sp,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    // App-Wide Voice Assistant Dialog
+    if (showInternalVoiceDialog) {
+        SarvamVoiceAssistantDialog(
+            isKannada = isKannada,
+            onDismiss = { showInternalVoiceDialog = false }
+        )
     }
 }

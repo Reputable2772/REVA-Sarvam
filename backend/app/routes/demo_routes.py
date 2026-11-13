@@ -28,8 +28,11 @@ def reset_demo_scenario(db: Session = Depends(get_db)):
             farmer_id=f["farmer_id"],
             name=f["name"],
             village=f["village"],
-            district=f["district"],
-            phone=f["phone"]
+            district=f.get("district", "Kolar"),
+            state=f.get("state", "Karnataka"),
+            pincode=f.get("pincode", "563101"),
+            phone=f["phone"],
+            mpin_hash=f.get("mpin_hash", "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4")
         ))
 
     # 2. Seed 6 Harvest Lots (200kg each = 1,200kg total)

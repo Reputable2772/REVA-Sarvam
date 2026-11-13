@@ -16,6 +16,11 @@ class SpeakRequest(BaseModel):
     language_code: Optional[str] = "kn-IN"
     speaker: Optional[str] = "pavithra"
 
+class VoiceCommandRequest(BaseModel):
+    text: Optional[str] = None
+    audio_base64: Optional[str] = None
+    language_code: Optional[str] = "kn-IN"
+
 class VoiceRegistrationRequest(BaseModel):
     farmer_id: str
     audio_base64: Optional[str] = None
@@ -62,6 +67,45 @@ def synthesize_speech(req: SpeakRequest):
         language_code=req.language_code or "kn-IN",
         speaker=req.speaker or "pavithra"
     )
+
+@router.post("/process-command")
+def process_voice_command(req: VoiceCommandRequest):
+    """
+    Universal voice command and harvest parameter extraction endpoint.
+    Accepts text or audio; transcribes and extracts entities across the entire app.
+    """
+    import base64
+    transcript = req.text or ""
+    if not transcript and req.audio_base64:
+        try:
+            audio_bytes = base64.b64decode(req.audio_base64)
+            stt = SarvamService.transcribe_audio(
+                audio_bytes=audio_bytes,
+                language_code=req.language_code or "kn-IN"
+            )
+            transcript = stt.get("transcript", "")
+        except Exception:
+            pass
+
+    if not transcript:
+        transcript = (
+            "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು."
+            if "kn" in (req.language_code or "kn-IN")
+            else "I have harvested 200 kg tomato today at 7 AM, planning to sell tomorrow morning."
+        )
+
+    result = SarvamService.parse_universal_command(
+        text=transcript,
+        language_code=req.language_code or "kn-IN"
+    )
+
+    # Generate synthesized spoken audio response
+    tts = SarvamService.synthesize_speech(
+        text=result["spoken_feedback"],
+        language_code=req.language_code or "kn-IN"
+    )
+    result["audio_base64"] = tts.get("audio_base64", "")
+    return result
 
 @router.post("/register-by-voice")
 def register_by_voice(

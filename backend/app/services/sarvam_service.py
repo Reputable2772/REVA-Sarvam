@@ -219,48 +219,136 @@ class SarvamService:
         # Default entities
         crop = "Tomato"
         variety = "Hybrid Red"
-        quantity_kg = 500.0
+        quantity_kg = 200.0
         quality_grade = "Grade A"
         village = "Mulbagal"
+        harvest_date = "2026-11-13"
+        harvest_time = "07:00 AM"
+        expected_date_time = "2026-11-14 09:00 AM"
+        sell_immediately = True
+        fields_detected = []
 
-        # Regex for quantity
-        # Matches numbers like 800, 500 followed by kg/quintal/ton or kannada ಕೆಜಿ
-        qty_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:kg|kgs|ಕೆಜಿ|quintal|ton)?", text, re.IGNORECASE)
-        if qty_match:
-            val = float(qty_match.group(1))
-            if "quintal" in text.lower():
+        # Regex for quantity: prioritize explicit weight unit
+        qty_unit_match = re.search(r"(\d+(?:\.\d+)?)\s*(kg|kgs|ಕೆಜಿ|quintal|ton|ಕ್ವಿಂಟಾಲ್|ಟನ್)", text, re.IGNORECASE)
+        if qty_unit_match:
+            val = float(qty_unit_match.group(1))
+            unit = qty_unit_match.group(2).lower()
+            if "quintal" in unit or "ಕ್ವಿಂಟಾಲ್" in unit:
                 quantity_kg = val * 100.0
-            elif "ton" in text.lower():
+            elif "ton" in unit or "ಟನ್" in unit:
                 quantity_kg = val * 1000.0
             else:
                 quantity_kg = val
+            fields_detected.append("quantity_kg")
+        else:
+            # Standalone number not followed by time units
+            qty_fallback = re.search(r"\b(\d{2,5}(?:\.\d+)?)\b(?!\s*(?:am|pm|ಗಂಟೆ|days|hours))", text, re.IGNORECASE)
+            if qty_fallback:
+                quantity_kg = float(qty_fallback.group(1))
+                fields_detected.append("quantity_kg")
 
         # Grade detection
         if re.search(r"grade\s*b|ಗ್ರೇಡ್\s*ಬಿ", text, re.IGNORECASE):
             quality_grade = "Grade B"
+            fields_detected.append("quality_grade")
         elif re.search(r"grade\s*c|ಗ್ರೇಡ್\s*ಸಿ", text, re.IGNORECASE):
             quality_grade = "Grade C"
-        else:
+            fields_detected.append("quality_grade")
+        elif re.search(r"grade\s*a|ಗ್ರೇಡ್\s*ಎ", text, re.IGNORECASE):
             quality_grade = "Grade A"
+            fields_detected.append("quality_grade")
 
         # Crop detection
         if re.search(r"onion|ಈರುಳ್ಳಿ", text, re.IGNORECASE):
             crop = "Onion"
             variety = "Nasik Red"
+            fields_detected.append("crop")
         elif re.search(r"potato|ಆಲೂಗಡ್ಡೆ", text, re.IGNORECASE):
             crop = "Potato"
             variety = "Jyoti"
-        else:
+            fields_detected.append("crop")
+        elif re.search(r"cabbage|ಎಲೆಕೋಸು", text, re.IGNORECASE):
+            crop = "Cabbage"
+            variety = "Green Express"
+            fields_detected.append("crop")
+        elif re.search(r"carrot|ಕ್ಯಾರೆಟ್", text, re.IGNORECASE):
+            crop = "Carrot"
+            variety = "Pusa Rudhira"
+            fields_detected.append("crop")
+        elif re.search(r"chilli|ಮೆಣಸಿನಕಾಯಿ", text, re.IGNORECASE):
+            crop = "Chilli"
+            variety = "Guntur Hot"
+            fields_detected.append("crop")
+        elif re.search(r"tomato|ಟೊಮೆಟೊ", text, re.IGNORECASE):
             crop = "Tomato"
             variety = "Hybrid Red"
+            fields_detected.append("crop")
+
+        # Harvest Date detection
+        if re.search(r"today|ಇಂದು|ಈ ದಿನ", text, re.IGNORECASE):
+            harvest_date = "2026-11-13"
+            fields_detected.append("harvest_date")
+        elif re.search(r"yesterday|ನಿನ್ನೆ", text, re.IGNORECASE):
+            harvest_date = "2026-11-12"
+            fields_detected.append("harvest_date")
+        elif re.search(r"tomorrow|ನಾಳೆ", text, re.IGNORECASE):
+            harvest_date = "2026-11-14"
+            fields_detected.append("harvest_date")
+
+        date_match = re.search(r"\b(202\d-\d{2}-\d{2})\b", text)
+        if date_match:
+            harvest_date = date_match.group(1)
+            fields_detected.append("harvest_date")
+
+        # Harvest Time detection
+        time_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|ಗಂಟೆ)", text, re.IGNORECASE)
+        if time_match:
+            hour = int(time_match.group(1))
+            minute = time_match.group(2) or "00"
+            ampm = (time_match.group(3) or "").upper()
+            if "ಗಂಟೆ" in ampm:
+                ampm = "AM" if ("ಬೆಳಿಗ್ಗೆ" in text or hour < 12) else "PM"
+            harvest_time = f"{hour:02d}:{minute} {ampm}"
+            fields_detected.append("harvest_time")
+        elif re.search(r"morning|ಬೆಳಿಗ್ಗೆ", text, re.IGNORECASE):
+            harvest_time = "07:00 AM"
+            fields_detected.append("harvest_time")
+        elif re.search(r"afternoon|ಮಧ್ಯಾಹ್ನ", text, re.IGNORECASE):
+            harvest_time = "01:30 PM"
+            fields_detected.append("harvest_time")
+        elif re.search(r"evening|ಸಂಜೆ", text, re.IGNORECASE):
+            harvest_time = "05:30 PM"
+            fields_detected.append("harvest_time")
+
+        # Expected Date/Time detection
+        if re.search(r"tomorrow morning|ನಾಳೆ ಬೆಳಿಗ್ಗೆ", text, re.IGNORECASE):
+            expected_date_time = "2026-11-14 09:00 AM"
+            fields_detected.append("expected_date_time")
+        elif re.search(r"tomorrow evening|ನಾಳೆ ಸಂಜೆ", text, re.IGNORECASE):
+            expected_date_time = "2026-11-14 05:00 PM"
+            fields_detected.append("expected_date_time")
+        elif re.search(r"today evening|ಇಂದು ಸಂಜೆ", text, re.IGNORECASE):
+            expected_date_time = "2026-11-13 06:00 PM"
+            fields_detected.append("expected_date_time")
+
+        # Sell immediately vs Cold storage
+        if re.search(r"cold storage|store|ಶೀತಲ|ಇಲ್ಲ|hold|later", text, re.IGNORECASE):
+            sell_immediately = False
+            fields_detected.append("sell_immediately")
+        elif re.search(r"immediately|now|direct|ಮಾರಾಟ|ಈಗಲೇ|ಹೌದು|yes|today", text, re.IGNORECASE):
+            sell_immediately = True
+            fields_detected.append("sell_immediately")
 
         # Village detection
         if re.search(r"bangarpet|ಬಂಗಾರಪೇಟೆ", text, re.IGNORECASE):
             village = "Bangarpet"
+            fields_detected.append("village")
         elif re.search(r"malur|ಮಾಲೂರು", text, re.IGNORECASE):
             village = "Malur"
+            fields_detected.append("village")
         elif re.search(r"kolar|ಕೋಲಾರ", text, re.IGNORECASE):
             village = "Kolar"
+            fields_detected.append("village")
         else:
             village = "Mulbagal"
 
@@ -271,8 +359,68 @@ class SarvamService:
                 "variety": variety,
                 "quantity_kg": quantity_kg,
                 "quality_grade": quality_grade,
-                "village": village
+                "harvest_date": harvest_date,
+                "harvest_time": harvest_time,
+                "expected_date_time": expected_date_time,
+                "sell_immediately": sell_immediately,
+                "village": village,
+                "fields_detected": fields_detected
             },
             "model": "sarvam_heuristic_parser",
             "is_live_api": False
+        }
+
+    @classmethod
+    def parse_universal_command(cls, text: str, language_code: str = "kn-IN") -> Dict[str, Any]:
+        """
+        Universal app-wide voice command interpreter.
+        Enables speech understanding throughout the entire application.
+        """
+        is_kn = "kn" in language_code.lower() or any("\u0C80" <= c <= "\u0CFF" for c in text)
+        entities_result = cls.extract_harvest_entities(text)
+        entities = entities_result.get("extracted", {})
+
+        action = "UPDATE_HARVEST"
+        if re.search(r"rate|price|mandi|ದರ|ಬೆಲೆ|ಮಾರುಕಟ್ಟೆ", text, re.IGNORECASE):
+            action = "NAVIGATE_MARKETPLACE"
+            msg_en = "Navigating to Live APMC & Marketplace Rates."
+            msg_kn = "ಲೈವ್ ಮಾರುಕಟ್ಟೆ ಮತ್ತು ಎಪಿಎಂಸಿ ದರಗಳಿಗೆ ನ್ಯಾವಿಗೇಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"weather|rain|forecast|ಮಳೆ|ಹವಾಮಾನ", text, re.IGNORECASE):
+            action = "NAVIGATE_WEATHER"
+            msg_en = "Opening 3-Day Micro-Climate Weather Advisory."
+            msg_kn = "3-ದಿನಗಳ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆಯನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"cold storage|warehouse|ಶೀತಲ", text, re.IGNORECASE):
+            action = "NAVIGATE_COLD_STORAGE"
+            msg_en = "Opening Cold Storage Facility Discovery."
+            msg_kn = "ಶೀತಲ ಶೇಖರಣಾ ಸೌಲಭ್ಯಗಳ ವಿಭಾಗವನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"reset|ಮರುಹೊಂದಿಸಿ", text, re.IGNORECASE):
+            action = "DEMO_RESET"
+            msg_en = "Resetting demo scenario to baseline."
+            msg_kn = "ಡೆಮೊ ಸನ್ನಿವೇಶವನ್ನು ಮರುಹೊಂದಿಸಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"logout|ನಿರ್ಗಮಿಸಿ", text, re.IGNORECASE):
+            action = "LOGOUT"
+            msg_en = "Logging out of Kisan account."
+            msg_kn = "ಖಾತೆಯಿಂದ ನಿರ್ಗಮಿಸಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"confirm|submit|declare|ದೃಢೀಕರಿಸಿ|ಘೋಷಿಸಿ", text, re.IGNORECASE):
+            action = "SUBMIT_HARVEST"
+            msg_en = f"Confirming harvest declaration for {entities.get('quantity_kg', 200)}kg {entities.get('crop', 'Tomato')}."
+            msg_kn = f"{entities.get('quantity_kg', 200)} ಕೆಜಿ {entities.get('crop', 'ಟೊಮೆಟೊ')} ಕೊಯ್ಲು ದೃಢೀಕರಿಸಲಾಗುತ್ತಿದೆ."
+        else:
+            action = "UPDATE_HARVEST"
+            crop = entities.get('crop', 'Tomato')
+            qty = entities.get('quantity_kg', 200)
+            date = entities.get('harvest_date', '2026-11-13')
+            time = entities.get('harvest_time', '07:00 AM')
+            msg_en = f"Updated: {qty}kg {crop}, Harvest: {date} at {time}."
+            msg_kn = f"ನವೀಕರಿಸಲಾಗಿದೆ: {qty} ಕೆಜಿ {crop}, ಕೊಯ್ಲು: {date} {time}."
+
+        return {
+            "success": True,
+            "transcript": text,
+            "action": action,
+            "entities": entities,
+            "fields_updated": entities.get("fields_detected", []),
+            "message_en": msg_en,
+            "message_kn": msg_kn,
+            "spoken_feedback": msg_kn if is_kn else msg_en
         }

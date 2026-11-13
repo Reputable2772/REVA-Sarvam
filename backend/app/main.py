@@ -43,7 +43,7 @@ def health_check():
         "database": "SQLite (WAL mode)",
         "modules": [
             "farmer", "logistics", "data_importer", "demo_checkpoints",
-            "sarvam_voice_ai", "auth_otp", "weather_wttr_in",
+            "sarvam_voice_ai", "auth_mobile_mpin", "weather_wttr_in",
             "cold_storage_phase14", "offline_sync_phase15", "fcm_notifications_phase17"
         ],
         "timestamp": datetime.now(timezone.utc).isoformat()

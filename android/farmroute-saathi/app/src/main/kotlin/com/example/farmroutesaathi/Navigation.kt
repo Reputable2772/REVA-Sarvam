@@ -6,6 +6,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.auth.LoginScreen
+import com.example.farmroutesaathi.ui.harvest.HarvestQuestionnaireScreen
 import com.example.farmroutesaathi.ui.main.MainScreen
 
 @Composable
@@ -22,6 +23,18 @@ fun MainNavigation() {
           LoginScreen(
             onLoginSuccess = {
               backStack.clear()
+              backStack.add(HarvestQuestionnaire)
+            }
+          )
+        }
+        entry<HarvestQuestionnaire> {
+          HarvestQuestionnaireScreen(
+            onHarvestSubmitted = { harvestId ->
+              backStack.clear()
+              backStack.add(Main)
+            },
+            onSkip = {
+              backStack.clear()
               backStack.add(Main)
             }
           )
@@ -29,6 +42,7 @@ fun MainNavigation() {
         entry<Main> {
           MainScreen(
             onItemClick = { navKey -> backStack.add(navKey) },
+            onDeclareHarvestClick = { backStack.add(HarvestQuestionnaire) },
             onLogout = {
               UserSession.logout()
               backStack.clear()

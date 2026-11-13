@@ -1,131 +1,187 @@
-import random
-import os
+import hashlib
+import uuid
 import re
-from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 
 from backend.app.database import get_db
-from backend.app.models.models import EmailOtpRecord, Farmer, AuditLog
+from backend.app.models.models import Farmer, AuditLog
+from backend.app.services.geo_dataset_service import GeoDatasetService
 
-router = APIRouter(prefix="/auth", tags=["Email OTP Authentication"])
+router = APIRouter(prefix="/auth", tags=["Mobile & MPIN Authentication"])
 
-EMAIL_REGEX = re.compile(r"^[\w\.-]+@[\w\.-]+\.\w+$")
+SALT = "farmroute_kisan_secure_salt"
 
-class RequestOtpInput(BaseModel):
-    email: str = Field(..., description="Farmer or buyer email address")
-    role: Optional[str] = "farmer"
+def hash_mpin(mpin: str) -> str:
+    return hashlib.sha256(f"{SALT}_{mpin}".encode("utf-8")).hexdigest()
 
-class VerifyOtpInput(BaseModel):
-    email: str
-    otp_code: str
+def verify_mpin(mpin: str, mpin_hash: str) -> bool:
+    return hash_mpin(mpin) == mpin_hash
 
-@router.post("/request-otp")
-def request_otp(req: RequestOtpInput, db: Session = Depends(get_db)):
-    """
-    Generates and dispatches a 6-digit OTP to the specified email address.
-    Valid for 5 minutes with attempt throttling.
-    """
-    if not EMAIL_REGEX.match(req.email.strip()):
-        raise HTTPException(status_code=400, detail="Invalid email format.")
+def clean_phone_number(phone: str) -> str:
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    return digits
 
-    email_clean = req.email.strip().lower()
-    # Generate 6-digit secure numeric OTP
-    otp_code = f"{random.randint(100000, 999999)}"
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(minutes=5)
+class CheckAccountRequest(BaseModel):
+    phone: str = Field(..., description="10-digit mobile number")
 
-    # Invalidate previous unverified OTPs for this email
-    db.query(EmailOtpRecord).filter(
-        EmailOtpRecord.email == email_clean,
-        EmailOtpRecord.verified == False
-    ).delete()
+class LoginRequest(BaseModel):
+    phone: str = Field(..., description="10-digit mobile number")
+    mpin: str = Field(..., min_length=4, max_length=6, description="4 to 6 digit MPIN")
 
-    record = EmailOtpRecord(
-        email=email_clean,
-        otp_code=otp_code,
-        created_at=now,
-        expires_at=expires_at,
-        verified=False,
-        attempts=0
-    )
-    db.add(record)
+class RegisterRequest(BaseModel):
+    phone: str = Field(..., description="10-digit mobile number")
+    mpin: str = Field(..., min_length=4, max_length=6, description="4 to 6 digit MPIN")
+    name: str = Field(..., min_length=2, max_length=100, description="Farmer full name")
+    state: str = Field(..., description="State name from AGMARKNET dataset")
+    district: str = Field(..., description="District name in state from AGMARKNET dataset")
+    pincode: str = Field(..., min_length=6, max_length=6, description="6-digit postal code")
 
-    # Audit log
-    log = AuditLog(
-        action="OTP_REQUESTED",
-        actor_role=req.role.upper() if req.role else "USER",
-        actor_id=email_clean,
-        details=f"Email OTP generated, expires at {expires_at.isoformat()}"
-    )
-    db.add(log)
-    db.commit()
-
-    # For hackathon/demo environment, include dev_otp in response
-    return {
-        "success": True,
-        "message": f"Verification code sent to {email_clean}",
-        "expires_in_seconds": 300,
-        "dev_otp": otp_code # Demo convenience for instant testing
-    }
-
-@router.post("/verify-otp")
-def verify_otp(req: VerifyOtpInput, db: Session = Depends(get_db)):
-    """
-    Verifies the email OTP. Enforces expiration and max 3 attempts limit.
-    """
-    email_clean = req.email.strip().lower()
-    record = db.query(EmailOtpRecord).filter(
-        EmailOtpRecord.email == email_clean,
-        EmailOtpRecord.verified == False
-    ).order_by(EmailOtpRecord.id.desc()).first()
-
-    if not record:
-        raise HTTPException(status_code=400, detail="No active OTP found. Please request a new code.")
-
-    # Check expiration
-    now = datetime.now(timezone.utc)
-    record_expires = record.expires_at
-    if record_expires.tzinfo is None:
-        record_expires = record_expires.replace(tzinfo=timezone.utc)
-
-    if now > record_expires:
-        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
-
-    # Check attempts
-    if record.attempts >= 3:
-        raise HTTPException(status_code=429, detail="Too many invalid attempts. Request a new OTP.")
-
-    if record.otp_code != req.otp_code.strip():
-        record.attempts += 1
-        db.commit()
-        raise HTTPException(status_code=400, detail=f"Invalid OTP code. {3 - record.attempts} attempts remaining.")
-
-    # Success
-    record.verified = True
+@router.post("/check-account")
+def check_account(req: CheckAccountRequest, db: Session = Depends(get_db)):
+    phone = clean_phone_number(req.phone)
+    if not phone or len(phone) < 10:
+        raise HTTPException(status_code=400, detail="Invalid phone number format. Must contain 10 digits.")
     
-    # Check if existing farmer profile or create default
-    farmer = db.query(Farmer).filter(Farmer.phone == req.email).first()
-    farmer_id = farmer.farmer_id if farmer else f"FR-KLR-{req.email.split('@')[0].upper()[:6]}"
+    farmer = db.query(Farmer).filter(Farmer.phone == phone).first()
+    if not farmer:
+        farmer = db.query(Farmer).filter(Farmer.phone.endswith(phone)).first()
 
-    log = AuditLog(
-        action="OTP_VERIFIED",
+    if farmer:
+        return {
+            "exists": True,
+            "phone": phone,
+            "name": farmer.name,
+            "district": farmer.district,
+            "state": farmer.state,
+            "pincode": farmer.pincode
+        }
+    return {
+        "exists": False,
+        "phone": phone,
+        "name": "",
+        "district": "",
+        "state": "",
+        "pincode": ""
+    }
+
+@router.post("/login")
+def login(req: LoginRequest, db: Session = Depends(get_db)):
+    phone = clean_phone_number(req.phone)
+    farmer = db.query(Farmer).filter(Farmer.phone == phone).first()
+    if not farmer:
+        farmer = db.query(Farmer).filter(Farmer.phone.endswith(phone)).first()
+    
+    if not farmer:
+        raise HTTPException(
+            status_code=404,
+            detail="Account does not exist. Please register first."
+        )
+
+    if not verify_mpin(req.mpin, farmer.mpin_hash) and farmer.mpin_hash != req.mpin:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid MPIN. Please try again."
+        )
+
+    token = f"fr-token-{phone}-{uuid.uuid4().hex[:12]}"
+    
+    db.add(AuditLog(
+        action="FARMER_LOGGED_IN",
         actor_role="FARMER",
-        actor_id=req.email,
-        details=f"Email authenticated successfully. Bound to farmer_id {farmer_id}"
-    )
-    db.add(log)
+        actor_id=farmer.farmer_id,
+        details=f"Successful MPIN authentication for {farmer.name} ({phone})"
+    ))
     db.commit()
 
-    # Generate session/token string
-    session_token = f"FR_SESSION_{req.email}_{int(now.timestamp())}"
+    return {
+        "status": "authenticated",
+        "token": token,
+        "farmer": {
+            "farmer_id": farmer.farmer_id,
+            "name": farmer.name,
+            "phone": phone,
+            "district": farmer.district,
+            "state": farmer.state,
+            "pincode": farmer.pincode
+        }
+    }
+
+@router.post("/register")
+def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    phone = clean_phone_number(req.phone)
+    if len(phone) != 10 or not phone.isdigit():
+        raise HTTPException(status_code=400, detail="Phone number must be exactly 10 digits.")
+
+    if not req.mpin.isdigit() or len(req.mpin) < 4:
+        raise HTTPException(status_code=400, detail="MPIN must be 4 to 6 numeric digits.")
+
+    # Spatial verification using AGMARKNET dataset
+    is_valid, err_msg = GeoDatasetService.validate_location(
+        state=req.state,
+        district=req.district,
+        pincode=req.pincode
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=err_msg)
+
+    # Check if account already exists
+    existing = db.query(Farmer).filter(Farmer.phone == phone).first()
+    if existing:
+        existing.name = req.name.strip()
+        existing.state = req.state.strip()
+        existing.district = req.district.strip()
+        existing.pincode = req.pincode.strip()
+        existing.mpin_hash = hash_mpin(req.mpin)
+        db.commit()
+        farmer = existing
+    else:
+        dist_code = req.district[:3].upper() if len(req.district) >= 3 else "KLR"
+        farmer_id = f"FR-{dist_code}-{phone[-6:]}"
+        farmer = Farmer(
+            farmer_id=farmer_id,
+            phone=phone,
+            name=req.name.strip(),
+            village="",
+            district=req.district.strip(),
+            state=req.state.strip(),
+            pincode=req.pincode.strip(),
+            mpin_hash=hash_mpin(req.mpin)
+        )
+        db.add(farmer)
+        db.commit()
+
+    token = f"fr-token-{phone}-{uuid.uuid4().hex[:12]}"
+    
+    db.add(AuditLog(
+        action="FARMER_REGISTERED",
+        actor_role="FARMER",
+        actor_id=farmer.farmer_id,
+        details=f"New farmer onboarding: {farmer.name}, {farmer.district}, {farmer.state} ({farmer.pincode})"
+    ))
+    db.commit()
 
     return {
-        "success": True,
-        "message": "Authentication successful",
-        "email": req.email,
-        "farmer_id": farmer_id,
-        "session_token": session_token
+        "status": "registered",
+        "token": token,
+        "farmer": {
+            "farmer_id": farmer.farmer_id,
+            "name": farmer.name,
+            "phone": phone,
+            "district": farmer.district,
+            "state": farmer.state,
+            "pincode": farmer.pincode
+        }
     }
+
+@router.get("/geo/states", response_model=List[str])
+def get_states():
+    return GeoDatasetService.get_valid_states()
+
+@router.get("/geo/districts", response_model=List[str])
+def get_districts(state: str = Query(..., description="State name")):
+    return GeoDatasetService.get_districts_for_state(state)

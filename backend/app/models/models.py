@@ -7,13 +7,15 @@ class Farmer(Base):
     __tablename__ = "farmers"
 
     farmer_id = Column(String(50), primary_key=True)
+    phone = Column(String(20), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=False)
-    village = Column(String(100), nullable=False)
+    village = Column(String(100), nullable=True, default="")
     district = Column(String(100), nullable=False, default="Kolar")
     state = Column(String(100), nullable=False, default="Karnataka")
+    pincode = Column(String(10), nullable=False, default="563101")
+    mpin_hash = Column(String(128), nullable=False, default="39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4") # Default SHA-256 for '1234'
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    phone = Column(String(20), nullable=False)
     metadata_json = Column(Text, nullable=True, default="{}") # Extensible attributes
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -29,6 +31,9 @@ class HarvestLot(Base):
     quantity_kg = Column(Float, nullable=False)
     quality_grade = Column(String(20), nullable=False, default="Grade A") # Farmer-declared
     harvest_date = Column(String(20), nullable=False)
+    harvest_time = Column(String(50), nullable=True, default="07:00 AM")
+    expected_date_time = Column(String(50), nullable=True, default="2026-11-14 09:00 AM")
+    sell_immediately = Column(Boolean, nullable=False, default=True)
     status = Column(String(30), nullable=False, default="ready_for_sale") # ready_for_sale, pooled, weighed, delivered
     metadata_json = Column(Text, nullable=True, default="{}") # Extensible quality/harvest parameters
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -159,20 +164,6 @@ class AuditLog(Base):
     actor_id = Column(String(50), nullable=False)
     details = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-class EmailOtpRecord(Base):
-    """
-    Email OTP Authentication Model
-    """
-    __tablename__ = "email_otp_records"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    email = Column(String(150), nullable=False, index=True)
-    otp_code = Column(String(10), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, nullable=False)
-    verified = Column(Boolean, default=False)
-    attempts = Column(Integer, default=0)
 
 class ColdStorageFacility(Base):
     """

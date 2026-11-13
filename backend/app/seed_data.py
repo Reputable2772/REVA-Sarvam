@@ -6,42 +6,60 @@ SEED_FARMERS: List[Dict[str, Any]] = [
         "name": "Manjunath Gowda",
         "village": "Mulbagal",
         "district": "Kolar",
-        "phone": "+91 98450 11001"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845012345",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     },
     {
         "farmer_id": "FARMER-02",
-        "name": "Ramesh Reddy",
+        "name": "Venkatamma",
         "village": "Devarayasamudra",
         "district": "Kolar",
-        "phone": "+91 98450 11002"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845012346",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     },
     {
         "farmer_id": "FARMER-03",
-        "name": "Venkatesh Murthy",
+        "name": "Anand Kumar",
         "village": "Bangarpet",
         "district": "Kolar",
-        "phone": "+91 98450 11003"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845012347",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     },
     {
         "farmer_id": "FARMER-04",
-        "name": "Krishnappa Gowda",
+        "name": "Ramesh Babu",
         "village": "Srinivaspur",
         "district": "Kolar",
-        "phone": "+91 98450 11004"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845012348",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     },
     {
         "farmer_id": "FARMER-05",
         "name": "Anjanappa Reddy",
         "village": "Malur",
         "district": "Kolar",
-        "phone": "+91 98450 11005"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845011005",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     },
     {
         "farmer_id": "FARMER-06",
         "name": "Narayanaswamy",
         "village": "Kolar Rural",
         "district": "Kolar",
-        "phone": "+91 98450 11006"
+        "state": "Karnataka",
+        "pincode": "563101",
+        "phone": "9845011006",
+        "mpin_hash": "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4"
     }
 ]
 
