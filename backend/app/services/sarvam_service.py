@@ -172,51 +172,11 @@ class SarvamService:
         }
 
     @classmethod
-    def extract_harvest_entities(cls, text: str) -> Dict[str, Any]:
+    def _extract_heuristic(cls, text: str) -> Dict[str, Any]:
         """
-        Extracts structured crop registration fields from unstructured voice transcript.
-        Fields: crop, variety, quantity_kg, quality_grade, village
+        Robust agricultural NLP heuristic parser.
+        Default entities and regular expression matchers for Kannada & English.
         """
-        api_key = cls.get_api_key()
-
-        if api_key:
-            try:
-                system_prompt = (
-                    "You are an agricultural AI parser. Extract harvest registration details from the farmer statement. "
-                    "Return strict JSON with keys: crop, variety, quantity_kg, quality_grade, village."
-                )
-                payload = {
-                    "model": "sarvam-105b",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text}
-                    ],
-                    "temperature": 0.1
-                }
-                req = urllib.request.Request(
-                    cls.COMPLETIONS_URL,
-                    data=json.dumps(payload).encode(),
-                    headers={
-                        "api-subscription-key": api_key,
-                        "Content-Type": "application/json"
-                    },
-                    method="POST"
-                )
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    res_data = json.loads(response.read().decode())
-                    content = res_data["choices"][0]["message"]["content"]
-                    parsed = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
-                    return {
-                        "success": True,
-                        "extracted": parsed,
-                        "model": "sarvam-105b",
-                        "is_live_api": True
-                    }
-            except Exception:
-                pass
-
-        # Robust agricultural NLP heuristic parser
-        # Default entities
         crop = "Tomato"
         variety = "Hybrid Red"
         quantity_kg = 200.0
@@ -353,19 +313,125 @@ class SarvamService:
             village = "Mulbagal"
 
         return {
+            "crop": crop,
+            "variety": variety,
+            "quantity_kg": quantity_kg,
+            "quality_grade": quality_grade,
+            "harvest_date": harvest_date,
+            "harvest_time": harvest_time,
+            "expected_date_time": expected_date_time,
+            "sell_immediately": sell_immediately,
+            "village": village,
+            "fields_detected": fields_detected
+        }
+
+    @classmethod
+    def extract_harvest_entities(cls, text: str) -> Dict[str, Any]:
+        """
+        Extracts structured crop registration fields from unstructured voice transcript.
+        Fields: crop, variety, quantity_kg, quality_grade, village, harvest_date, harvest_time, expected_date_time, sell_immediately.
+        """
+        api_key = cls.get_api_key()
+        parsed = None
+
+        if api_key:
+            try:
+                system_prompt = (
+                    "You are an agricultural AI parser. Extract harvest registration details from the farmer statement. "
+                    "Return strict JSON with keys: crop, variety, quantity_kg, quality_grade, village, "
+                    "harvest_date (YYYY-MM-DD), harvest_time (e.g. 07:00 AM), expected_date_time, sell_immediately (boolean). "
+                    "Always use standard English names for crops (e.g. Tomato, Onion, Potato, Cabbage, Carrot, Chilli)."
+                )
+                payload = {
+                    "model": "sarvam-105b",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    "temperature": 0.1
+                }
+                req = urllib.request.Request(
+                    cls.COMPLETIONS_URL,
+                    data=json.dumps(payload).encode(),
+                    headers={
+                        "api-subscription-key": api_key,
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    res_data = json.loads(response.read().decode())
+                    content = res_data["choices"][0]["message"]["content"]
+                    parsed = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
+            except Exception:
+                parsed = None
+
+        heuristic = cls._extract_heuristic(text)
+
+        if parsed:
+            # Map Kannada keys if LLM translated them
+            key_mappings = {
+                "ಬೆಳೆ": "crop",
+                "ಪ್ರಕಾರ": "variety",
+                "ತಳಿ": "variety",
+                "ಪ್ರಮಾಣ": "quantity_kg",
+                "ತೂಕ": "quantity_kg",
+                "ಗುಣಮಟ್ಟ": "quality_grade",
+                "ಗ್ರೇಡ್": "quality_grade",
+                "ಗ್ರಾಮ": "village",
+                "ಊರು": "village",
+                "ಸ್ಥಳ": "village",
+                "ಕೊಯ್ಲು_ದಿನಾಂಕ": "harvest_date",
+                "ಕೊಯ್ಲು_ಸಮಯ": "harvest_time",
+                "ಮಾರಾಟ_ಸಮಯ": "expected_date_time",
+                "ತಕ್ಷಣ_ಮಾರಾಟ": "sell_immediately"
+            }
+            normalized = {}
+            for k, v in parsed.items():
+                target_k = key_mappings.get(k, k)
+                normalized[target_k] = v
+
+            # Normalize crop name
+            crop_val = normalized.get("crop")
+            if crop_val:
+                crop_lower = str(crop_val).strip().lower()
+                if "tomat" in crop_lower or "ಟೊಮೆಟೊ" in crop_lower:
+                    normalized["crop"] = "Tomato"
+                elif "onion" in crop_lower or "ಈರುಳ್ಳಿ" in crop_lower:
+                    normalized["crop"] = "Onion"
+                elif "potato" in crop_lower or "ಆಲೂ" in crop_lower:
+                    normalized["crop"] = "Potato"
+                elif "cabbage" in crop_lower or "ಕೋಸು" in crop_lower:
+                    normalized["crop"] = "Cabbage"
+                elif "carrot" in crop_lower or "ಕ್ಯಾರೆಟ್" in crop_lower:
+                    normalized["crop"] = "Carrot"
+                elif "chilli" in crop_lower or "ಮೆಣಸಿನ" in crop_lower:
+                    normalized["crop"] = "Chilli"
+                else:
+                    normalized["crop"] = str(crop_val).title()
+
+            # Normalize quantity
+            if "quantity_kg" in normalized and normalized["quantity_kg"] is not None:
+                try:
+                    normalized["quantity_kg"] = float(normalized["quantity_kg"])
+                except (ValueError, TypeError):
+                    pass
+
+            # Fill in any missing or null fields from heuristic
+            for key, h_val in heuristic.items():
+                if key not in normalized or normalized[key] is None or normalized[key] == "":
+                    normalized[key] = h_val
+
+            return {
+                "success": True,
+                "extracted": normalized,
+                "model": "sarvam-105b",
+                "is_live_api": True
+            }
+
+        return {
             "success": True,
-            "extracted": {
-                "crop": crop,
-                "variety": variety,
-                "quantity_kg": quantity_kg,
-                "quality_grade": quality_grade,
-                "harvest_date": harvest_date,
-                "harvest_time": harvest_time,
-                "expected_date_time": expected_date_time,
-                "sell_immediately": sell_immediately,
-                "village": village,
-                "fields_detected": fields_detected
-            },
+            "extracted": heuristic,
             "model": "sarvam_heuristic_parser",
             "is_live_api": False
         }

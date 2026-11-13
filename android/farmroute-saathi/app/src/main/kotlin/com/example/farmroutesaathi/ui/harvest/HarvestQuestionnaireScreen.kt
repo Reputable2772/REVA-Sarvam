@@ -1,5 +1,6 @@
 package com.example.farmroutesaathi.ui.harvest
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -18,14 +19,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.farmroutesaathi.audio.VoiceRecorder
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.HarvestDeclaration
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 @Composable
 fun HarvestQuestionnaireScreen(
@@ -42,14 +46,156 @@ fun HarvestQuestionnaireScreen(
     var sellImmediately by remember { mutableStateOf(true) }
     var quantityKg by remember { mutableStateOf("200") }
 
-    // Voice / STT State
-    var isListening by remember { mutableStateOf(false) }
+    // Voice / STT Recording State
+    var isRecordingAudio by remember { mutableStateOf(false) }
+    var isUploadingAudio by remember { mutableStateOf(false) }
+    var audioSavedFileName by remember { mutableStateOf<String?>(null) }
     var voiceFeedback by remember { mutableStateOf<String?>(null) }
     var recognizedFields by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var voiceTranscriptInput by remember { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val voiceRecorder = remember { VoiceRecorder(context) }
     val farmer = UserSession.currentFarmer
+
+    fun processSpeechInput(spokenText: String) {
+        if (spokenText.isBlank()) return
+        voiceTranscriptInput = spokenText
+        isUploadingAudio = true
+        scope.launch {
+            try {
+                val res = ApiClient.processVoiceCommand(spokenText, if (isKannada) "kn-IN" else "en-IN")
+                val jsonObj = JSONObject(res)
+                val entities = jsonObj.optJSONObject("entities")
+                if (entities != null) {
+                    if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
+                        val c = entities.getString("crop")
+                        crop = when {
+                            c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
+                            c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
+                            c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
+                            c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
+                            c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
+                            c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
+                            else -> c
+                        }
+                    }
+                    if (entities.has("quantity_kg")) {
+                        val q = entities.optDouble("quantity_kg", 0.0)
+                        if (q > 0) quantityKg = q.toInt().toString()
+                    }
+                    if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
+                        harvestDate = entities.getString("harvest_date")
+                    }
+                    if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
+                        harvestTime = entities.getString("harvest_time")
+                    }
+                    if (entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
+                        expectedDateTime = entities.getString("expected_date_time")
+                    }
+                    if (entities.has("sell_immediately")) {
+                        sellImmediately = entities.getBoolean("sell_immediately")
+                    }
+                }
+                val feedback = jsonObj.optString("spoken_feedback", "")
+                voiceFeedback = if (feedback.isNotBlank()) {
+                    "✓ $feedback"
+                } else {
+                    if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
+                    else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"
+                }
+            } catch (e: Exception) {
+                voiceFeedback = "Voice processing error: ${e.localizedMessage}"
+            } finally {
+                isUploadingAudio = false
+            }
+        }
+    }
+
+    fun toggleAudioRecording() {
+        if (!isRecordingAudio) {
+            try {
+                val recordedFile = voiceRecorder.startRecording()
+                isRecordingAudio = true
+                audioSavedFileName = recordedFile.name
+                voiceFeedback = if (isKannada)
+                    "🔴 ಮೈಕ್ರೊಫೋನ್ ರೆಕಾರ್ಡಿಂಗ್ ಪ್ರಾರಂಭವಾಗಿದೆ... ಮಾತನಾಡಿ (ನಿಲ್ಲಿಸಲು ಮತ್ತೆ ಟ್ಯಾಪ್ ಮಾಡಿ)"
+                else
+                    "🔴 Recording from microphone... Speak now (tap again to stop & send to Sarvam)"
+            } catch (e: Exception) {
+                voiceFeedback = "Microphone error: ${e.localizedMessage}"
+            }
+        } else {
+            val audioFile = voiceRecorder.stopRecording()
+            isRecordingAudio = false
+
+            if (audioFile != null && audioFile.exists() && audioFile.length() > 44) {
+                audioSavedFileName = audioFile.name
+                isUploadingAudio = true
+                voiceFeedback = if (isKannada)
+                    "⏳ ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್ ಉಳಿಸಲಾಗಿದೆ (${audioFile.length() / 1024} KB). ಸರ್ವಂ ಸಾರಸ್ v4 ಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ..."
+                else
+                    "⏳ Audio saved (${audioFile.length() / 1024} KB). Uploading to Sarvam Saaras v4 backend..."
+
+                scope.launch {
+                    try {
+                        val res = ApiClient.uploadVoiceAudio(audioFile, if (isKannada) "kn-IN" else "en-IN")
+                        val jsonObj = JSONObject(res)
+                        val rawTranscript = jsonObj.optString("raw_transcript", "")
+                        if (rawTranscript.isNotBlank()) {
+                            voiceTranscriptInput = rawTranscript
+                        }
+                        val entities = jsonObj.optJSONObject("entities")
+                        if (entities != null) {
+                            if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
+                                val c = entities.getString("crop")
+                                crop = when {
+                                    c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
+                                    c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
+                                    c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
+                                    c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
+                                    c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
+                                    c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
+                                    else -> c
+                                }
+                            }
+                            if (entities.has("quantity_kg")) {
+                                val q = entities.optDouble("quantity_kg", 0.0)
+                                if (q > 0) quantityKg = q.toInt().toString()
+                            }
+                            if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
+                                harvestDate = entities.getString("harvest_date")
+                            }
+                            if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
+                                harvestTime = entities.getString("harvest_time")
+                            }
+                            if (entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
+                                expectedDateTime = entities.getString("expected_date_time")
+                            }
+                            if (entities.has("sell_immediately")) {
+                                sellImmediately = entities.getBoolean("sell_immediately")
+                            }
+                        }
+                        val feedback = jsonObj.optString("spoken_feedback", "")
+                        voiceFeedback = if (feedback.isNotBlank()) {
+                            "✓ $feedback"
+                        } else {
+                            if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
+                            else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"
+                        }
+                    } catch (e: Exception) {
+                        voiceFeedback = "Sarvam upload error: ${e.localizedMessage}"
+                    } finally {
+                        isUploadingAudio = false
+                    }
+                }
+            } else {
+                voiceFeedback = if (isKannada) "ರೆಕಾರ್ಡ್ ಮಾಡಿದ ಆಡಿಯೋ ಫೈಲ್ ಖಾಲಿಯಾಗಿದೆ" else "Recording stopped: no audio recorded"
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -181,64 +327,25 @@ fun HarvestQuestionnaireScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Voice Listening Ripple Button
+                    // Voice Recording Hardware Button (Records audio file and sends to Sarvam STT)
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = if (isListening) HarvestGold.copy(alpha = 0.25f) else ForestGreenDeep.copy(alpha = 0.06f),
+                        color = when {
+                            isRecordingAudio -> Color(0xFFEF4444).copy(alpha = 0.20f)
+                            isUploadingAudio -> HarvestGold.copy(alpha = 0.25f)
+                            else -> ForestGreenDeep.copy(alpha = 0.06f)
+                        },
                         border = BorderStroke(
                             1.5.dp,
-                            if (isListening) HarvestGold else ForestGreenDeep.copy(alpha = 0.3f)
+                            when {
+                                isRecordingAudio -> Color(0xFFEF4444)
+                                isUploadingAudio -> HarvestGold
+                                else -> ForestGreenDeep.copy(alpha = 0.3f)
+                            }
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                isListening = !isListening
-                                if (isListening) {
-                                    scope.launch {
-                                        // Trigger Sarvam STT understanding
-                                        val sampleSpeech = if (isKannada)
-                                            "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
-                                        else
-                                            "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
-
-                                        val res = ApiClient.processVoiceCommand(sampleSpeech, if (isKannada) "kn-IN" else "en-IN")
-                                        isListening = false
-
-                                        // Parse recognized fields and update form
-                                        if (res.contains("\"crop\":")) {
-                                            val c = res.substringAfter("\"crop\":\"").substringBefore("\"")
-                                            if (c.isNotBlank()) crop = c
-                                        }
-                                        if (res.contains("\"quantity_kg\":")) {
-                                            val q = res.substringAfter("\"quantity_kg\":").substringBefore(",")
-                                                .substringBefore("}").trim()
-                                            if (q.toDoubleOrNull() != null) quantityKg = q.toDouble().toInt().toString()
-                                        }
-                                        if (res.contains("\"harvest_date\":")) {
-                                            val hd = res.substringAfter("\"harvest_date\":\"").substringBefore("\"")
-                                            if (hd.isNotBlank()) harvestDate = hd
-                                        }
-                                        if (res.contains("\"harvest_time\":")) {
-                                            val ht = res.substringAfter("\"harvest_time\":\"").substringBefore("\"")
-                                            if (ht.isNotBlank()) harvestTime = ht
-                                        }
-                                        if (res.contains("\"expected_date_time\":")) {
-                                            val ed = res.substringAfter("\"expected_date_time\":\"").substringBefore("\"")
-                                            if (ed.isNotBlank()) expectedDateTime = ed
-                                        }
-                                        if (res.contains("\"sell_immediately\":")) {
-                                            val imm = res.substringAfter("\"sell_immediately\":").substringBefore(",")
-                                                .substringBefore("}").trim().toBoolean()
-                                            sellImmediately = imm
-                                        }
-
-                                        voiceFeedback = if (isKannada)
-                                            "✓ ಗುರುತಿಸಲಾಗಿದೆ: 250 ಕೆಜಿ $crop, ಕೊಯ್ಲು: $harvestDate $harvestTime"
-                                        else
-                                            "✓ Recognized: 250kg $crop, Harvest: $harvestDate $harvestTime"
-                                    }
-                                }
-                            }
+                            .clickable { toggleAudioRecording() }
                     ) {
                         Row(
                             modifier = Modifier
@@ -247,18 +354,32 @@ fun HarvestQuestionnaireScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            Text(if (isListening) "🔊" else "🎙️", fontSize = 20.sp)
+                            Text(
+                                if (isRecordingAudio) "🔴" else if (isUploadingAudio) "⏳" else "🎙️",
+                                fontSize = 20.sp
+                            )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = if (isListening)
-                                    (if (isKannada) "ಆಲಿಸುತ್ತಿದೆ... ಮಾತನಾಡಿ" else "Listening with Sarvam STT...")
-                                else
-                                    (if (isKannada) "ಧ್ವನಿ ಮೂಲಕ ನಮೂದಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap to Speak Harvest Details"),
+                                text = when {
+                                    isRecordingAudio -> if (isKannada) "ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Recording Audio... Tap to Stop & Send"
+                                    isUploadingAudio -> if (isKannada) "ಸರ್ವಂ AI ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ..." else "Sarvam AI Analyzing Audio..."
+                                    else -> if (isKannada) "ಧ್ವನಿ ರೆಕಾರ್ಡ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap to Record & Send Audio to Sarvam"
+                                },
                                 fontWeight = FontWeight.Bold,
-                                color = ForestGreenDeep,
+                                color = if (isRecordingAudio) Color(0xFFDC2626) else ForestGreenDeep,
                                 fontSize = 13.sp
                             )
                         }
+                    }
+
+                    // Recording File info banner
+                    if (audioSavedFileName != null) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "📁 Local Recording: $audioSavedFileName",
+                            fontSize = 10.sp,
+                            color = Color.Gray
+                        )
                     }
 
                     // Spoken Feedback Banner
@@ -279,10 +400,40 @@ fun HarvestQuestionnaireScreen(
                         }
                     }
 
+                    // Editable Spoken Transcript / Text input bar
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = voiceTranscriptInput,
+                        onValueChange = { voiceTranscriptInput = it },
+                        label = {
+                            Text(
+                                if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ (ಸಂಪಾದಿಸಿ ಅಥವಾ ಬರೆಯಿರಿ)" else "Voice Transcript / Custom Input",
+                                fontSize = 11.sp
+                            )
+                        },
+                        placeholder = {
+                            Text(
+                                if (isKannada) "ಉದಾ: ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ..."
+                                else "e.g. Harvested 250 kg tomato today at 7 AM...",
+                                fontSize = 11.sp
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                if (voiceTranscriptInput.isNotBlank()) processSpeechInput(voiceTranscriptInput)
+                            }) {
+                                Text("⚡", fontSize = 18.sp)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
                     // Quick Voice Test Phrases
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = if (isKannada) "ಮಾದರಿ ಧ್ವನಿ ಪ್ರಾಂಪ್ಟ್‌ಗಳು (ಪರೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ):" else "Sample Voice Phrases (tap to simulate speech):",
+                        text = if (isKannada) "ಮಾದರಿ ಧ್ವನಿ ಆಜ್ಞೆಗಳು (ಪರೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ):" else "Sample Voice Commands (tap to test Sarvam STT):",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.Gray
@@ -294,34 +445,33 @@ fun HarvestQuestionnaireScreen(
                     ) {
                         AssistChip(
                             onClick = {
-                                crop = "Tomato"
-                                quantityKg = "200"
-                                harvestDate = "2026-11-13"
-                                harvestTime = "07:00 AM"
-                                sellImmediately = true
-                                voiceFeedback = "✓ Applied: 200kg Tomato, Today 7AM"
+                                val phrase = if (isKannada)
+                                    "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
+                                else
+                                    "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
+                                processSpeechInput(phrase)
                             },
-                            label = { Text("🍅 200kg Tomato", fontSize = 10.sp) },
+                            label = { Text("🍅 250kg Tomato", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
                             onClick = {
-                                crop = "Onion"
-                                quantityKg = "300"
-                                harvestDate = "2026-11-13"
-                                harvestTime = "06:30 AM"
-                                sellImmediately = true
-                                voiceFeedback = "✓ Applied: 300kg Onion, Today 6:30AM"
+                                val phrase = if (isKannada)
+                                    "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 6:30 ಕ್ಕೆ 300 ಕೆಜಿ ಈರುಳ್ಳಿ ಕೊಯ್ಲು ಮಾಡಿದೆ, ನಾಳೆ ಮಾರಾಟ"
+                                else
+                                    "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
+                                processSpeechInput(phrase)
                             },
                             label = { Text("🧅 300kg Onion", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
                             onClick = {
-                                crop = "Potato"
-                                quantityKg = "500"
-                                sellImmediately = false
-                                voiceFeedback = "✓ Applied: 500kg Potato (Cold Storage)"
+                                val phrase = if (isKannada)
+                                    "500 ಕೆಜಿ ಆಲೂಗಡ್ಡೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ, ಶೀತಲ ಶೇಖರಣೆ ಮಾಡಬೇಕು"
+                                else
+                                    "500 kg potato harvested, send to cold storage do not sell immediately"
+                                processSpeechInput(phrase)
                             },
                             label = { Text("❄️ Cold Storage", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)

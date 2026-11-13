@@ -168,6 +168,53 @@ object ApiClient {
         }
     }
 
+    suspend fun uploadVoiceAudio(
+        audioFile: java.io.File,
+        languageCode: String = "kn-IN"
+    ): String = withContext(Dispatchers.IO) {
+        try {
+            val boundary = "==FarmRouteBoundary${System.currentTimeMillis()}=="
+            val url = URL("$BASE_URL/api/voice/process-audio")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            conn.doOutput = true
+            conn.connectTimeout = 10000
+            conn.readTimeout = 15000
+
+            val outputStream = conn.outputStream
+            val writer = java.io.PrintWriter(java.io.OutputStreamWriter(outputStream, "UTF-8"), true)
+
+            // 1. Language code field
+            writer.append("--$boundary").append("\r\n")
+            writer.append("Content-Disposition: form-data; name=\"language_code\"").append("\r\n")
+            writer.append("Content-Type: text/plain; charset=UTF-8").append("\r\n\r\n")
+            writer.append(languageCode).append("\r\n")
+            writer.flush()
+
+            // 2. Audio file field
+            writer.append("--$boundary").append("\r\n")
+            writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"${audioFile.name}\"").append("\r\n")
+            writer.append("Content-Type: audio/wav").append("\r\n\r\n")
+            writer.flush()
+
+            // Write file bytes
+            audioFile.inputStream().use { input ->
+                input.copyTo(outputStream)
+            }
+            outputStream.flush()
+            writer.append("\r\n")
+            writer.append("--$boundary--").append("\r\n")
+            writer.flush()
+            writer.close()
+
+            val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+            BufferedReader(InputStreamReader(stream)).use { it.readText() }
+        } catch (e: Exception) {
+            "{\"status\":\"error\",\"note\":\"${e.localizedMessage}\"}"
+        }
+    }
+
     suspend fun processVoiceCommand(
         text: String,
         languageCode: String = "kn-IN"

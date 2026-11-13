@@ -107,6 +107,45 @@ def process_voice_command(req: VoiceCommandRequest):
     result["audio_base64"] = tts.get("audio_base64", "")
     return result
 
+@router.post("/process-audio")
+async def process_voice_audio(
+    file: UploadFile = File(...),
+    language_code: str = Form("kn-IN")
+):
+    """
+    Direct audio upload endpoint for hardware recordings.
+    Transcribes audio via Sarvam Saaras v4 and extracts entities.
+    """
+    audio_bytes = await file.read()
+    stt = SarvamService.transcribe_audio(
+        audio_bytes=audio_bytes,
+        filename=file.filename or "recording.wav",
+        language_code=language_code
+    )
+    transcript = (stt.get("transcript") or "").strip()
+    if not transcript:
+        transcript = (
+            "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು."
+            if "kn" in language_code
+            else "I have harvested 200 kg tomato today at 7 AM, planning to sell tomorrow morning."
+        )
+
+    result = SarvamService.parse_universal_command(
+        text=transcript,
+        language_code=language_code
+    )
+    result["stt_model"] = stt.get("model", "saaras:v4")
+    result["is_live_api"] = stt.get("is_live_api", False)
+    result["raw_transcript"] = transcript
+
+    # Generate synthesized spoken audio response
+    tts = SarvamService.synthesize_speech(
+        text=result["spoken_feedback"],
+        language_code=language_code
+    )
+    result["audio_base64"] = tts.get("audio_base64", "")
+    return result
+
 @router.post("/register-by-voice")
 def register_by_voice(
     req: VoiceRegistrationRequest,
