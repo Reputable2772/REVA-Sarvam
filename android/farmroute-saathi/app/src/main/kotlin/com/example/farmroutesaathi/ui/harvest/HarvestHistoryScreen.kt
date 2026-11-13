@@ -349,12 +349,6 @@ fun HarvestHistoryScreen(
                 }
             }
         }
-                        isKannada = isKannada,
-                        onViewMandiRates = { onMandiComparisonClick?.invoke(item.lotId) }
-                    )
-                }
-            }
-        }
     }
 }
 

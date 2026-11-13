@@ -7,6 +7,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.FarmRouteSaathiTheme
@@ -18,12 +19,15 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     setContent {
       val isDark = UserSession.isDarkTheme
-      FarmRouteSaathiTheme(darkTheme = isDark) {
-        Surface(
-          modifier = Modifier.fillMaxSize(),
-          color = MaterialTheme.colorScheme.background
-        ) {
-          MainNavigation()
+      val currentLang = UserSession.selectedLanguageCode
+      key(currentLang) {
+        FarmRouteSaathiTheme(darkTheme = isDark) {
+          Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+          ) {
+            MainNavigation()
+          }
         }
       }
     }

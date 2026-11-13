@@ -75,7 +75,7 @@ fun MandiComparisonScreen(
                 }
             }, "com.google.android.tts")
             ttsEngine = tts
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             try {
                 tts = TextToSpeech(context) { status ->
                     if (status == TextToSpeech.SUCCESS) {
@@ -83,7 +83,7 @@ fun MandiComparisonScreen(
                     }
                 }
                 ttsEngine = tts
-            } catch (_: Exception) {}
+            } catch (ignored: Exception) {}
         }
 
         onDispose {
@@ -91,12 +91,12 @@ fun MandiComparisonScreen(
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
                 mediaPlayer = null
-            } catch (_: Exception) {}
+            } catch (ignored: Exception) {}
             try {
                 tts?.stop()
                 tts?.shutdown()
                 ttsEngine = null
-            } catch (_: Exception) {}
+            } catch (ignored: Exception) {}
         }
     }
 
@@ -113,7 +113,7 @@ fun MandiComparisonScreen(
                         quantityKg = lotObj.optDouble("quantity_kg", 200.0)
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {}
 
             try {
                 val langCode = if (isKannada) "kn-IN" else "en-IN"
@@ -161,7 +161,7 @@ fun MandiComparisonScreen(
                 } else {
                     mandisList = getDefaultMandiData(crop, quantityKg)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 mandisList = getDefaultMandiData(crop, quantityKg)
             } finally {
                 isLoading = false
@@ -175,10 +175,10 @@ fun MandiComparisonScreen(
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
                 mediaPlayer = null
-            } catch (_: Exception) {}
+            } catch (ignored: Exception) {}
             try {
                 ttsEngine?.stop()
-            } catch (_: Exception) {}
+            } catch (ignored: Exception) {}
             isPlayingAudio = false
             return
         }
@@ -213,9 +213,9 @@ fun MandiComparisonScreen(
                             }
                             mediaPlayer = player
                             playedViaMediaPlayer = true
-                        } catch (_: Exception) {
-                            playedViaMediaPlayer = false
                         }
+                    } catch (e: Exception) {
+                        playedViaMediaPlayer = false
                     }
                 }
 
@@ -237,7 +237,7 @@ fun MandiComparisonScreen(
                 } else if (!playedViaMediaPlayer) {
                     isPlayingAudio = false
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 isPlayingAudio = false
             }
         }

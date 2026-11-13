@@ -252,6 +252,10 @@ object ApiClient {
         getJson("$BASE_URL/api/farmer/lots/$farmerId")
     }
 
+    suspend fun getHarvestLot(harvestId: String): String = withContext(Dispatchers.IO) {
+        getJson("$BASE_URL/api/farmer/lot/$harvestId")
+    }
+
     suspend fun getMandiAnalysis(harvestId: String, targetMandi: String? = null): String = withContext(Dispatchers.IO) {
         val queryParam = if (targetMandi != null) "?target_mandi=${URLEncoder.encode(targetMandi, "UTF-8")}" else ""
         getJson("$BASE_URL/api/farmer/harvests/$harvestId/mandi-analysis$queryParam")
