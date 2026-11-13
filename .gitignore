@@ -3,8 +3,15 @@ dist/
 *.log
 .env
 .DS_Store
-
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 scripts/mcp_state.json
+.gradle/
+build/
+app/build/

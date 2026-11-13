@@ -429,7 +429,7 @@ export function App() {
                     <h3 className="font-bold text-sm text-slate-100">Optimized Rural Pickup Route (Road-Curvature 1.25x)</h3>
                     <p className="text-xs text-slate-400">Sequential village pickup order to minimize transit time and carbon footprint</p>
                   </div>
-                  <span className="text-xs text-slate-400">Kolar $\rightarrow$ Whitefield DC</span>
+                  <span className="text-xs text-slate-400">Kolar → Whitefield DC</span>
                 </div>
 
                 {logisticsPlan && (

@@ -20,6 +20,7 @@
             jq
             git
             android-tools
+            jdk17
           ];
 
           shellHook = ''
