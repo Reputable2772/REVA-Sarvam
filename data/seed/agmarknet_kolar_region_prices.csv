@@ -1,0 +1,6 @@
+mandi_name,distance_km,modal_price_per_kg,min_price_per_kg,max_price_per_kg,daily_arrivals_tonnes,commission_pct,unloading_crate_fee,weighment_fee,transport_cost,is_trap,trap_reason
+Kolar APMC,30.0,22.0,18.0,25.0,450.0,6.5,5.0,30.0,350.0,False,Standard APMC benchmark
+Bangarpet APMC,42.0,24.0,19.0,26.5,120.0,8.0,8.0,50.0,520.0,True,"Modal illusion trap: Rs 2 higher gross price offset by Rs 170 extra transport and higher commission"
+Malur APMC,55.0,23.0,19.5,25.0,210.0,7.0,6.0,35.0,600.0,False,Processing corridor
+Mulbagal Sub-Market,5.0,20.0,16.0,22.0,80.0,6.0,4.0,20.0,120.0,False,Local village collection
+Chintamani APMC,48.0,21.5,17.0,24.0,160.0,6.5,5.0,30.0,500.0,False,Northern cluster

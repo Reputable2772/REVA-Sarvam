@@ -11,11 +11,12 @@ from .models import (
 )
 from .marketplace_service import MarketplaceService
 from .escrow_service import EscrowService
+from .agmarknet_service import AgmarknetImporter
 
 app = FastAPI(
     title="FarmRoute AI - Marketplace & Escrow API",
     version="1.0.0",
-    description="Institutional Marketplace matching and 7-stage Escrow settlement engine."
+    description="Institutional Marketplace matching, 7-stage Escrow settlement, and AGMARKNET flexible ingestion engine."
 )
 
 app.add_middleware(
@@ -28,6 +29,7 @@ app.add_middleware(
 
 marketplace = MarketplaceService()
 escrow = EscrowService()
+agmarknet = AgmarknetImporter()
 
 @app.get("/health")
 def health():
@@ -86,3 +88,23 @@ def execute_instant_payout(payout_req: UpiPayoutRequest):
         return escrow.execute_instant_upi_payout(payout_req)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/market-data/import/json")
+def import_market_data_json():
+    try:
+        data = agmarknet.import_from_json()
+        return {"status": "success", "imported_count": len(data), "mandis": [m["mandi_name"] for m in data]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/market-data/import/csv")
+def import_market_data_csv():
+    try:
+        data = agmarknet.import_from_csv()
+        return {"status": "success", "imported_count": len(data), "mandis": [m["mandi_name"] for m in data]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/market-data/mandi-netbacks")
+def get_mandi_netback_evaluations(quantity_kg: float = 100.0):
+    return agmarknet.evaluate_mandi_netbacks(quantity_kg=quantity_kg)

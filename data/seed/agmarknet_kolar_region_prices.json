@@ -1,0 +1,74 @@
+{
+  "source": "AGMARKNET / Karnataka Directorate of Agricultural Marketing",
+  "district": "Kolar",
+  "commodity": "Tomato",
+  "date": "2026-11-13",
+  "records": [
+    {
+      "mandi_name": "Kolar APMC",
+      "distance_from_mulbagal_km": 30.0,
+      "modal_price_per_kg": 22.0,
+      "min_price_per_kg": 18.0,
+      "max_price_per_kg": 25.0,
+      "daily_arrivals_tonnes": 450.0,
+      "commission_pct": 6.5,
+      "unloading_fee_per_crate": 5.0,
+      "weighment_fee_per_lot": 30.0,
+      "estimated_transport_per_farmer": 350.0,
+      "notes": "Primary regional tomato hub"
+    },
+    {
+      "mandi_name": "Bangarpet APMC",
+      "distance_from_mulbagal_km": 42.0,
+      "modal_price_per_kg": 24.0,
+      "min_price_per_kg": 19.0,
+      "max_price_per_kg": 26.5,
+      "daily_arrivals_tonnes": 120.0,
+      "commission_pct": 8.0,
+      "unloading_fee_per_crate": 8.0,
+      "weighment_fee_per_lot": 50.0,
+      "estimated_transport_per_farmer": 520.0,
+      "is_trap": true,
+      "trap_reason": "Bangarpet Trap: Rs 2/kg higher gross modal price (+9%), but Rs 170 extra transport and higher commission results in LOWER net farmer return."
+    },
+    {
+      "mandi_name": "Malur APMC",
+      "distance_from_mulbagal_km": 55.0,
+      "modal_price_per_kg": 23.0,
+      "min_price_per_kg": 19.5,
+      "max_price_per_kg": 25.0,
+      "daily_arrivals_tonnes": 210.0,
+      "commission_pct": 7.0,
+      "unloading_fee_per_crate": 6.0,
+      "weighment_fee_per_lot": 35.0,
+      "estimated_transport_per_farmer": 600.0,
+      "notes": "Industrial processing corridor"
+    },
+    {
+      "mandi_name": "Mulbagal Sub-Market",
+      "distance_from_mulbagal_km": 5.0,
+      "modal_price_per_kg": 20.0,
+      "min_price_per_kg": 16.0,
+      "max_price_per_kg": 22.0,
+      "daily_arrivals_tonnes": 80.0,
+      "commission_pct": 6.0,
+      "unloading_fee_per_crate": 4.0,
+      "weighment_fee_per_lot": 20.0,
+      "estimated_transport_per_farmer": 120.0,
+      "notes": "Hyper-local village aggregation point"
+    },
+    {
+      "mandi_name": "Chintamani APMC",
+      "distance_from_mulbagal_km": 48.0,
+      "modal_price_per_kg": 21.5,
+      "min_price_per_kg": 17.0,
+      "max_price_per_kg": 24.0,
+      "daily_arrivals_tonnes": 160.0,
+      "commission_pct": 6.5,
+      "unloading_fee_per_crate": 5.0,
+      "weighment_fee_per_lot": 30.0,
+      "estimated_transport_per_farmer": 500.0,
+      "notes": "Secondary northern cluster"
+    }
+  ]
+}
