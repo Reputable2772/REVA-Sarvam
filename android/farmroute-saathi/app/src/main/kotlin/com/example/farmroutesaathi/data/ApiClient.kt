@@ -240,6 +240,35 @@ object ApiClient {
         postJson("$BASE_URL/api/demo/checkpoint/$step", "{}")
     }
 
+    suspend fun getFarmerHarvests(phone: String? = null): String = withContext(Dispatchers.IO) {
+        val queryParam = if (phone != null) "?farmer_phone=$phone" else ""
+        getJson("$BASE_URL/api/farmer/harvests$queryParam")
+    }
+
+    suspend fun getMandiAnalysis(harvestId: String, targetMandi: String? = null): String = withContext(Dispatchers.IO) {
+        val queryParam = if (targetMandi != null) "?target_mandi=${URLEncoder.encode(targetMandi, "UTF-8")}" else ""
+        getJson("$BASE_URL/api/farmer/harvests/$harvestId/mandi-analysis$queryParam")
+    }
+
+    suspend fun getMandiVoiceExplanation(harvestId: String, languageCode: String = "kn-IN"): String = withContext(Dispatchers.IO) {
+        val jsonBody = "{\"harvest_id\":\"$harvestId\",\"language_code\":\"$languageCode\"}"
+        postJson("$BASE_URL/api/voice/mandi-explanation", jsonBody)
+    }
+
+    private fun getJson(urlString: String): String {
+        return try {
+            val url = URL(urlString)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 4000
+            conn.readTimeout = 4000
+            val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
+            BufferedReader(InputStreamReader(stream)).use { it.readText() }
+        } catch (e: Exception) {
+            "{\"status\":\"simulated_ok\",\"note\":\"${e.localizedMessage}\"}"
+        }
+    }
+
     private fun postJson(urlString: String, jsonBody: String): String {
         return try {
             val url = URL(urlString)

@@ -7,6 +7,7 @@ import androidx.navigation3.ui.NavDisplay
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.auth.LoginScreen
 import com.example.farmroutesaathi.ui.harvest.HarvestQuestionnaireScreen
+import com.example.farmroutesaathi.ui.harvest.MandiComparisonScreen
 import com.example.farmroutesaathi.ui.main.MainScreen
 
 @Composable
@@ -32,6 +33,7 @@ fun MainNavigation() {
             onHarvestSubmitted = { harvestId ->
               backStack.clear()
               backStack.add(Main)
+              backStack.add(MandiComparison(harvestId))
             },
             onSkip = {
               backStack.clear()
@@ -39,10 +41,17 @@ fun MainNavigation() {
             }
           )
         }
+        entry<MandiComparison> { key ->
+          MandiComparisonScreen(
+            harvestId = key.harvestId,
+            onBackClick = { backStack.removeLastOrNull() }
+          )
+        }
         entry<Main> {
           MainScreen(
             onItemClick = { navKey -> backStack.add(navKey) },
             onDeclareHarvestClick = { backStack.add(HarvestQuestionnaire) },
+            onMandiComparisonClick = { hId -> backStack.add(MandiComparison(hId)) },
             onLogout = {
               UserSession.logout()
               backStack.clear()

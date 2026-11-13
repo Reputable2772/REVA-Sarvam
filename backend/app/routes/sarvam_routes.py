@@ -223,3 +223,54 @@ def register_by_voice(
             "model": tts_info.get("model")
         }
     }
+
+class MandiVoiceExplanationRequest(BaseModel):
+    harvest_id: Optional[str] = "FR-KLR-20261113-0001"
+    crop: Optional[str] = "Tomato"
+    quantity_kg: Optional[float] = 200.0
+    language_code: Optional[str] = "kn-IN"
+
+@router.post("/mandi-explanation")
+def get_mandi_voice_explanation(
+    req: MandiVoiceExplanationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Synthesizes spoken audio explanation comparing Mandi options across India,
+    highlighting transparent costs, net profit, and headline price traps for uneducated farmers.
+    """
+    from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
+    from backend.app.models.models import HarvestLot
+
+    crop = req.crop or "Tomato"
+    qty = req.quantity_kg or 200.0
+
+    if req.harvest_id:
+        lot = db.query(HarvestLot).filter(HarvestLot.lot_id == req.harvest_id).first()
+        if lot:
+            crop = lot.crop
+            qty = lot.quantity_kg
+
+    mandis = PanIndiaMandiService.evaluate_mandi_options(
+        crop=crop,
+        quantity_kg=qty
+    )
+
+    spoken_res = SarvamService.generate_mandi_spoken_summary(
+        crop=crop,
+        quantity_kg=qty,
+        mandi_results=mandis,
+        language_code=req.language_code or "kn-IN"
+    )
+
+    return {
+        "success": True,
+        "harvest_id": req.harvest_id,
+        "crop": crop,
+        "quantity_kg": qty,
+        "summary_text": spoken_res.get("summary_text"),
+        "audio_base64": spoken_res.get("audio_base64"),
+        "language_code": req.language_code or "kn-IN",
+        "recommended_mandi": spoken_res.get("recommended_mandi"),
+        "trap_mandi": spoken_res.get("trap_mandi")
+    }

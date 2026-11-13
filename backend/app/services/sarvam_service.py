@@ -4,7 +4,7 @@ import base64
 import re
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from backend.app.config import settings
 
 class SarvamService:
@@ -28,10 +28,20 @@ class SarvamService:
     @classmethod
     def get_api_keys(cls) -> list:
         keys = []
-        raw_keys = os.getenv("SARVAM_API_KEYS", getattr(settings, "SARVAM_API_KEYS", "") or "")
+        if "SARVAM_API_KEYS" in os.environ:
+            raw_keys = os.environ.get("SARVAM_API_KEYS", "")
+        else:
+            raw_keys = getattr(settings, "SARVAM_API_KEYS", "") or ""
         if raw_keys:
             keys.extend([k.strip() for k in raw_keys.split(",") if k.strip()])
-        single_key = os.getenv("SARVAM_API_KEY", getattr(settings, "SARVAM_API_KEY", "") or "").strip()
+
+        if "SARVAM_API_KEY" in os.environ:
+            single_key = os.environ.get("SARVAM_API_KEY", "")
+        elif "SARVAM_API_KEYS" in os.environ:
+            single_key = ""
+        else:
+            single_key = getattr(settings, "SARVAM_API_KEY", "") or ""
+        single_key = single_key.strip()
         if single_key and single_key not in keys:
             keys.append(single_key)
         return keys
@@ -592,4 +602,55 @@ class SarvamService:
             "message_en": msg_en,
             "message_kn": msg_kn,
             "spoken_feedback": msg_kn if is_kn else msg_en
+        }
+
+    @classmethod
+    def generate_mandi_spoken_summary(
+        cls,
+        crop: str,
+        quantity_kg: float,
+        mandi_results: List[Dict[str, Any]],
+        language_code: str = "kn-IN"
+    ) -> Dict[str, Any]:
+        """
+        Synthesizes spoken audio explanation comparing Mandi options and highlighting headline traps.
+        """
+        is_kn = "kn" in language_code.lower()
+        if not mandi_results:
+            msg = "ಯಾವುದೇ ಮಾರುಕಟ್ಟೆ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ." if is_kn else "No mandi data available for comparison."
+            tts_res = cls.synthesize_speech(msg, language_code)
+            return {"summary_text": msg, "audio_base64": tts_res.get("audio_base64", "")}
+
+        recommended = next((m for m in mandi_results if m.get("is_recommended")), mandi_results[0])
+        trap = next((m for m in mandi_results if m.get("is_trap")), None)
+
+        rec_name = recommended.get("mandi_name") or recommended.get("market") or "Primary Mandi"
+        rec_net = int(recommended.get("net_take_home", 0))
+
+        if is_kn:
+            text = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} ಮೂಲಕ ₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ಸಿಗುತ್ತದೆ. "
+            if trap:
+                trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
+                trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
+                diff = int(rec_net - trap.get("net_take_home", 0))
+                text += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಜಾಸ್ತಿ ಕಾಣಿಸಿದರೂ, ಸಾರಿಗೆ ವೆಚ್ಚ ಮತ್ತು ಕಮಿಷನ್ ಕಡಿತದಿಂದ ₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
+            else:
+                text += "ಕಡಿಮೆ ಸಾರಿಗೆ ಮತ್ತು ಕಮಿಷನ್ ವೆಚ್ಚ ಇರುವ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ."
+        else:
+            text = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} gives the highest net return of ₹{rec_net}. "
+            if trap:
+                trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
+                trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
+                loss = int(rec_net - trap.get("net_take_home", 0))
+                text += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but high freight and commission leaves you with ₹{loss} less cash in hand."
+            else:
+                text += "Choosing direct pooling saves middleman commission and transport loss."
+
+        tts_res = cls.synthesize_speech(text, language_code)
+        return {
+            "summary_text": text,
+            "audio_base64": tts_res.get("audio_base64", ""),
+            "language_code": language_code,
+            "recommended_mandi": rec_name,
+            "trap_mandi": (trap.get("mandi_name") or trap.get("market")) if trap else None
         }

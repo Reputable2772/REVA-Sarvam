@@ -54,6 +54,7 @@ fun HarvestQuestionnaireScreen(
     var recognizedFields by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSubmitting by remember { mutableStateOf(false) }
     var voiceTranscriptInput by remember { mutableStateOf("") }
+    var hasRecordedOnce by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -62,15 +63,26 @@ fun HarvestQuestionnaireScreen(
 
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
-        voiceTranscriptInput = spokenText
+        voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) spokenText else "$voiceTranscriptInput | $spokenText"
         isUploadingAudio = true
         scope.launch {
             try {
                 val res = ApiClient.processVoiceCommand(spokenText, if (isKannada) "kn-IN" else "en-IN")
                 val jsonObj = JSONObject(res)
+                val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
+                    (0 until arr.length()).map { arr.getString(it) }.toSet()
+                } ?: emptySet()
                 val entities = jsonObj.optJSONObject("entities")
                 if (entities != null) {
-                    if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
+                    val isFirst = !hasRecordedOnce
+                    val updateCrop = isFirst || fieldsUpdated.contains("crop")
+                    val updateQty = isFirst || fieldsUpdated.contains("quantity_kg")
+                    val updateDate = isFirst || fieldsUpdated.contains("harvest_date")
+                    val updateTime = isFirst || fieldsUpdated.contains("harvest_time")
+                    val updateExpected = isFirst || fieldsUpdated.contains("expected_date_time")
+                    val updateSell = isFirst || fieldsUpdated.contains("sell_immediately")
+
+                    if (updateCrop && entities.has("crop") && entities.getString("crop").isNotBlank()) {
                         val c = entities.getString("crop")
                         crop = when {
                             c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
@@ -82,26 +94,27 @@ fun HarvestQuestionnaireScreen(
                             else -> c
                         }
                     }
-                    if (entities.has("quantity_kg")) {
+                    if (updateQty && entities.has("quantity_kg")) {
                         val q = entities.optDouble("quantity_kg", 0.0)
                         if (q > 0) quantityKg = q.toInt().toString()
                     }
-                    if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
+                    if (updateDate && entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
                         harvestDate = entities.getString("harvest_date")
                     }
-                    if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
+                    if (updateTime && entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
                         harvestTime = entities.getString("harvest_time")
                     }
-                    if (entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
+                    if (updateExpected && entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
                         expectedDateTime = entities.getString("expected_date_time")
                     }
-                    if (entities.has("sell_immediately")) {
+                    if (updateSell && entities.has("sell_immediately")) {
                         sellImmediately = entities.getBoolean("sell_immediately")
                     }
+                    hasRecordedOnce = true
                 }
                 val feedback = jsonObj.optString("spoken_feedback", "")
                 voiceFeedback = if (feedback.isNotBlank()) {
-                    "✓ $feedback"
+                    "✓ $feedback (Fields merged)"
                 } else {
                     if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
                     else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"
@@ -145,11 +158,22 @@ fun HarvestQuestionnaireScreen(
                         val jsonObj = JSONObject(res)
                         val rawTranscript = jsonObj.optString("raw_transcript", "")
                         if (rawTranscript.isNotBlank()) {
-                            voiceTranscriptInput = rawTranscript
+                            voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) rawTranscript else "$voiceTranscriptInput | $rawTranscript"
                         }
+                        val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
+                            (0 until arr.length()).map { arr.getString(it) }.toSet()
+                        } ?: emptySet()
                         val entities = jsonObj.optJSONObject("entities")
                         if (entities != null) {
-                            if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
+                            val isFirst = !hasRecordedOnce
+                            val updateCrop = isFirst || fieldsUpdated.contains("crop")
+                            val updateQty = isFirst || fieldsUpdated.contains("quantity_kg")
+                            val updateDate = isFirst || fieldsUpdated.contains("harvest_date")
+                            val updateTime = isFirst || fieldsUpdated.contains("harvest_time")
+                            val updateExpected = isFirst || fieldsUpdated.contains("expected_date_time")
+                            val updateSell = isFirst || fieldsUpdated.contains("sell_immediately")
+
+                            if (updateCrop && entities.has("crop") && entities.getString("crop").isNotBlank()) {
                                 val c = entities.getString("crop")
                                 crop = when {
                                     c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
@@ -161,26 +185,27 @@ fun HarvestQuestionnaireScreen(
                                     else -> c
                                 }
                             }
-                            if (entities.has("quantity_kg")) {
+                            if (updateQty && entities.has("quantity_kg")) {
                                 val q = entities.optDouble("quantity_kg", 0.0)
                                 if (q > 0) quantityKg = q.toInt().toString()
                             }
-                            if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
+                            if (updateDate && entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
                                 harvestDate = entities.getString("harvest_date")
                             }
-                            if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
+                            if (updateTime && entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
                                 harvestTime = entities.getString("harvest_time")
                             }
-                            if (entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
+                            if (updateExpected && entities.has("expected_date_time") && entities.getString("expected_date_time").isNotBlank()) {
                                 expectedDateTime = entities.getString("expected_date_time")
                             }
-                            if (entities.has("sell_immediately")) {
+                            if (updateSell && entities.has("sell_immediately")) {
                                 sellImmediately = entities.getBoolean("sell_immediately")
                             }
+                            hasRecordedOnce = true
                         }
                         val feedback = jsonObj.optString("spoken_feedback", "")
                         voiceFeedback = if (feedback.isNotBlank()) {
-                            "✓ $feedback"
+                            "✓ $feedback (Fields merged)"
                         } else {
                             if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
                             else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"

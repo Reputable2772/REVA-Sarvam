@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.components.*
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.delay
@@ -37,6 +38,7 @@ fun MainScreen(
     onItemClick: (NavKey) -> Unit = {},
     onLogout: (() -> Unit)? = null,
     onDeclareHarvestClick: (() -> Unit)? = null,
+    onMandiComparisonClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isKannada by remember { mutableStateOf(false) }
@@ -143,7 +145,11 @@ fun MainScreen(
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         when (currentTab) {
-                            RoleTab.FARMER -> FarmerDashboardView(isKannada = isKannada)
+                            RoleTab.FARMER -> FarmerDashboardView(
+                                isKannada = isKannada,
+                                onDeclareHarvestClick = onDeclareHarvestClick,
+                                onMandiComparisonClick = onMandiComparisonClick
+                            )
                             RoleTab.BUYER -> BuyerDashboardView(isKannada = isKannada)
                             RoleTab.OPERATOR -> OperatorCollectionCenterView(isKannada = isKannada)
                             RoleTab.BENEFITS -> GovernmentBenefitsOpportunityView(isKannada = isKannada)
@@ -182,7 +188,15 @@ fun MainScreen(
 // 1. FARMER DASHBOARD SCREEN
 // ============================================================================
 @Composable
-fun FarmerDashboardView(isKannada: Boolean) {
+fun FarmerDashboardView(
+    isKannada: Boolean,
+    onDeclareHarvestClick: (() -> Unit)? = null,
+    onMandiComparisonClick: ((String) -> Unit)? = null
+) {
+    val currentLot = UserSession.activeHarvestId
+    val farmerName = UserSession.currentFarmer?.name ?: "Manjunath Gowda"
+    val farmerLocation = UserSession.currentFarmer?.district ?: "Mulbagal"
+
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(14.dp),
@@ -197,13 +211,13 @@ fun FarmerDashboardView(isKannada: Boolean) {
             ) {
                 Column {
                     Text(
-                        text = if (isKannada) "ನಮಸ್ಕಾರ, ಮಂಜುನಾಥ್ ಗೌಡ" else "Welcome, Manjunath Gowda",
+                        text = if (isKannada) "ನಮಸ್ಕಾರ, $farmerName" else "Welcome, $farmerName",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = if (isKannada) "ಮೂಲ್ಬಾಗಿಲು ಸಂಗ್ರಹಣಾ ಕೇಂದ್ರ #12" else "Mulbagal Collection Cluster #12",
+                        text = if (isKannada) "$farmerLocation ಸಂಗ್ರಹಣಾ ಕೇಂದ್ರ #12" else "$farmerLocation Collection Cluster #12",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -214,7 +228,7 @@ fun FarmerDashboardView(isKannada: Boolean) {
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
                 ) {
                     Text(
-                        text = "Demo Farmer",
+                        text = "Farmer Hub",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
@@ -223,29 +237,83 @@ fun FarmerDashboardView(isKannada: Boolean) {
                 }
             }
 
-            // Harvest Summary Card
+            // Harvest Summary Card with Action Buttons
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isKannada) "ಸಕ್ರಿಯ ಕೊಯ್ಲು ($currentLot):" else "Active Harvest Lot ($currentLot):",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = ForestGreenDeep.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "READY FOR SALE",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ForestGreenDeep,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                     Text(
-                        text = if (isKannada) "ದಾಖಲಾದ ಬೆಳೆ ವಿವರ (Declared Lot FR-KLR-00251):" else "Declared Harvest (Lot FR-KLR-00251):",
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = "100 kg Tomato | Grade A Premium Firm",
+                        text = "200 kg Tomato | Grade A Premium Firm",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = if (isKannada) "ಧ್ವನಿ ನೋಂದಣಿ: ಸರ್ವಂ AI ಸಾಥಿ (ಕನ್ನಡ) ಧ್ವನಿ ಇನ್ಪುಟ್" else "Voice Stamp: Sarvam AI Saathi (Kannada Voice)",
+                        text = if (isKannada) "ಧ್ವನಿ ನೋಂದಣಿ: ಸರ್ವಂ AI ಸಾಥಿ (ಕನ್ನಡ) ಧ್ವನಿ ಇನ್ಪುಟ್" else "Voice Stamp: Sarvam AI Saathi (Hardware Mic PCM)",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Buttons: Compare Mandis & Schedule New Harvest
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onMandiComparisonClick?.invoke(currentLot) },
+                            colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1.2f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (isKannada) "📊 ಮಾರುಕಟ್ಟೆ ಹೋಲಿಕೆ" else "📊 View All Mandis",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { onDeclareHarvestClick?.invoke() },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = if (isKannada) "➕ ಹೊಸ ಕೊಯ್ಲು" else "➕ Add Harvest",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ForestGreenDeep
+                            )
+                        }
+                    }
                 }
             }
 
@@ -287,29 +355,39 @@ fun FarmerDashboardView(isKannada: Boolean) {
 
             AnimatedNetbackChart(routes = netbackRoutes, isKannada = isKannada)
 
-            // Simulated Prototype Payout Banner
+            // Transparent Mandi Intelligence Card (Replacing Simulated Payout)
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onMandiComparisonClick?.invoke(currentLot) }
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isKannada) "💡 ಮಾರುಕಟ್ಟೆ ಪಾರದರ್ಶಕತೆ & ದರ ಮೋಸ ಎಚ್ಚರಿಕೆ:" else "💡 Mandi Cost Transparency & Trap Advisory:",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = ForestGreenDeep
+                        )
+                        Text(
+                            text = if (isKannada) "ದೂರದ ಮಂಡಿಗಳಲ್ಲಿ ದರ ಹೆಚ್ಚಿದ್ದರೂ ಸಾರಿಗೆ & ಕಮಿಷನ್ ವೆಚ್ಚದಿಂದ ನಿವ್ವಳ ಹಣ ಕಡಿಮೆಯಾಗುತ್ತದೆ. ಸಂಪೂರ್ಣ ವಿವರಗಳನ್ನು ಪರಿಶೀಲಿಸಿ."
+                            else "Higher headline prices at distant mandis often yield lower cash in hand once freight & commissions are deducted. Tap to inspect.",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Text(
-                        text = if (isKannada) "ಸಿಮ್ಯುಲೇಟೆಡ್ ಪಾವತಿ ಸ್ಥಿತಿ (Simulated Payout):" else "Simulated Payout Status:",
+                        text = "➔",
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "₹2,420.00 — SIMULATED PROTOTYPE PAYMENT",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = HarvestGoldDark
-                    )
-                    Text(
-                        text = "Ref: SIM-NPCI-00251 | No actual banking transfer performed.",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = ForestGreenDeep,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 }
             }

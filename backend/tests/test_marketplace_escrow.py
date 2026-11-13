@@ -86,4 +86,32 @@ def test_invalid_negotiation_transition():
             role="farmer"
         )
 
+from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
+
+def test_pan_india_mandi_evaluation_and_deductions():
+    results = PanIndiaMandiService.evaluate_mandi_options(
+        crop="Tomato",
+        quantity_kg=200.0,
+        farmer_district="Kolar",
+        farmer_state="Karnataka"
+    )
+    assert len(results) >= 3
+    for m in results:
+        assert "transport_cost" in m["itemized_deductions"]
+        assert "commission_cost" in m["itemized_deductions"]
+        assert "unloading_cost" in m["itemized_deductions"]
+        assert "weighing_fee" in m["itemized_deductions"]
+        assert m["net_take_home"] == round(m["gross_revenue"] - m["itemized_deductions"]["total_deductions"], 2)
+
+def test_pan_india_trap_detection():
+    results = PanIndiaMandiService.evaluate_mandi_options(
+        crop="Tomato",
+        quantity_kg=200.0,
+        farmer_district="Kolar",
+        farmer_state="Karnataka"
+    )
+    recommended = next((m for m in results if m.get("is_recommended")), None)
+    assert recommended is not None
+    assert recommended["net_take_home"] >= results[-1]["net_take_home"]
+
 

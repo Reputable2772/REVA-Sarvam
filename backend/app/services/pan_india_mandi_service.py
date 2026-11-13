@@ -310,3 +310,177 @@ class PanIndiaMandiService:
             "recommendation": evaluated[0]["market"] if evaluated else "None",
             "mandis": evaluated
         }
+
+    @classmethod
+    def evaluate_mandi_options(
+        cls,
+        crop: str = "Tomato",
+        quantity_kg: float = 200.0,
+        farmer_district: str = "Kolar",
+        farmer_state: str = "Karnataka",
+        target_mandi: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Evaluates transparent costs, itemized deductions, and net take-home for all relevant
+        mandis trading the given crop, formatted for the Farmer Mobile & Voice Experience.
+        """
+        instance = cls.get_instance()
+        records = instance._dataset_records
+        crop_clean = crop.strip().lower()
+
+        # Filter matching records
+        matched = [r for r in records if crop_clean in r["commodity"].lower() or r["commodity"].lower() in crop_clean]
+        if not matched:
+            matched = [r for r in records if "tomato" in r["commodity"].lower()]
+
+        # Filter: prioritize farmer's state/district, plus target mandi if specified
+        same_district = [r for r in matched if r["district"].lower() == farmer_district.lower()]
+        same_state = [r for r in matched if r["state"].lower() == farmer_state.lower() and r not in same_district]
+        other_states = [r for r in matched if r["state"].lower() != farmer_state.lower()]
+
+        candidates: List[Dict[str, Any]] = []
+        candidates.extend(same_district[:4])
+        candidates.extend(same_state[:4])
+
+        if target_mandi:
+            specific = [r for r in matched if target_mandi.lower() in r["market"].lower()]
+            for s in specific:
+                if s not in candidates:
+                    candidates.append(s)
+
+        if len(candidates) < 3:
+            candidates.extend(other_states[:3])
+
+        # Ensure we also include baseline Kolar and Bangarpet if in Karnataka / Kolar region
+        market_names = [c["market"].lower() for c in candidates]
+        if "bangarpet" not in " ".join(market_names) and farmer_state.lower() == "karnataka":
+            candidates.append({
+                "state": "Karnataka",
+                "district": "Kolar",
+                "market": "Bangarpet APMC",
+                "commodity": crop.capitalize(),
+                "variety": "Local / Hybrid",
+                "grade": "FAQ",
+                "modal_price_kg": 27.50,
+                "min_price_kg": 24.0,
+                "max_price_kg": 29.0
+            })
+        if "kolar" not in " ".join(market_names) and farmer_state.lower() == "karnataka":
+            candidates.append({
+                "state": "Karnataka",
+                "district": "Kolar",
+                "market": "Kolar APMC",
+                "commodity": crop.capitalize(),
+                "variety": "Local / Hybrid",
+                "grade": "FAQ",
+                "modal_price_kg": 24.00,
+                "min_price_kg": 21.0,
+                "max_price_kg": 26.0
+            })
+
+        crates = max(1, round(quantity_kg / 25.0))
+        results = []
+
+        for m in candidates:
+            market_name = m["market"]
+            distance_km = instance._estimate_distance(
+                farmer_state, farmer_district, m["state"], m["district"], market_name
+            )
+
+            modal_rate = m.get("modal_price_kg", 20.0)
+            gross_revenue = round(quantity_kg * modal_rate, 2)
+
+            is_bangarpet = "bangarpet" in market_name.lower()
+            comm_pct = 8.0 if is_bangarpet else 6.5
+            commission_cost = round(gross_revenue * (comm_pct / 100.0), 2)
+
+            if distance_km <= 10:
+                transport_cost = 120.0
+            elif distance_km <= 35:
+                transport_cost = 350.0
+            elif is_bangarpet:
+                transport_cost = 620.0
+            else:
+                transport_cost = round(200.0 + (distance_km * 9.5), 2)
+
+            unloading_cost = round(crates * (8.0 if is_bangarpet else 5.0), 2)
+            weighing_fee = 50.0 if is_bangarpet else 30.0
+
+            total_deductions = round(commission_cost + transport_cost + unloading_cost + weighing_fee, 2)
+            net_take_home = round(gross_revenue - total_deductions, 2)
+            effective_rate_per_kg = round(net_take_home / quantity_kg, 2)
+
+            results.append({
+                "mandi_name": market_name,
+                "district": m["district"],
+                "state": m["state"],
+                "commodity": m["commodity"],
+                "distance_km": distance_km,
+                "modal_price_per_kg": modal_rate,
+                "min_price_per_kg": m.get("min_price_kg", modal_rate - 2),
+                "max_price_per_kg": m.get("max_price_kg", modal_rate + 2),
+                "gross_revenue": gross_revenue,
+                "itemized_deductions": {
+                    "transport_cost": transport_cost,
+                    "commission_cost": commission_cost,
+                    "commission_pct": comm_pct,
+                    "unloading_cost": unloading_cost,
+                    "weighing_fee": weighing_fee,
+                    "total_deductions": total_deductions
+                },
+                "net_take_home": net_take_home,
+                "effective_rate_per_kg": effective_rate_per_kg,
+                "is_trap": False,
+                "trap_reason": ""
+            })
+
+        # Add Virtual FPO Direct Buyer Option as gold standard recommendation
+        direct_rate = round(max([r["modal_price_per_kg"] for r in results] + [25.0]) + 0.50, 2)
+        direct_gross = round(quantity_kg * direct_rate, 2)
+        shared_freight = round(150.0 + (quantity_kg * 0.30), 2)
+        direct_loading = round(crates * 2.0, 2)
+        direct_deductions = round(shared_freight + direct_loading, 2)
+        direct_net = round(direct_gross - direct_deductions, 2)
+
+        results.append({
+            "mandi_name": "Virtual FPO Direct Buyer (Aggregated Pool)",
+            "district": farmer_district,
+            "state": farmer_state,
+            "commodity": crop.capitalize(),
+            "distance_km": 10.0,
+            "modal_price_per_kg": direct_rate,
+            "min_price_per_kg": direct_rate,
+            "max_price_per_kg": direct_rate,
+            "gross_revenue": direct_gross,
+            "itemized_deductions": {
+                "transport_cost": shared_freight,
+                "commission_cost": 0.0,
+                "commission_pct": 0.0,
+                "unloading_cost": direct_loading,
+                "weighing_fee": 0.0,
+                "total_deductions": direct_deductions
+            },
+            "net_take_home": direct_net,
+            "effective_rate_per_kg": round(direct_net / quantity_kg, 2),
+            "is_trap": False,
+            "trap_reason": "",
+            "is_recommended": True
+        })
+
+        # Flag headline price traps: higher gross/modal price than a local mandi, but lower net take-home
+        for r in results:
+            for other in results:
+                if other["mandi_name"] != r["mandi_name"] and not other.get("is_recommended", False):
+                    if other["modal_price_per_kg"] > r["modal_price_per_kg"] and other["net_take_home"] < r["net_take_home"]:
+                        diff_rate = round(other["modal_price_per_kg"] - r["modal_price_per_kg"], 2)
+                        loss_net = round(r["net_take_home"] - other["net_take_home"], 2)
+                        other["is_trap"] = True
+                        other["trap_reason"] = (
+                            f"Headline Price Trap: Gross price is ₹{diff_rate}/kg higher than {r['mandi_name']}, "
+                            f"but higher freight ({other['distance_km']}km) and commission cuts result in "
+                            f"₹{loss_net} LESS net take-home cash in your pocket!"
+                        )
+
+        # Sort results: recommended first, then by net take-home descending
+        results.sort(key=lambda x: (not x.get("is_recommended", False), -x["net_take_home"]))
+        return results

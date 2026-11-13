@@ -149,6 +149,86 @@ def get_farmer_lots(farmer_id: str, db: Session = Depends(get_db)):
         ]
     }
 
+@router.get("/harvests")
+def list_farmer_harvests(
+    phone: Optional[str] = None,
+    farmer_id: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns scheduled and stored harvests for a farmer identified by mobile phone or farmer_id.
+    """
+    query = db.query(HarvestLot)
+    if phone:
+        farmer = db.query(Farmer).filter(Farmer.phone == phone).first()
+        if farmer:
+            query = query.filter(HarvestLot.farmer_id == farmer.farmer_id)
+        else:
+            return {"success": True, "count": 0, "harvests": []}
+    elif farmer_id:
+        query = query.filter(HarvestLot.farmer_id == farmer_id)
+
+    lots = query.order_by(HarvestLot.created_at.desc()).all()
+    return {
+        "success": True,
+        "count": len(lots),
+        "harvests": [
+            {
+                "harvest_id": l.lot_id,
+                "lot_id": l.lot_id,
+                "farmer_id": l.farmer_id,
+                "crop": l.crop,
+                "variety": l.variety,
+                "quantity_kg": l.quantity_kg,
+                "quality_grade": l.quality_grade,
+                "harvest_date": l.harvest_date,
+                "harvest_time": l.harvest_time,
+                "expected_date_time": l.expected_date_time,
+                "sell_immediately": l.sell_immediately,
+                "status": l.status
+            }
+            for l in lots
+        ]
+    }
+
+@router.get("/harvests/{harvest_id}/mandi-analysis")
+def get_harvest_mandi_analysis(
+    harvest_id: str,
+    target_mandi: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Evaluates all mandi options across India for a specific harvest,
+    transparently analyzing all costs, transport, APMC commissions, and net cash in hand.
+    """
+    from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
+
+    lot = db.query(HarvestLot).filter(HarvestLot.lot_id == harvest_id).first()
+    farmer = db.query(Farmer).filter(Farmer.farmer_id == lot.farmer_id).first() if lot else None
+
+    crop = lot.crop if lot else "Tomato"
+    quantity_kg = lot.quantity_kg if lot else 200.0
+    farmer_district = farmer.district if farmer else "Kolar"
+    farmer_state = farmer.state if farmer else "Karnataka"
+
+    mandi_options = PanIndiaMandiService.evaluate_mandi_options(
+        crop=crop,
+        quantity_kg=quantity_kg,
+        farmer_district=farmer_district,
+        farmer_state=farmer_state,
+        target_mandi=target_mandi
+    )
+
+    return {
+        "success": True,
+        "harvest_id": harvest_id,
+        "crop": crop,
+        "quantity_kg": quantity_kg,
+        "farmer_location": f"{farmer_district}, {farmer_state}",
+        "mandis_count": len(mandi_options),
+        "mandis": mandi_options
+    }
+
 class NetbackCalcRequest(BaseModel):
     quantity_kg: float = Field(..., gt=0)
     crop: str = "Tomato"
