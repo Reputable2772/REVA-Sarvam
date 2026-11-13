@@ -8,6 +8,18 @@ import androidx.compose.ui.graphics.Color
 // Palette: Forest Green, Fresh Lime, Harvest Gold, Warm Ivory, OLED Charcoal
 // ============================================================================
 
+// ============================================================================
+// FARMROUTE SAATHI — FROM SOIL TO MARKET COLOR SYSTEM
+// Palette: Deep Earth, Crop Green, Fresh Leaf, Harvest Gold, Natural Sky, Field Paper
+// ============================================================================
+
+val SoilDeepEarth         = Color(0xFF493A2D) // Rich fertile soil, grounding anchor
+val SoilCropGreen         = Color(0xFF486B43) // Thriving healthy crops, primary action button
+val SoilFreshLeaf         = Color(0xFF91A96D) // Fresh shoot green, natural foliage
+val SoilHarvestGold       = Color(0xFFD7A747) // Golden sunlight & ripe harvest
+val SoilNaturalSky        = Color(0xFFA9C5C9) // Morning open sky & clean air
+val SoilFieldPaper        = Color(0xFFF4F0E5) // Warm organic field paper background
+
 // 🌿 Core Brand & Nature Spectrum
 val ForestGreenDeep       = Color(0xFF14472D) // Deep evergreen anchor (headers, major CTAs)
 val ForestGreenPrimary    = Color(0xFF1B5E20) // Vibrant foliage green
