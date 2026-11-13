@@ -107,6 +107,7 @@ fun ColdStorageDiscoveryScreen(
                 val langCode = if (isKannada) "kn-IN" else "en-IN"
 
                 val res = ApiClient.discoverColdStorage(
+                    farmerId = UserSession.currentFarmer?.phone ?: "FARMER-01",
                     farmerLat = lat,
                     farmerLon = lon,
                     crop = crop,

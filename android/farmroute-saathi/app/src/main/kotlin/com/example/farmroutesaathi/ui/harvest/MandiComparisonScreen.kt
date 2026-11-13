@@ -196,13 +196,11 @@ fun MandiComparisonScreen(
                 var playedViaMediaPlayer = false
 
                 if (audioBase64.isNotBlank()) {
-                    val decodedBytes = Base64.decode(audioBase64, Base64.DEFAULT)
-                    if (decodedBytes != null && decodedBytes.isNotEmpty()) {
-                        try {
+                    try {
+                        val decodedBytes: ByteArray? = Base64.decode(audioBase64, Base64.DEFAULT)
+                        if (decodedBytes != null && decodedBytes.isNotEmpty()) {
                             val tempFile = File.createTempFile("mandi_tts_", ".wav", context.cacheDir)
-                            val fos = FileOutputStream(tempFile)
-                            fos.write(decodedBytes)
-                            fos.close()
+                            FileOutputStream(tempFile).use { it.write(decodedBytes) }
 
                             val player = MediaPlayer().apply {
                                 setDataSource(tempFile.absolutePath)

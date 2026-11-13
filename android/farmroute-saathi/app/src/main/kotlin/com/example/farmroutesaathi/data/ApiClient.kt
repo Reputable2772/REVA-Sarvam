@@ -262,6 +262,20 @@ object ApiClient {
         postJson("$BASE_URL/api/voice/mandi-explanation", jsonBody)
     }
 
+    suspend fun compareMandis(harvestId: String, language: String = "en-IN"): String = withContext(Dispatchers.IO) {
+        getMandiAnalysis(harvestId)
+    }
+
+    suspend fun searchMandis(query: String, crop: String = "Tomato", language: String = "en-IN"): String = withContext(Dispatchers.IO) {
+        val encodedQ = URLEncoder.encode(query, "UTF-8")
+        val encodedC = URLEncoder.encode(crop, "UTF-8")
+        getJson("$BASE_URL/api/market-data/pan-india/mandi-analysis?query=$encodedQ&crop=$encodedC")
+    }
+
+    suspend fun getMandiSpokenAudio(harvestId: String, language: String = "kn-IN"): String = withContext(Dispatchers.IO) {
+        getMandiVoiceExplanation(harvestId, language)
+    }
+
     suspend fun getSchemeRecommendations(identifier: String): String = withContext(Dispatchers.IO) {
         getJson("$BASE_URL/api/schemes/recommendations/$identifier")
     }
@@ -316,15 +330,20 @@ object ApiClient {
     }
 
     suspend fun discoverColdStorage(
-        farmerId: String,
+        farmerId: String = "FARMER-01",
         crop: String = "Tomato",
         quantityKg: Double = 500.0,
         latitude: Double = 13.133,
         longitude: Double = 78.133,
+        farmerLat: Double = latitude,
+        farmerLon: Double = longitude,
         locationText: String = "Kolar, Karnataka",
-        radiusKm: Double = 50.0
+        radiusKm: Double = 50.0,
+        language: String = "en-IN"
     ): String = withContext(Dispatchers.IO) {
-        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"latitude\":$latitude,\"longitude\":$longitude,\"location_text\":\"$locationText\",\"radius_km\":$radiusKm}"
+        val lat = if (farmerLat != 13.133) farmerLat else latitude
+        val lon = if (farmerLon != 78.133) farmerLon else longitude
+        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"latitude\":$lat,\"longitude\":$lon,\"location_text\":\"$locationText\",\"radius_km\":$radiusKm,\"language\":\"$language\"}"
         val res = postJson("$BASE_URL/api/cold-storage/discover", jsonBody)
         if (res.contains("\"simulated_ok\"") || res.contains("404") || res.contains("Failed to connect") || res.contains("Connection refused")) {
             """
@@ -434,6 +453,15 @@ object ApiClient {
         } else {
             res
         }
+    }
+
+    suspend fun getWeatherRiskAlert(
+        lat: Double = 13.133,
+        lon: Double = 78.133,
+        crop: String = "Tomato",
+        farmerId: String = "FARMER-01"
+    ): String = withContext(Dispatchers.IO) {
+        getWeatherHarvestAlerts(farmerId)
     }
 
     suspend fun getWeatherHarvestAlerts(farmerId: String): String = withContext(Dispatchers.IO) {
