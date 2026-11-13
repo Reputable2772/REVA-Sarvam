@@ -1,0 +1,33 @@
+"Sl. No.",State/UT,"Available Capacity (MT)","Capacity Required (MT)"
+1,"Andhra Pradesh",1577828,530925
+2,"Arunachal Pradesh",5000,7508
+3,Assam,119652,71996
+4,Bihar,1406395,5123982
+5,Chattishgarh,427766,513830
+6,Delhi,129857,40122
+7,Goa,7705,2271
+8,Gujarat,2030873,2239476
+9,Haryana,588649,240395
+10,"Himachal Pradesh",38557,306147
+11,"Jammu & Kashmir",64769,907842
+12,Jharkhand,217280,24951
+13,Karnataka,526752,210313
+14,Kerala,78355,45874
+15,"Madhya Pradesh",1097168,1867179
+16,Maharashtra,706303,157709
+17,Manipur,2175,5062
+18,Meghalaya,8200,18704
+19,Mizoram,3931,8920
+20,Nagaland,6150,8675
+21,Odisha,326639,305500
+22,Punjab,2004778,1693408
+23,Rajasthan,480032,53395
+24,Sikkim,2000,2621
+25,"Tamil Nadu",295671,194640
+26,Telangana,NA,277129
+27,Tripura,39181,8554
+28,"Uttar Pradesh",13633039,10675137
+29,Uttarakhand,84545,72931
+30,"West Bengal",5901925,9480929
+31,"UT & Others",12526,4539
+Total,Total,31823701,35100664

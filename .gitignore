@@ -15,3 +15,6 @@ scripts/mcp_state.json
 .gradle/
 build/
 app/build/
+api_response.json
+scratch_page.html
+test.csv
