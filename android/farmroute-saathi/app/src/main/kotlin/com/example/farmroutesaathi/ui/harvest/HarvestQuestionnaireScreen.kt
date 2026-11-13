@@ -328,9 +328,8 @@ fun HarvestQuestionnaireScreen(
 
     if (showLanguageDialog) {
         LanguageSelectionDialog(
-            currentLangCode = UserSession.selectedLanguageCode,
             onDismiss = { showLanguageDialog = false },
-            onSelect = { lang ->
+            onLanguageSelected = { lang ->
                 UserSession.setLanguage(lang)
                 showLanguageDialog = false
             }
