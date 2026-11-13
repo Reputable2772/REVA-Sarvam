@@ -102,7 +102,6 @@ class VirtualFpoPool(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     shares = relationship("FarmerPoolShare", back_populates="pool")
-    escrow_orders = relationship("EscrowOrder", back_populates="pool")
 
 class FarmerPoolShare(Base):
     __tablename__ = "farmer_pool_shares"
@@ -137,23 +136,6 @@ class OperatorWeighment(Base):
     verified_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     lot = relationship("HarvestLot", back_populates="weighment")
-
-class EscrowOrder(Base):
-    __tablename__ = "escrow_orders"
-
-    id = Column(String(50), primary_key=True)
-    pool_id = Column(String(50), ForeignKey("virtual_fpo_pools.pool_id"), nullable=False)
-    buyer_id = Column(String(50), nullable=False)
-    total_amount = Column(Float, nullable=False)
-    grade_a_amount = Column(Float, nullable=False)
-    grade_b_amount = Column(Float, nullable=False, default=0.0)
-    grade_c_amount = Column(Float, nullable=False, default=0.0)
-    status = Column(String(30), nullable=False, default="PENDING") # PENDING, ESCROW_LOCKED, DELIVERED, SETTLED
-    is_simulated = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    settled_at = Column(DateTime, nullable=True)
-
-    pool = relationship("VirtualFpoPool", back_populates="escrow_orders")
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
