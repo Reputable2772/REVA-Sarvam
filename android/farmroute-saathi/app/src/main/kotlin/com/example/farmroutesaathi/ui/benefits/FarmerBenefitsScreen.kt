@@ -397,15 +397,16 @@ fun FarmerBenefitsScreen(
         // Missing Information Prompt Banner (If user can unlock Raitha Siri / Smallholder grants)
         if (moreInfoNeededCount > 0) {
             Card(
-                colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCardHigh else WarmIvoryBackground),
-                shape = RoundedCornerShape(12.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, HarvestGold),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCardHigh else Color.White),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.2.dp, HarvestGold),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(12.dp),
+                        .padding(14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -413,13 +414,13 @@ fun FarmerBenefitsScreen(
                         Text(
                             text = if (isKannada) "💡 ₹20,000 ರೈತ ಸಿರಿ ಸೌಲಭ್ಯ ಅನ್‌ಲಾಕ್ ಮಾಡಿ" else "💡 Unlock ₹20,000 Raitha Siri Benefit",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
+                            fontSize = 12.5.sp,
                             color = if (isDark) HarvestGold else HarvestGoldDark
                         )
                         Text(
                             text = if (isKannada) "ಫ್ರೂಟ್ಸ್ (FRUITS) FID ದಾಖಲಿಸಿ ಅರ್ಹತೆ ಖಚಿತಪಡಿಸಿ" else "Provide FRUITS FID & Landholding to confirm eligibility",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = 11.sp,
+                            color = if (isDark) SoilFieldPaper.copy(alpha = 0.8f) else SoilDeepEarth.copy(alpha = 0.8f)
                         )
                     }
 
@@ -452,10 +453,24 @@ fun FarmerBenefitsScreen(
                 FilterChip(
                     selected = selectedCategory == catKey,
                     onClick = { selectedCategory = catKey },
-                    label = { Text(label, fontSize = 11.sp) },
+                    label = {
+                        Text(
+                            text = label,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (selectedCategory == catKey) FontWeight.Bold else FontWeight.Medium
+                        )
+                    },
                     colors = FilterChipDefaults.filterChipColors(
+                        containerColor = if (isDark) SurfaceDarkCard else Color.White,
+                        labelColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
                         selectedContainerColor = SoilCropGreen,
                         selectedLabelColor = Color.White
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        borderColor = if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.18f),
+                        selectedBorderColor = SoilCropGreen,
+                        enabled = true,
+                        selected = selectedCategory == catKey
                     )
                 )
             }
@@ -467,7 +482,7 @@ fun FarmerBenefitsScreen(
                 CircularProgressIndicator(color = SoilCropGreen)
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 filteredSchemes.forEach { scheme ->
                     SchemeCardView(
                         scheme = scheme,
@@ -490,15 +505,16 @@ fun FarmerBenefitsScreen(
         // FPO Institutional Distinction Banner
         Card(
             colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
+            shape = RoundedCornerShape(14.dp),
+            border = androidx.compose.foundation.BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = if (isKannada) "ℹ️ FPO ಸಂಸ್ಥೆ ಮತ್ತು ವೈಯಕ್ತಿಕ ರೈತರ ಸೌಲಭ್ಯಗಳ ವ್ಯತ್ಯಾಸ" else "ℹ️ Individual vs FPO Institutional Grants Policy",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = 13.5.sp,
                     color = if (isDark) SoilFreshLeaf else SoilCropGreen
                 )
                 Text(
@@ -506,9 +522,9 @@ fun FarmerBenefitsScreen(
                         "SFAC ಮತ್ತು ನಬಾರ್ಡ್‌ನ ₹15 ಲಕ್ಷ ಈಕ್ವಿಟಿ ಅನುದಾನವು ನೋಂದಾಯಿತ FPO ಕಂಪನಿಗೆ ಮಾತ್ರ ಸಿಗುತ್ತದೆ, ವೈಯಕ್ತಿಕ ರೈತರ ಖಾತೆಗಲ್ಲ. ನೀವು FPO ಸದಸ್ಯರಾಗುವುದರಿಂದ ಸಾಮೂಹಿಕ ಖರೀದಿ ಮತ್ತು ಸಾರಿಗೆ ವೆಚ್ಚ ಉಳಿತಾಯವಾಗುತ್ತದೆ."
                     else
                         "Institutional grants (SFAC/NABARD up to ₹15 Lakhs) are deposited directly into registered Farmer Producer Companies for infrastructure & procurement, not paid to individual farmers. Joining your local Kolar FPO gives you aggregated market power.",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 15.sp
+                    fontSize = 12.sp,
+                    color = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                    lineHeight = 17.sp
                 )
             }
         }
@@ -518,11 +534,15 @@ fun FarmerBenefitsScreen(
     if (showMissingInfoDialog) {
         AlertDialog(
             onDismissRequest = { showMissingInfoDialog = false },
+            containerColor = if (isDark) SurfaceDarkCard else Color.White,
+            titleContentColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+            textContentColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
             title = {
                 Text(
                     text = if (isKannada) "ರೈತ ಪ್ರೊಫೈಲ್ ಅಪ್‌ಡೇಟ್" else "Voluntary Farmer Profile",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 16.sp,
+                    color = if (isDark) SoilFieldPaper else SoilDeepEarth
                 )
             },
             text = {
@@ -532,7 +552,8 @@ fun FarmerBenefitsScreen(
                             "ಭೂಮಿ ವಿಸ್ತೀರ್ಣ ಮತ್ತು FRUITS FID ದಾಖಲಿಸಿ ಕರ್ನಾಟಕ ಸರ್ಕಾರದ ₹20,000 ರೈತ ಸಿರಿ ಸೌಲಭ್ಯವನ್ನು ದೃಢೀಕರಿಸಿ:"
                         else
                             "Provide your landholding and FRUITS FID to unlock Karnataka Raitha Siri benefits:",
-                        fontSize = 11.sp
+                        fontSize = 11.5.sp,
+                        color = if (isDark) SoilFieldPaper else SoilDeepEarth
                     )
 
                     OutlinedTextField(
@@ -540,7 +561,15 @@ fun FarmerBenefitsScreen(
                         onValueChange = { landholdingInput = it },
                         label = { Text("Landholding (Hectares)") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                            unfocusedTextColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilCropGreen.copy(alpha = 0.4f),
+                            focusedLabelColor = SoilCropGreen,
+                            unfocusedLabelColor = if (isDark) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.7f)
+                        )
                     )
 
                     OutlinedTextField(
@@ -548,7 +577,15 @@ fun FarmerBenefitsScreen(
                         onValueChange = { fruitsIdInput = it },
                         label = { Text("FRUITS FID Number") },
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                            unfocusedTextColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilCropGreen.copy(alpha = 0.4f),
+                            focusedLabelColor = SoilCropGreen,
+                            unfocusedLabelColor = if (isDark) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.7f)
+                        )
                     )
 
                     Row(
@@ -559,21 +596,25 @@ fun FarmerBenefitsScreen(
                             checked = isFpoMemberInput,
                             onCheckedChange = { isFpoMemberInput = it }
                         )
-                        Text("Member of local FPO cluster", fontSize = 12.sp)
+                        Text(
+                            text = "Member of local FPO cluster",
+                            fontSize = 12.sp,
+                            color = if (isDark) SoilFieldPaper else SoilDeepEarth
+                        )
                     }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { submitVoluntaryProfile() },
-                    colors = ButtonDefaults.buttonColors(containerColor = FreshLeafGreen)
+                    colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen)
                 ) {
                     Text("Recalculate Eligibility", color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showMissingInfoDialog = false }) {
-                    Text("Cancel")
+                    Text("Cancel", color = if (isDark) SoilFreshLeaf else SoilCropGreen)
                 }
             }
         )
@@ -583,15 +624,23 @@ fun FarmerBenefitsScreen(
     if (showNotificationsSheet) {
         AlertDialog(
             onDismissRequest = { showNotificationsSheet = false },
+            containerColor = if (isDark) SurfaceDarkCard else Color.White,
+            titleContentColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
+            textContentColor = if (isDark) SoilFieldPaper else SoilDeepEarth,
             title = {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("🔔 Scheme Alerts & Notifications", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(
+                        text = "🔔 Scheme Alerts & Notifications",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (isDark) SoilFieldPaper else SoilDeepEarth
+                    )
                     IconButton(onClick = { showNotificationsSheet = false }) {
-                        Text("✕")
+                        Text("✕", color = if (isDark) SoilFieldPaper else SoilDeepEarth)
                     }
                 }
             },
@@ -601,11 +650,15 @@ fun FarmerBenefitsScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (notificationsList.isEmpty()) {
-                        Text("No active notifications at this time.", fontSize = 12.sp)
+                        Text(
+                            text = "No active notifications at this time.",
+                            fontSize = 12.sp,
+                            color = if (isDark) SoilFieldPaper else SoilDeepEarth
+                        )
                     } else {
                         notificationsList.forEach { notif ->
                             Surface(
-                                color = if (isDark) SurfaceDarkCard else SurfaceParchmentWarm,
+                                color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -614,16 +667,17 @@ fun FarmerBenefitsScreen(
                                         text = if (isKannada) notif.titleKn else notif.titleEn,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
-                                        color = if (isDark) FreshLimeAccent else ForestGreenDeep
+                                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                                     )
                                     Text(
                                         text = if (isKannada) notif.bodyKn else notif.bodyEn,
-                                        fontSize = 11.sp
+                                        fontSize = 11.5.sp,
+                                        color = if (isDark) SoilFieldPaper else SoilDeepEarth
                                     )
                                     Text(
                                         text = if (isKannada) notif.whyReceivedKn else notif.whyReceivedEn,
-                                        fontSize = 10.sp,
-                                        color = HarvestGoldDark,
+                                        fontSize = 10.5.sp,
+                                        color = if (isDark) HarvestGold else HarvestGoldDark,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -634,7 +688,7 @@ fun FarmerBenefitsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showNotificationsSheet = false }) {
-                    Text("Close")
+                    Text("Close", color = if (isDark) SoilFreshLeaf else SoilCropGreen)
                 }
             }
         )
@@ -652,10 +706,10 @@ fun SchemeCardView(
     var isExpanded by remember { mutableStateOf(false) }
 
     val statusColor = when (scheme.matchStatus) {
-        "LIKELY_ELIGIBLE" -> FreshLeafGreen
-        "MORE_INFO_REQUIRED" -> HarvestGoldDark
+        "LIKELY_ELIGIBLE" -> if (isDark) SoilFreshLeaf else SoilCropGreen
+        "MORE_INFO_REQUIRED" -> if (isDark) HarvestGold else HarvestGoldDark
         "POTENTIALLY_RELEVANT" -> SemanticInfoBlue
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> if (isDark) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.7f)
     }
 
     val statusLabel = when (scheme.matchStatus) {
@@ -722,21 +776,25 @@ fun SchemeCardView(
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = if (isKannada) scheme.titleKn else scheme.titleEn,
-                    fontSize = 15.sp,
+                    fontSize = 15.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) TextPrimaryDark else SoilDeepEarth
+                    color = if (isDark) SoilFieldPaper else SoilDeepEarth
                 )
                 Text(
                     text = scheme.issuingDepartment,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 11.5.sp,
+                    color = if (isDark) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.75f)
                 )
             }
 
             // Benefit Spec Box (High-Contrast Living Intelligence style)
             Surface(
                 color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
-                shape = RoundedCornerShape(8.dp),
+                shape = RoundedCornerShape(10.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.08f)
+                ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -749,12 +807,13 @@ fun SchemeCardView(
                     Column {
                         Text(
                             text = if (isKannada) "ಆರ್ಥಿಕ ಸೌಲಭ್ಯ / ಪ್ರೋತ್ಸಾಹಧನ:" else "Financial Assistance / Benefit:",
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = 10.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) SoilFieldPaper.copy(alpha = 0.7f) else SoilDeepEarth.copy(alpha = 0.7f)
                         )
                         Text(
                             text = scheme.benefitAmountSpec,
-                            fontSize = 13.sp,
+                            fontSize = 13.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = if (isDark) SoilFreshLeaf else SoilCropGreen
                         )
@@ -765,9 +824,10 @@ fun SchemeCardView(
             // Relevance reason
             Text(
                 text = "💡 ${if (isKannada) scheme.relevanceReasonKn else scheme.relevanceReasonEn}",
-                fontSize = 11.sp,
+                fontSize = 11.5.sp,
                 color = if (isDark) HarvestGold else HarvestGoldDark,
-                lineHeight = 15.sp
+                lineHeight = 16.sp,
+                fontWeight = FontWeight.Medium
             )
 
             // Missing information callout if any
@@ -779,7 +839,7 @@ fun SchemeCardView(
                 ) {
                     Text(
                         text = "⚠️ Missing: ${scheme.missingFields.joinToString(", ")}",
-                        fontSize = 10.sp,
+                        fontSize = 10.5.sp,
                         color = SemanticWarningAmber,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(6.dp)
@@ -798,8 +858,8 @@ fun SchemeCardView(
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = if (isExpanded) "▲ Hide Details" else "▼ View Documents & Steps",
-                        fontSize = 11.sp,
+                        text = if (isExpanded) "▲ Hide Details" else "▼ View Full Scheme Dossier & Steps",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
@@ -813,7 +873,7 @@ fun SchemeCardView(
                 }
             }
 
-            // Expanded Dossier Section
+            // Expanded Dossier Section (Structured 8-part view with 100% visible high-contrast styling)
             AnimatedVisibility(visible = isExpanded) {
                 Column(
                     modifier = Modifier
@@ -821,64 +881,182 @@ fun SchemeCardView(
                         .padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    HorizontalDivider(color = BorderParchment.copy(alpha = 0.5f))
+                    HorizontalDivider(color = if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.15f))
 
-                    // Benefit Description
+                    // 1. Scheme Overview
                     Text(
-                        text = "📋 Description:",
+                        text = if (isKannada) "📋 1. ಯೋಜನೆಯ ಸಾರಾಂಶ:" else "📋 1. Scheme Overview:",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
+                        fontSize = 12.5.sp,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
                     Text(
-                        text = if (isKannada) scheme.benefitDescKn else scheme.benefitDescEn,
-                        fontSize = 11.sp,
-                        lineHeight = 15.sp
+                        text = (if (isKannada) scheme.benefitDescKn.ifEmpty { scheme.benefitDescEn } else scheme.benefitDescEn)
+                            .ifEmpty { "Official scheme details published under MoA&FW / Karnataka Agriculture." },
+                        fontSize = 12.sp,
+                        color = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                        lineHeight = 17.sp
                     )
 
-                    // Required Documents Checklist
+                    // 2. Eligibility Criteria
                     Text(
-                        text = "📄 Required Documents Checklist:",
+                        text = if (isKannada) "✅ 2. ಅರ್ಹತಾ ಮಾನದಂಡಗಳು:" else "✅ 2. Eligibility Criteria:",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
+                        fontSize = 12.5.sp,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
-                    scheme.requiredDocuments.forEach { doc ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("☑", color = if (isDark) SoilFreshLeaf else SoilCropGreen, fontSize = 12.sp)
-                            Text(doc, fontSize = 11.sp)
-                        }
-                    }
-
-                    // Step-by-Step Instructions
-                    Text(
-                        text = "🚀 Step-by-Step Application Walkthrough:",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp
-                    )
-                    scheme.applicationSteps.forEach { step ->
-                        Text(step, fontSize = 11.sp, lineHeight = 15.sp)
-                    }
-
-                    // Official Source & Portal URL
                     Surface(
-                        color = if (isDark) Color.Black.copy(alpha = 0.3f) else SoilFieldPaper,
+                        color = if (isDark) SoilCropGreen.copy(alpha = 0.15f) else SoilCropGreen.copy(alpha = 0.08f),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = (if (isKannada) scheme.eligibilityKn.ifEmpty { scheme.eligibilityEn } else scheme.eligibilityEn)
+                                .ifEmpty { "Open to all notified landholding and smallholder farmers." },
+                            fontSize = 12.sp,
+                            color = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                            lineHeight = 17.sp,
+                            modifier = Modifier.padding(10.dp)
+                        )
+                    }
+
+                    // 3. Financial Assistance & Benefits
+                    Text(
+                        text = if (isKannada) "💰 3. ಆರ್ಥಿಕ ಸೌಲಭ್ಯ ಮತ್ತು ಪ್ರಯೋಜನಗಳು:" else "💰 3. Financial Assistance & Benefits:",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = if (isDark) HarvestGold else HarvestGoldDark
+                    )
+                    Surface(
+                        color = if (isDark) HarvestGold.copy(alpha = 0.12f) else HarvestGold.copy(alpha = 0.10f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = scheme.benefitAmountSpec,
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isDark) HarvestGold else SoilDeepEarth,
+                            modifier = Modifier.padding(10.dp),
+                            lineHeight = 17.sp
+                        )
+                    }
+
+                    // 4. Required Documents Checklist
+                    Text(
+                        text = if (isKannada) "📄 4. ಅಗತ್ಯ ದಾಖಲೆಗಳ ಪಟ್ಟಿ:" else "📄 4. Required Documents Checklist:",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
+                    )
+                    if (scheme.requiredDocuments.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            scheme.requiredDocuments.forEach { doc ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("☑", color = if (isDark) SoilFreshLeaf else SoilCropGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = doc,
+                                        fontSize = 12.sp,
+                                        color = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "• Land RTC / Pahani, Aadhaar card, Bank Passbook, and e-KYC.",
+                            fontSize = 11.5.sp,
+                            color = if (isDark) SoilFieldPaper else SoilDeepEarth
+                        )
+                    }
+
+                    // 5. Step-by-Step Application Procedure
+                    Text(
+                        text = if (isKannada) "🚀 5. ಅರ್ಜಿ ಸಲ್ಲಿಸುವ ಹಂತ-ಹಂತದ ವಿಧಾನ:" else "🚀 5. Application Procedure (Step-by-Step):",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
+                    )
+                    if (scheme.applicationSteps.isNotEmpty()) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            scheme.applicationSteps.forEach { step ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Text("•", color = if (isDark) SoilFreshLeaf else SoilCropGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = step,
+                                        fontSize = 12.sp,
+                                        color = if (isDark) SoilFieldPaper else SoilDeepEarth,
+                                        lineHeight = 17.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = "Apply via official portal or visit your nearest Raitha Samparka Kendra / CSC Centre.",
+                            fontSize = 11.5.sp,
+                            color = if (isDark) SoilFieldPaper else SoilDeepEarth
+                        )
+                    }
+
+                    // 6. Important Conditions & Exclusions
+                    Text(
+                        text = if (isKannada) "⚠️ 6. ಮುಖ್ಯ ಷರತ್ತುಗಳು ಮತ್ತು ಹೊರತುಪಡಿಸುವಿಕೆಗಳು:" else "⚠️ 6. Important Conditions & Exclusions:",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = if (isDark) SemanticWarningAmber else Color(0xFFB45309)
+                    )
+                    Surface(
+                        color = if (isDark) SemanticWarningAmber.copy(alpha = 0.12f) else Color(0xFFFEF3C7),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = (if (isKannada) scheme.exclusionKn.ifEmpty { scheme.exclusionEn } else scheme.exclusionEn)
+                                .ifEmpty { "Standard government exclusions apply (e.g. non-agricultural use or institutional entities)." },
+                            fontSize = 11.5.sp,
+                            color = if (isDark) SoilFieldPaper else Color(0xFF78350F),
+                            modifier = Modifier.padding(10.dp),
+                            lineHeight = 16.sp
+                        )
+                    }
+
+                    // 7. Official Website & Helpdesk & 8. Last Verified Date
+                    Surface(
+                        color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            1.dp,
+                            if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.08f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "🌐 Official Portal: ${scheme.officialPortalUrl}",
-                                fontSize = 10.sp,
+                                text = "🌐 7. Official Portal: ${scheme.officialPortalUrl}",
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SemanticInfoBlue
                             )
                             Text(
                                 text = "📞 Official Helpdesk: ${scheme.officialContact}",
-                                fontSize = 10.sp
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (isDark) SoilFieldPaper else SoilDeepEarth
                             )
                             Text(
-                                text = "Last Verified: ${scheme.lastVerifiedDate} (${scheme.freshnessLabel})",
-                                fontSize = 9.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "🛡️ 8. Verified: ${scheme.lastVerifiedDate} • ${scheme.freshnessLabel} (${scheme.verificationStatus})",
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (isDark) SoilFreshLeaf else SoilCropGreen
                             )
                         }
                     }
@@ -889,16 +1067,31 @@ fun SchemeCardView(
 }
 
 private fun parseSchemeJson(obj: JSONObject): SchemeCardData {
+    val id = obj.optString("scheme_id")
+    val defaultScheme = getDefaultSchemes().find { it.schemeId == id }
+
     val reqDocs = mutableListOf<String>()
     val docsArr = obj.optJSONArray("required_documents")
-    if (docsArr != null) {
-        for (i in 0 until docsArr.length()) reqDocs.add(docsArr.getString(i))
+    if (docsArr != null && docsArr.length() > 0) {
+        for (i in 0 until docsArr.length()) {
+            val d = docsArr.optString(i, "").trim()
+            if (d.isNotEmpty()) reqDocs.add(d)
+        }
+    }
+    if (reqDocs.isEmpty() && defaultScheme != null) {
+        reqDocs.addAll(defaultScheme.requiredDocuments)
     }
 
     val steps = mutableListOf<String>()
     val stepsArr = obj.optJSONArray("application_steps")
-    if (stepsArr != null) {
-        for (i in 0 until stepsArr.length()) steps.add(stepsArr.getString(i))
+    if (stepsArr != null && stepsArr.length() > 0) {
+        for (i in 0 until stepsArr.length()) {
+            val s = stepsArr.optString(i, "").trim()
+            if (s.isNotEmpty()) steps.add(s)
+        }
+    }
+    if (steps.isEmpty() && defaultScheme != null) {
+        steps.addAll(defaultScheme.applicationSteps)
     }
 
     val missing = mutableListOf<String>()
@@ -913,31 +1106,40 @@ private fun parseSchemeJson(obj: JSONObject): SchemeCardData {
         for (i in 0 until rulesArr.length()) rules.add(rulesArr.getString(i))
     }
 
+    val benefitDescEn = obj.optString("benefit_description_en").ifEmpty { defaultScheme?.benefitDescEn ?: "" }
+    val benefitDescKn = obj.optString("benefit_description_kn").ifEmpty { defaultScheme?.benefitDescKn ?: "" }
+    val eligibilityEn = obj.optString("eligibility_criteria_en").ifEmpty { defaultScheme?.eligibilityEn ?: "" }
+    val eligibilityKn = obj.optString("eligibility_criteria_kn").ifEmpty { defaultScheme?.eligibilityKn ?: "" }
+    val exclusionEn = obj.optString("exclusion_criteria_en").ifEmpty { defaultScheme?.exclusionEn ?: "" }
+    val exclusionKn = obj.optString("exclusion_criteria_kn").ifEmpty { defaultScheme?.exclusionKn ?: "" }
+    val officialPortalUrl = obj.optString("official_portal_url").ifEmpty { defaultScheme?.officialPortalUrl ?: "https://agricoop.gov.in" }
+    val officialContact = obj.optString("official_contact").ifEmpty { defaultScheme?.officialContact ?: "Kisan Call Centre: 1551" }
+
     return SchemeCardData(
-        schemeId = obj.optString("scheme_id"),
-        titleEn = obj.optString("title_en"),
-        titleKn = obj.optString("title_kn"),
-        category = obj.optString("category"),
-        targetLevel = obj.optString("target_level", "INDIVIDUAL_FARMER"),
-        issuingDepartment = obj.optString("issuing_department"),
-        benefitAmountSpec = obj.optString("benefit_amount_spec"),
-        benefitDescEn = obj.optString("benefit_description_en"),
-        benefitDescKn = obj.optString("benefit_description_kn"),
-        eligibilityEn = obj.optString("eligibility_criteria_en"),
-        eligibilityKn = obj.optString("eligibility_criteria_kn"),
-        exclusionEn = obj.optString("exclusion_criteria_en"),
-        exclusionKn = obj.optString("exclusion_criteria_kn"),
+        schemeId = id,
+        titleEn = obj.optString("title_en").ifEmpty { defaultScheme?.titleEn ?: id },
+        titleKn = obj.optString("title_kn").ifEmpty { defaultScheme?.titleKn ?: id },
+        category = obj.optString("category").ifEmpty { defaultScheme?.category ?: "GENERAL" },
+        targetLevel = obj.optString("target_level", defaultScheme?.targetLevel ?: "INDIVIDUAL_FARMER"),
+        issuingDepartment = obj.optString("issuing_department").ifEmpty { defaultScheme?.issuingDepartment ?: "Government of India / Karnataka" },
+        benefitAmountSpec = obj.optString("benefit_amount_spec").ifEmpty { defaultScheme?.benefitAmountSpec ?: "Govt Subsidy / DBT" },
+        benefitDescEn = benefitDescEn,
+        benefitDescKn = benefitDescKn,
+        eligibilityEn = eligibilityEn,
+        eligibilityKn = eligibilityKn,
+        exclusionEn = exclusionEn,
+        exclusionKn = exclusionKn,
         requiredDocuments = reqDocs,
         applicationSteps = steps,
-        applicationMethod = obj.optString("application_method"),
-        officialPortalUrl = obj.optString("official_portal_url"),
-        officialContact = obj.optString("official_contact"),
+        applicationMethod = obj.optString("application_method").ifEmpty { defaultScheme?.applicationMethod ?: "ONLINE_OR_CSC" },
+        officialPortalUrl = officialPortalUrl,
+        officialContact = officialContact,
         verificationStatus = obj.optString("verification_status", "OFFICIALLY_VERIFIED"),
         lastVerifiedDate = obj.optString("last_verified_date", "2026-11-13"),
         freshnessLabel = obj.optString("freshness_label", "Active 2026"),
-        matchStatus = obj.optString("match_status", "LIKELY_ELIGIBLE"),
-        relevanceReasonEn = obj.optString("relevance_reason_en"),
-        relevanceReasonKn = obj.optString("relevance_reason_kn"),
+        matchStatus = obj.optString("match_status", defaultScheme?.matchStatus ?: "LIKELY_ELIGIBLE"),
+        relevanceReasonEn = obj.optString("relevance_reason_en").ifEmpty { defaultScheme?.relevanceReasonEn ?: "Verified scheme for Indian farmers." },
+        relevanceReasonKn = obj.optString("relevance_reason_kn").ifEmpty { defaultScheme?.relevanceReasonKn ?: "ರೈತರಿಗೆ ಸರ್ಕಾರದ ಅಧಿಕೃತ ಯೋಜನೆ." },
         missingFields = missing,
         matchedRules = rules
     )
