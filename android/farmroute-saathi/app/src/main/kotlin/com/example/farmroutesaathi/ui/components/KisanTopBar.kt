@@ -38,6 +38,7 @@ fun KisanTopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(gradientBrush)
+            .statusBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(
