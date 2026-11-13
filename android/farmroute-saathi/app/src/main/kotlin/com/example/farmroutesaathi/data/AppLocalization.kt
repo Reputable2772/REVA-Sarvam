@@ -50,7 +50,25 @@ object AppLocalization {
             "enter_full_name_err" to "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
             "enter_pincode_err" to "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ 6-ಅಂಕಿಯ ಪಿನ್‌ಕೋಡ್ ನಮೂದಿಸಿ",
             "set_new_mpin_err" to "ದಯವಿಟ್ಟು 4-ಅಂಕಿಯ ಹೊಸ MPIN ನಮೂದಿಸಿ",
-            "mpin_mismatch_err" to "MPIN ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ"
+            "mpin_mismatch_err" to "MPIN ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ",
+            // Questionnaire Strings
+            "questionnaire_title" to "ಕೊಯ್ಲು ವಿವರಗಳ ಪ್ರಶ್ನಾವಳಿ",
+            "questionnaire_sub" to "ನಿಮ್ಮ ಬೆಳೆ ಕೊಯ್ಲು ವಿವರಗಳನ್ನು ನಮೂದಿಸಿ ಅಥವಾ ಧ್ವನಿ ಮೂಲಕ ಮಾತನಾಡಿ",
+            "action_heading" to "ನಿಮ್ಮ ಕೊಯ್ಲನ್ನು ಏನು ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
+            "sell_now_title" to "ತಕ್ಷಣ ಮಾರಾಟ ⚡",
+            "sell_now_desc" to "ಮಂಡಿಗಳು, ನೇರ ಖರೀದಿದಾರರು ಮತ್ತು FPO ಪೂಲಿಂಗ್ ಅವಕಾಶಗಳನ್ನು ಹೋಲಿಕೆ ಮಾಡಿ.",
+            "cold_storage_title" to "ಶೀತಲಾಗಾರ ಶೋಧಿಸಿ ❄️",
+            "cold_storage_desc" to "ಸಮೀಪದ ಶೀತಲಾಗಾರಗಳನ್ನು ಶೋಧಿಸಿ ಮತ್ತು ಮಂಡಿಗಳಿಗೆ ಇರುವ ದೂರವನ್ನು ಹೋಲಿಕೆ ಮಾಡಿ.",
+            "btn_confirm_sell_now" to "⚡ ಕೊಯ್ಲು ದೃಢೀಕರಿಸಿ & ಮಾರಾಟ ಮಾರ್ಗಗಳನ್ನು ಹೋಲಿಸಿ ➔",
+            "btn_confirm_cold_storage" to "❄️ ಕೊಯ್ಲು ದೃಢೀಕರಿಸಿ & ಶೀತಲಾಗಾರ ಶೋಧಿಸಿ ➔",
+            "skip_questionnaire" to "ಈಗಲೇ ಬಿಟ್ಟುಬಿಡಿ (ಡೀಫಾಲ್ಟ್ ಲಾಟ್ ಬಳಸಿ)",
+            "select_crop_title" to "1. ಬೆಳೆ ಆಯ್ಕೆಮಾಡಿ (Select Crop)",
+            "harvest_date_title" to "2. ಕೊಯ್ಲು ದಿನಾಂಕ (Harvest Date)",
+            "harvest_time_title" to "3. ಕೊಯ್ಲು ಸಮಯ (Harvest Time)",
+            "expected_time_title" to "4. ನಿರೀಕ್ಷಿತ ಸಾಗಣೆ ಸಮಯ (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. ಅಂದಾಜು ತೂಕ (Declared Quantity)",
+            "voice_card_title" to "ಫಾರ್ಮ್‌ರೂಟ್‌ ಧ್ವನಿ ಸಹಾಯಕ",
+            "voice_card_sub" to "ನಿಮ್ಮ ಕೊಯ್ಲಿನ ವಿವರಗಳನ್ನು ಮಾತನಾಡಿ"
         ),
 
         // ==========================================
@@ -100,7 +118,25 @@ object AppLocalization {
             "enter_full_name_err" to "Please enter your full name",
             "enter_pincode_err" to "Please enter a 6-digit pincode",
             "set_new_mpin_err" to "Please set a 4-digit MPIN",
-            "mpin_mismatch_err" to "MPIN confirmation does not match"
+            "mpin_mismatch_err" to "MPIN confirmation does not match",
+            // Questionnaire Strings
+            "questionnaire_title" to "Harvest Questionnaire",
+            "questionnaire_sub" to "Declare your harvest details below or speak naturally using voice",
+            "action_heading" to "What would you like to do with your harvest?",
+            "sell_now_title" to "Sell Now ⚡",
+            "sell_now_desc" to "Compare mandis, direct buyers and FPO pooling opportunities.",
+            "cold_storage_title" to "Find Cold Storage ❄️",
+            "cold_storage_desc" to "Discover nearby cold storage facilities and compare distances to Mandis.",
+            "btn_confirm_sell_now" to "⚡ CONFIRM & COMPARE SELLING ROUTES ➔",
+            "btn_confirm_cold_storage" to "❄️ CONFIRM & FIND COLD STORAGE ➔",
+            "skip_questionnaire" to "Skip for now (Use default lot FR-KLR-20261113-0001)",
+            "select_crop_title" to "1. Select Crop",
+            "harvest_date_title" to "2. Harvest Date",
+            "harvest_time_title" to "3. Harvest Time",
+            "expected_time_title" to "4. Expected Pickup / Delivery Time",
+            "declared_qty_title" to "5. Declared Quantity (kg)",
+            "voice_card_title" to "FarmRoute Voice Assistant",
+            "voice_card_sub" to "Speak your harvest details naturally"
         ),
 
         // ==========================================
@@ -150,7 +186,25 @@ object AppLocalization {
             "enter_full_name_err" to "దయచేసి మీ పూర్తి పేరు నమోదు చేయండి",
             "enter_pincode_err" to "దయచేసి సరైన 6-అంకెల పిన్‌కోడ్ నమోదు చేయండి",
             "set_new_mpin_err" to "దయచేసి 4-అంకెల కొత్త MPIN సెట్ చేయండి",
-            "mpin_mismatch_err" to "MPIN సరిపోలడం లేదు"
+            "mpin_mismatch_err" to "MPIN సరిపోలడం లేదు",
+            // Questionnaire Strings
+            "questionnaire_title" to "పంట వివరాల ప్రశ్నాపత్రం",
+            "questionnaire_sub" to "మీ పంట వివరాలను నమోదు చేయండి లేదా వాయిస్ ద్వారా మాట్లాడండి",
+            "action_heading" to "మీ పంటతో మీరు ఏమి చేయాలనుకుంటున్నారు?",
+            "sell_now_title" to "ఇప్పుడే అమ్మండి ⚡",
+            "sell_now_desc" to "మార్కెట్లు, ప్రత్యక్ష కొనుగోలుదారులు మరియు FPO పూలింగ్ అవకాశాలను పోల్చండి.",
+            "cold_storage_title" to "కోల్డ్ స్టోరేజ్ కనుగొనండి ❄️",
+            "cold_storage_desc" to "సమీపంలోని కోల్డ్ స్టోరేజ్ సౌకర్యాలను కనుగొనండి మరియు మార్కెట్లకు దూరాలను పోల్చండి.",
+            "btn_confirm_sell_now" to "⚡ పంటను నిర్ధారించి అమ్మకపు మార్గాలను పోల్చండి ➔",
+            "btn_confirm_cold_storage" to "❄️ పంటను నిర్ధారించి కోల్డ్ స్టోరేజ్ కనుగొనండి ➔",
+            "skip_questionnaire" to "ప్రస్తుతానికి దాటవేయండి (డిఫాల్ట్ లాట్ ఉపయోగించండి)",
+            "select_crop_title" to "1. పంటను ఎంచుకోండి (Select Crop)",
+            "harvest_date_title" to "2. పంట కోత తేదీ (Harvest Date)",
+            "harvest_time_title" to "3. పంట కోత సమయం (Harvest Time)",
+            "expected_time_title" to "4. ఆశించిన రవాణా సమయం (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. అంచనా పరిమాణం (Declared Quantity in kg)",
+            "voice_card_title" to "ఫార్మ్‌రూట్ వాయిస్ అసిస్టెంట్",
+            "voice_card_sub" to "మీ పంట వివరాలను సహజంగా మాట్లాడండి"
         ),
 
         // ==========================================
@@ -200,7 +254,25 @@ object AppLocalization {
             "enter_full_name_err" to "कृपया अपना पूरा नाम दर्ज करें",
             "enter_pincode_err" to "कृपया मान्य 6-अंकों का पिन कोड दर्ज करें",
             "set_new_mpin_err" to "कृपया 4-अंकों का MPIN सेट करें",
-            "mpin_mismatch_err" to "MPIN मेल नहीं खा रहा है"
+            "mpin_mismatch_err" to "MPIN मेल नहीं खा रहा है",
+            // Questionnaire Strings
+            "questionnaire_title" to "फसल विवरण प्रश्नावली",
+            "questionnaire_sub" to "अपनी फसल विवरण दर्ज करें या आवाज से बोलें",
+            "action_heading" to "आप अपनी फसल के साथ क्या करना चाहते हैं?",
+            "sell_now_title" to "अभी बेचें ⚡",
+            "sell_now_desc" to "मंडियों, सीधे खरीदारों और एफपीओ पूलिंग विकल्पों की तुलना करें।",
+            "cold_storage_title" to "शीतगृह खोजें ❄️",
+            "cold_storage_desc" to "नजदीकी शीतगृह खोजें और मंडियों तक की दूरी की तुलना करें।",
+            "btn_confirm_sell_now" to "⚡ फसल की पुष्टि करें और बिक्री मार्गों की तुलना करें ➔",
+            "btn_confirm_cold_storage" to "❄️ फसल की पुष्टि करें और शीतगृह खोजें ➔",
+            "skip_questionnaire" to "अभी छोड़ें (डिफ़ॉल्ट लॉट का उपयोग करें)",
+            "select_crop_title" to "1. फसल चुनें (Select Crop)",
+            "harvest_date_title" to "2. कटाई की तारीख (Harvest Date)",
+            "harvest_time_title" to "3. कटाई का समय (Harvest Time)",
+            "expected_time_title" to "4. संभावित उठान समय (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. घोषित मात्रा (Declared Quantity in kg)",
+            "voice_card_title" to "फार्मरूट आवाज सहायक",
+            "voice_card_sub" to "अपनी फसल का विवरण स्वाभाविक रूप से बोलें"
         ),
 
         // ==========================================
@@ -250,7 +322,25 @@ object AppLocalization {
             "enter_full_name_err" to "தயவுசெய்து உங்கள் முழுப் பெயரை உள்ளிடவும்",
             "enter_pincode_err" to "சரியான 6-இலக்க அஞ்சல் குறியீட்டை உள்ளிடவும்",
             "set_new_mpin_err" to "தயவுசெய்து 4-இலக்க புதிய MPIN அமைக்கவும்",
-            "mpin_mismatch_err" to "MPIN பொருந்தவில்லை"
+            "mpin_mismatch_err" to "MPIN பொருந்தவில்லை",
+            // Questionnaire Strings
+            "questionnaire_title" to "அறுவடை விவரங்கள் வினாத்தாள்",
+            "questionnaire_sub" to "உங்கள் அறுவடை விவரங்களை உள்ளிடவும் அல்லது குரல் மூலம் பேசவும்",
+            "action_heading" to "உங்கள் அறுவடையை என்ன செய்ய விரும்புகிறீர்கள்?",
+            "sell_now_title" to "இப்போதே விற்கவும் ⚡",
+            "sell_now_desc" to "மண்டிகள், நேரடி வாங்குவோர் மற்றும் FPO ஒருங்கிணைப்பு வாய்ப்புகளை ஒப்பிடுங்கள்.",
+            "cold_storage_title" to "குளிர்பதன கிடங்கு ❄️",
+            "cold_storage_desc" to "அருகிலுள்ள குளிர்பதன கிடங்குகளைக் கண்டறிந்து மண்டிகளுக்கான தூரத்தை ஒப்பிடுங்கள்.",
+            "btn_confirm_sell_now" to "⚡ அறுவடையை உறுதிசெய்து விற்பனை வழிகளை ஒப்பிடுங்கள் ➔",
+            "btn_confirm_cold_storage" to "❄️ அறுவடையை உறுதிசெய்து குளிர்பதன கிடங்கைத் தேடுங்கள் ➔",
+            "skip_questionnaire" to "இப்போதைக்கு தவிர்க்கவும் (இயல்புநிலை லாட்டைப் பயன்படுத்தவும்)",
+            "select_crop_title" to "1. பயிரைத் தேர்ந்தெடுக்கவும் (Select Crop)",
+            "harvest_date_title" to "2. அறுவடை தேதி (Harvest Date)",
+            "harvest_time_title" to "3. அறுவடை நேரம் (Harvest Time)",
+            "expected_time_title" to "4. எதிர்பார்க்கப்படும் நேரம் (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. அறிவிக்கப்பட்ட அளவு (Declared Quantity in kg)",
+            "voice_card_title" to "பார்ம்ரூட் குரல் உதவியாளர்",
+            "voice_card_sub" to "உங்கள் அறுவடை விவரங்களை எளிதாகப் பேசுங்கள்"
         ),
 
         // ==========================================
@@ -300,7 +390,25 @@ object AppLocalization {
             "enter_full_name_err" to "कृपया तुमचे पूर्ण नाव टाका",
             "enter_pincode_err" to "कृपया वैध 6-अंकी पिनकोड टाका",
             "set_new_mpin_err" to "कृपया नवीन 4-अंकी MPIN सेट करा",
-            "mpin_mismatch_err" to "MPIN जुळत नाही"
+            "mpin_mismatch_err" to "MPIN जुळत नाही",
+            // Questionnaire Strings
+            "questionnaire_title" to "पीक तपशील प्रश्नावली",
+            "questionnaire_sub" to "आपले पीक तपशील प्रविष्ट करा किंवा आवाजाने बोला",
+            "action_heading" to "आपल्या पिकाचे आपण काय करू इच्छिता?",
+            "sell_now_title" to "आता विका ⚡",
+            "sell_now_desc" to "बाजार, थेट खरेदीदार आणि FPO पूलिंग संधींची तुलना करा.",
+            "cold_storage_title" to "शीतगृह शोधा ❄️",
+            "cold_storage_desc" to "जवळची शीतगृहे शोधा आणि बाजारांचे अंतर तपासा.",
+            "btn_confirm_sell_now" to "⚡ पीक निश्चित करा आणि विक्री पर्यायांची तुलना करा ➔",
+            "btn_confirm_cold_storage" to "❄️ पीक निश्चित करा आणि शीतगृह शोधा ➔",
+            "skip_questionnaire" to "आत्ता वगळा (डीफॉल्ट लॉट वापरा)",
+            "select_crop_title" to "1. पीक निवडा (Select Crop)",
+            "harvest_date_title" to "2. पीक कापणी तारीख (Harvest Date)",
+            "harvest_time_title" to "3. कापणी वेळ (Harvest Time)",
+            "expected_time_title" to "4. अपेक्षित वाहतूक वेळ (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. घोषित वजन (Declared Quantity in kg)",
+            "voice_card_title" to "फार्मरूट व्हॉइस असिस्टंट",
+            "voice_card_sub" to "आपल्या पिकाचा तपशील सहज आवाजात सांगा"
         ),
 
         // ==========================================
@@ -350,7 +458,25 @@ object AppLocalization {
             "enter_full_name_err" to "કૃપા કરીને તમારું પૂરું નામ દાખલ કરો",
             "enter_pincode_err" to "કૃપા કરીને માન્ય 6-અંકનો પિનકોડ દાખલ કરો",
             "set_new_mpin_err" to "કૃપા કરીને 4-અંકનો નવો MPIN સેટ કરો",
-            "mpin_mismatch_err" to "MPIN મેળ ખાતો નથી"
+            "mpin_mismatch_err" to "MPIN મેળ ખાતો નથી",
+            // Questionnaire Strings
+            "questionnaire_title" to "પાક વિગતો પ્રશ્નાવલી",
+            "questionnaire_sub" to "તમારા પાકની વિગતો દાખલ કરો અથવા અવાજથી બોલો",
+            "action_heading" to "તમે તમારા પાક સાથે શું કરવા માંગો છો?",
+            "sell_now_title" to "હમણાં વેચો ⚡",
+            "sell_now_desc" to "માર્કેટ યાર્ડ, સીધા ખરીદદારો અને FPO પૂલિંગ વિકલ્પોની સરખામણી કરો.",
+            "cold_storage_title" to "કોલ્ડ સ્ટોરેજ શોધો ❄️",
+            "cold_storage_desc" to "નજીકના કોલ્ડ સ્ટોરેજ શોધો અને યાર્ડ સુધીના અંતરની સરખામણી કરો.",
+            "btn_confirm_sell_now" to "⚡ પાકની પુષ્ટિ કરો અને વેચાણ માર્ગોની સરખામણી કરો ➔",
+            "btn_confirm_cold_storage" to "❄️ પાકની પુષ્ટિ કરો અને કોલ્ડ સ્ટોરેજ શોધો ➔",
+            "skip_questionnaire" to "હમણાં માટે છોડો (ડિફોલ્ટ લૉટ વાપરો)",
+            "select_crop_title" to "1. પાક પસંદ કરો (Select Crop)",
+            "harvest_date_title" to "2. લણણી તારીખ (Harvest Date)",
+            "harvest_time_title" to "3. લણણી સમય (Harvest Time)",
+            "expected_time_title" to "4. અપેક્ષિત પરિવહન સમય (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. જાહેર કરેલ જથ્થો (Declared Quantity in kg)",
+            "voice_card_title" to "ફાર્મરૂટ અવાજ સહાયક",
+            "voice_card_sub" to "તમારા પાકની વિગતો સરળ અવાજમાં બોલો"
         ),
 
         // ==========================================
@@ -400,7 +526,25 @@ object AppLocalization {
             "enter_full_name_err" to "অনুগ্রহ করে আপনার পুরো নাম দিন",
             "enter_pincode_err" to "সঠিক ৬-সংখ্যার পিনকোড দিন",
             "set_new_mpin_err" to "৪-সংখ্যার নতুন MPIN সেট করুন",
-            "mpin_mismatch_err" to "MPIN মিলছে না"
+            "mpin_mismatch_err" to "MPIN মিলছে না",
+            // Questionnaire Strings
+            "questionnaire_title" to "ফসল বিবরণ প্রশ্নাবলী",
+            "questionnaire_sub" to "আপনার ফসলের বিবরণ লিখুন বা ভয়েসে বলুন",
+            "action_heading" to "আপনি আপনার ফসল দিয়ে কি করতে চান?",
+            "sell_now_title" to "এখনই বিক্রি করুন ⚡",
+            "sell_now_desc" to "মান্ডি, সরাসরি ক্রেতা এবং FPO পুলিং সুযোগ তুলনা করুন।",
+            "cold_storage_title" to "কোল্ড স্টোরেজ খুঁজুন ❄️",
+            "cold_storage_desc" to "কাছের কোল্ড স্টোরেজ খুঁজুন এবং মান্ডির দূরত্বের তুলনা করুন।",
+            "btn_confirm_sell_now" to "⚡ ফসল নিশ্চিত করুন ও বিক্রয়ের পথ তুলনা করুন ➔",
+            "btn_confirm_cold_storage" to "❄️ ফসল নিশ্চিত করুন ও কোল্ড স্টোরেজ খুঁজুন ➔",
+            "skip_questionnaire" to "এখনই এড়িয়ে যান (ডিফল্ট লট ব্যবহার করুন)",
+            "select_crop_title" to "1. ফসল নির্বাচন করুন (Select Crop)",
+            "harvest_date_title" to "2. ফসল কাটার তারিখ (Harvest Date)",
+            "harvest_time_title" to "3. কাটার সময় (Harvest Time)",
+            "expected_time_title" to "4. প্রত্যাশিত পরিবহন সময় (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. ঘোষিত পরিমাণ (Declared Quantity in kg)",
+            "voice_card_title" to "ফার্মরুট ভয়েস সহকারী",
+            "voice_card_sub" to "সহজে আপনার ফসলের বিবরণ বলুন"
         ),
 
         // ==========================================
@@ -450,7 +594,25 @@ object AppLocalization {
             "enter_full_name_err" to "ദയവായി നിങ്ങളുടെ പൂർണ്ണമായ പേര് നൽകുക",
             "enter_pincode_err" to "സാധുവായ 6-അക്ക പിൻകോഡ് നൽകുക",
             "set_new_mpin_err" to "ദയവായി 4-അക്ക പുതിയ MPIN സെറ്റ് ചെയ്യുക",
-            "mpin_mismatch_err" to "MPIN പൊരുത്തപ്പെടുന്നില്ല"
+            "mpin_mismatch_err" to "MPIN പൊരുത്തപ്പെടുന്നില്ല",
+            // Questionnaire Strings
+            "questionnaire_title" to "വിളവ് വിവരങ്ങൾ ചോദ്യാവലി",
+            "questionnaire_sub" to "നിങ്ങളുടെ വിളവ് വിവരങ്ങൾ നൽകുക അല്ലെങ്കിൽ വോയ്സ് വഴി പറയുക",
+            "action_heading" to "നിങ്ങളുടെ വിളവ് ഉപയോഗിച്ച് നിങ്ങൾ എന്താണ് ചെയ്യാൻ ആഗ്രഹിക്കുന്നത്?",
+            "sell_now_title" to "ഇപ്പോൾ വിൽക്കുക ⚡",
+            "sell_now_desc" to "വിപണികൾ, നേരിട്ടുള്ള വാങ്ങലുകാർ, FPO പൂളിംഗ് എന്നിവ താരതമ്യം ചെയ്യുക.",
+            "cold_storage_title" to "കോൾഡ് സ്റ്റോറേജ് കണ്ടെത്തുക ❄️",
+            "cold_storage_desc" to "അടുത്തുള്ള കോൾഡ് സ്റ്റോറേജുകൾ കണ്ടെത്തി വിപണിയിലേക്കുള്ള ദൂരം താരതമ്യം ചെയ്യുക.",
+            "btn_confirm_sell_now" to "⚡ വിളവ് സ്ഥിരീകരിച്ച് വിൽപന വഴികൾ താരതമ്യം ചെയ്യുക ➔",
+            "btn_confirm_cold_storage" to "❄️ വിളവ് സ്ഥിരീകരിച്ച് കോൾഡ് സ്റ്റോറേജ് കണ്ടെത്തുക ➔",
+            "skip_questionnaire" to "ഇപ്പോഴത്തേക്ക് ഒഴിവാക്കുക (സ്ഥിര ലോട്ടുകൾ ഉപയോഗിക്കുക)",
+            "select_crop_title" to "1. വിള തിരഞ്ഞെടുക്കുക (Select Crop)",
+            "harvest_date_title" to "2. വിളവെടുപ്പ് തീയതി (Harvest Date)",
+            "harvest_time_title" to "3. വിളവെടുപ്പ് സമയം (Harvest Time)",
+            "expected_time_title" to "4. പ്രതീക്ഷിക്കുന്ന ഗതാഗത സമയം (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. പ്രഖ്യാപിച്ച അളവ് (Declared Quantity in kg)",
+            "voice_card_title" to "ഫാംറൂട്ട് വോയ്‌സ് അസിസ്റ്റന്റ്",
+            "voice_card_sub" to "നിങ്ങളുടെ വിളവ് വിവരങ്ങൾ സ്വാഭാവികമായി സംസാരിക്കുക"
         ),
 
         // ==========================================
@@ -500,7 +662,25 @@ object AppLocalization {
             "enter_full_name_err" to "ଦୟାକରି ଆପଣଙ୍କ ପୂରା ନାମ ଦିଅନ୍ତୁ",
             "enter_pincode_err" to "ସଠିକ୍ ୬-ଅଙ୍କ ବିଶିଷ୍ଟ ପିନ୍ କୋଡ୍ ଦିଅନ୍ତୁ",
             "set_new_mpin_err" to "୪-ଅଙ୍କ ବିଶିଷ୍ଟ ନୂଆ MPIN ସେଟ୍ କରନ୍ତୁ",
-            "mpin_mismatch_err" to "MPIN ମେଳ ଖାଉନାହିଁ"
+            "mpin_mismatch_err" to "MPIN ମେଳ ଖାଉନାହିଁ",
+            // Questionnaire Strings
+            "questionnaire_title" to "ଫସଲ ବିବରଣୀ ପ୍ରଶ୍ନାବଳୀ",
+            "questionnaire_sub" to "ଆପଣଙ୍କ ଫସଲ ବିବରଣୀ ଦିଅନ୍ତୁ କିମ୍ବା ସ୍ୱରରେ କୁହନ୍ତୁ",
+            "action_heading" to "ଆପଣ ନିଜ ଫସଲ ସହିତ କ’ଣ କରିବାକୁ ଚାହାଁନ୍ତି?",
+            "sell_now_title" to "ବର୍ତ୍ତମାନ ବିକ୍ରି କରନ୍ତୁ ⚡",
+            "sell_now_desc" to "ମଣ୍ଡି, ପ୍ରତ୍ୟକ୍ଷ କ୍ରେତା ଏବଂ FPO ପୁଲିଂ ସୁଯୋଗ ତୁଳନା କରନ୍ତୁ।",
+            "cold_storage_title" to "କୋଲ୍ଡ ଷ୍ଟୋରେଜ୍ ଖୋଜନ୍ତୁ ❄️",
+            "cold_storage_desc" to "ନିକଟସ୍ଥ କୋଲ୍ଡ ଷ୍ଟୋରେଜ୍ ଖୋଜନ୍ତୁ ଏବଂ ମଣ୍ଡି ପର୍ଯ୍ୟନ୍ତ ଦୂରତା ତୁଳନା କରନ୍ତୁ।",
+            "btn_confirm_sell_now" to "⚡ ଫସଲ ନିଶ୍ଚିତ କରନ୍ତୁ ଏବଂ ବିକ୍ରୟ ମାର୍ଗ ତୁଳନା କରନ୍ତୁ ➔",
+            "btn_confirm_cold_storage" to "❄️ ଫସଲ ନିଶ୍ଚିତ କରନ୍ତୁ ଏବଂ କୋଲ୍ଡ ଷ୍ଟୋରେଜ୍ ଖୋଜନ୍ତୁ ➔",
+            "skip_questionnaire" to "ବର୍ତ୍ତମାନ ପାଇଁ ଛାଡିଦିଅନ୍ତୁ (ଡିଫଲ୍ଟ ଲଟ୍ ବ୍ୟବହାର କରନ୍ତୁ)",
+            "select_crop_title" to "1. ଫସଲ ଚୟନ କରନ୍ତୁ (Select Crop)",
+            "harvest_date_title" to "2. ଅମଳ ତାରିଖ (Harvest Date)",
+            "harvest_time_title" to "3. ଅମଳ ସମୟ (Harvest Time)",
+            "expected_time_title" to "4. ସମ୍ଭାବ୍ୟ ପରିବହନ ସମୟ (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. ଘୋଷିତ ପରିମାଣ (Declared Quantity in kg)",
+            "voice_card_title" to "ଫାର୍ମରୁଟ୍ ସ୍ୱର ସହାୟକ",
+            "voice_card_sub" to "ସହଜରେ ଆପଣଙ୍କ ଫସଲ ବିବରଣୀ କୁହନ୍ତୁ"
         ),
 
         // ==========================================
@@ -550,7 +730,25 @@ object AppLocalization {
             "enter_full_name_err" to "ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਪੂਰਾ ਨਾਮ ਦਰਜ ਕਰੋ",
             "enter_pincode_err" to "ਕਿਰਪਾ ਕਰਕੇ ਸਹੀ 6-ਅੰਕਾਂ ਦਾ ਪਿੰਨਕੋਡ ਦਰਜ ਕਰੋ",
             "set_new_mpin_err" to "ਕਿਰਪਾ ਕਰਕੇ 4-ਅੰਕਾਂ ਦਾ ਨਵਾਂ MPIN ਸੈੱਟ ਕਰੋ",
-            "mpin_mismatch_err" to "MPIN ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ"
+            "mpin_mismatch_err" to "MPIN ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
+            // Questionnaire Strings
+            "questionnaire_title" to "ਫ਼ਸਲ ਵੇਰਵਾ ਪ੍ਰਸ਼ਨਾਵਲੀ",
+            "questionnaire_sub" to "ਆਪਣੇ ਫ਼ਸਲ ਵੇਰਵੇ ਦਰਜ ਕਰੋ ਜਾਂ ਆਵਾਜ਼ ਨਾਲ ਬੋਲੋ",
+            "action_heading" to "ਤੁਸੀਂ ਆਪਣੀ ਫ਼ਸਲ ਨਾਲ ਕੀ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
+            "sell_now_title" to "ਹੁਣੇ ਵੇਚੋ ⚡",
+            "sell_now_desc" to "ਮੰਡੀਆਂ, ਸਿੱਧੇ ਖਰੀਦਦਾਰਾਂ ਅਤੇ FPO ਪੂਲਿੰਗ ਮੌਕਿਆਂ ਦੀ ਤੁਲਨਾ ਕਰੋ।",
+            "cold_storage_title" to "ਕੋਲਡ ਸਟੋਰੇਜ ਖੋਜੋ ❄️",
+            "cold_storage_desc" to "ਨੇੜਲੇ ਕੋਲਡ ਸਟੋਰੇਜ ਖੋਜੋ ਅਤੇ ਮੰਡੀਆਂ ਦੀ ਦੂਰੀ ਦੀ ਤੁਲਨਾ ਕਰੋ।",
+            "btn_confirm_sell_now" to "⚡ ਫ਼ਸਲ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਵਿਕਰੀ ਰੂਟਾਂ ਦੀ ਤੁਲਨਾ ਕਰੋ ➔",
+            "btn_confirm_cold_storage" to "❄️ ਫ਼ਸਲ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ ਅਤੇ ਕੋਲਡ ਸਟੋਰੇਜ ਖੋਜੋ ➔",
+            "skip_questionnaire" to "ਹੁਣ ਲਈ ਛੱਡੋ (ਡਿਫਾਲਟ ਲਾਟ ਵਰਤੋ)",
+            "select_crop_title" to "1. ਫ਼ਸਲ ਚੁਣੋ (Select Crop)",
+            "harvest_date_title" to "2. ਵਾਢੀ ਦੀ ਮਿਤੀ (Harvest Date)",
+            "harvest_time_title" to "3. ਵਾਢੀ ਦਾ ਸਮਾਂ (Harvest Time)",
+            "expected_time_title" to "4. ਅਨੁਮਾਨਿਤ ਲਿਜਾਣ ਦਾ ਸਮਾਂ (Expected Pickup / Delivery)",
+            "declared_qty_title" to "5. ਐਲਾਨੀ ਮਾਤਰਾ (Declared Quantity in kg)",
+            "voice_card_title" to "ਫਾਰਮਰੂਟ ਆਵਾਜ਼ ਸਹਾਇਕ",
+            "voice_card_sub" to "ਆਪਣੇ ਫ਼ਸਲ ਦੇ ਵੇਰਵੇ ਆਸਾਨੀ ਨਾਲ ਬੋਲੋ"
         )
     )
 

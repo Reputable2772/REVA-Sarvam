@@ -2,63 +2,64 @@ package com.example.farmroutesaathi.ui.harvest
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import android.widget.Toast
-import java.util.Calendar
-import java.util.Locale
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.audio.VoiceRecorder
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.HarvestDeclaration
 import com.example.farmroutesaathi.data.UserSession
+import com.example.farmroutesaathi.ui.components.LanguageSelectionDialog
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.util.Calendar
+import java.util.Locale
 
 @Composable
 fun HarvestQuestionnaireScreen(
     onHarvestSubmitted: (harvestId: String, needsStorage: Boolean, crop: String, qty: Double) -> Unit,
     onSkip: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
+    val selectedLang = UserSession.selectedLanguage
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     // Form states
     var crop by remember { mutableStateOf("Tomato") }
     var harvestDate by remember { mutableStateOf("2026-11-13") }
     var harvestTime by remember { mutableStateOf("07:00 AM") }
     var expectedDateTime by remember { mutableStateOf("2026-11-14 09:00 AM") }
-    var sellImmediately by remember { mutableStateOf(true) }
+    var sellImmediately by remember { mutableStateOf(true) } // true: Sell Now, false: Find Cold Storage
     var quantityKg by remember { mutableStateOf("200") }
-    var hasStorageAccess by remember { mutableStateOf(false) } // Default false to prompt smart cold storage discovery
-    var locationPinCode by remember { mutableStateOf("563101") }
-    var isGpsGranted by remember { mutableStateOf(true) }
+    val locationPinCode by remember { mutableStateOf("563101") }
+    val isGpsGranted by remember { mutableStateOf(true) }
 
     // Voice / STT Recording State
     var isRecordingAudio by remember { mutableStateOf(false) }
     var isUploadingAudio by remember { mutableStateOf(false) }
     var audioSavedFileName by remember { mutableStateOf<String?>(null) }
     var voiceFeedback by remember { mutableStateOf<String?>(null) }
-    var recognizedFields by remember { mutableStateOf<List<String>>(emptyList()) }
     var isSubmitting by remember { mutableStateOf(false) }
     var voiceTranscriptInput by remember { mutableStateOf("") }
     var hasRecordedOnce by remember { mutableStateOf(false) }
@@ -99,21 +100,12 @@ fun HarvestQuestionnaireScreen(
 
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
-        // Auto-detect spoken language: Kannada Unicode range (0x0C80 - 0x0CFF)
-        val hasKannadaChars = spokenText.any { it in '\u0C80'..'\u0CFF' }
-        if (hasKannadaChars) {
-            isKannada = true
-            UserSession.isKannadaPreferred = true
-        } else if (spokenText.any { it.isLetter() }) {
-            isKannada = false
-            UserSession.isKannadaPreferred = false
-        }
-
         voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) spokenText else "$voiceTranscriptInput | $spokenText"
         isUploadingAudio = true
         scope.launch {
             try {
-                val res = ApiClient.processVoiceCommand(spokenText, if (isKannada || hasKannadaChars) "kn-IN" else "en-IN")
+                val sarvamLang = selectedLang.sarvamCode
+                val res = ApiClient.processVoiceCommand(spokenText, sarvamLang)
                 val jsonObj = JSONObject(res)
                 val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }.toSet()
@@ -160,10 +152,9 @@ fun HarvestQuestionnaireScreen(
                 }
                 val feedback = jsonObj.optString("spoken_feedback", "")
                 voiceFeedback = if (feedback.isNotBlank()) {
-                    "✓ $feedback (Fields merged)"
+                    "✓ $feedback"
                 } else {
-                    if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
-                    else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"
+                    "✓ ${quantityKg}kg $crop ($harvestDate $harvestTime)"
                 }
             } catch (e: Exception) {
                 voiceFeedback = "Voice processing error: ${e.localizedMessage}"
@@ -179,10 +170,7 @@ fun HarvestQuestionnaireScreen(
                 val recordedFile = voiceRecorder.startRecording()
                 isRecordingAudio = true
                 audioSavedFileName = recordedFile.name
-                voiceFeedback = if (isKannada)
-                    "🔴 ಮೈಕ್ರೊಫೋನ್ ರೆಕಾರ್ಡಿಂಗ್ ಪ್ರಾರಂಭವಾಗಿದೆ... ಮಾತನಾಡಿ (ನಿಲ್ಲಿಸಲು ಮತ್ತೆ ಟ್ಯಾಪ್ ಮಾಡಿ)"
-                else
-                    "🔴 Recording from microphone... Speak now (tap again to stop & send to Sarvam)"
+                voiceFeedback = "🔴 ${AppLocalization.t("voice_card_sub")}..."
             } catch (e: Exception) {
                 voiceFeedback = "Microphone error: ${e.localizedMessage}"
             }
@@ -193,26 +181,15 @@ fun HarvestQuestionnaireScreen(
             if (audioFile != null && audioFile.exists() && audioFile.length() > 44) {
                 audioSavedFileName = audioFile.name
                 isUploadingAudio = true
-                voiceFeedback = if (isKannada)
-                    "⏳ ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್ ಉಳಿಸಲಾಗಿದೆ (${audioFile.length() / 1024} KB). ಸರ್ವಂ ಸಾರಸ್ v4 ಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ..."
-                else
-                    "⏳ Audio saved (${audioFile.length() / 1024} KB). Uploading to Sarvam Saaras v4 backend..."
+                voiceFeedback = "⏳ Processing Sarvam Saaras AI (${audioFile.length() / 1024} KB)..."
 
                 scope.launch {
                     try {
-                        val res = ApiClient.uploadVoiceAudio(audioFile, if (isKannada) "kn-IN" else "en-IN")
+                        val sarvamLang = selectedLang.sarvamCode
+                        val res = ApiClient.uploadVoiceAudio(audioFile, sarvamLang)
                         val jsonObj = JSONObject(res)
                         val rawTranscript = jsonObj.optString("raw_transcript", "")
                         if (rawTranscript.isNotBlank()) {
-                            // Ensure Voice Transcript is displayed in the exact language spoken by the user
-                            val hasKannadaChars = rawTranscript.any { it in '\u0C80'..'\u0CFF' }
-                            if (hasKannadaChars) {
-                                isKannada = true
-                                UserSession.isKannadaPreferred = true
-                            } else if (rawTranscript.any { it.isLetter() }) {
-                                isKannada = false
-                                UserSession.isKannadaPreferred = false
-                            }
                             voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) rawTranscript else "$voiceTranscriptInput | $rawTranscript"
                         }
                         val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
@@ -260,10 +237,9 @@ fun HarvestQuestionnaireScreen(
                         }
                         val feedback = jsonObj.optString("spoken_feedback", "")
                         voiceFeedback = if (feedback.isNotBlank()) {
-                            "✓ $feedback (Fields merged)"
+                            "✓ $feedback"
                         } else {
-                            if (isKannada) "✓ ಗುರುತಿಸಲಾಗಿದೆ: $quantityKg ಕೆಜಿ $crop ($harvestDate $harvestTime)"
-                            else "✓ Recognized: ${quantityKg}kg $crop ($harvestDate $harvestTime)"
+                            "✓ ${quantityKg}kg $crop ($harvestDate $harvestTime)"
                         }
                     } catch (e: Exception) {
                         voiceFeedback = "Sarvam upload error: ${e.localizedMessage}"
@@ -272,290 +248,441 @@ fun HarvestQuestionnaireScreen(
                     }
                 }
             } else {
-                voiceFeedback = if (isKannada) "ರೆಕಾರ್ಡ್ ಮಾಡಿದ ಆಡಿಯೋ ಫೈಲ್ ಖಾಲಿಯಾಗಿದೆ" else "Recording stopped: no audio recorded"
+                voiceFeedback = "Recording stopped (no audio recorded)"
             }
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
+    fun submitHarvest() {
+        if (isSubmitting) return
+        isSubmitting = true
+        scope.launch {
+            try {
+                val fId = farmer?.phone ?: "9845012345"
+                val qVal = quantityKg.toDoubleOrNull() ?: 200.0
+
+                val res = ApiClient.declareHarvest(
+                    farmerId = fId,
+                    crop = crop,
+                    quantityKg = qVal,
+                    harvestDate = harvestDate,
+                    harvestTime = harvestTime,
+                    expectedDateTime = expectedDateTime,
+                    sellImmediately = sellImmediately
+                )
+
+                // Extract Unique Harvest ID from response
+                val uniqueHarvestId = if (res.contains("\"harvest_id\":\"")) {
+                    res.substringAfter("\"harvest_id\":\"").substringBefore("\"")
+                } else if (res.contains("\"lot_id\":\"")) {
+                    res.substringAfter("\"lot_id\":\"").substringBefore("\"")
+                } else {
+                    "FR-KLR-20261113-0001"
+                }
+
+                val needsStorage = !sellImmediately
+
+                // Store in UserSession for the entire app!
+                UserSession.setHarvest(
+                    HarvestDeclaration(
+                        harvestId = uniqueHarvestId,
+                        crop = crop,
+                        harvestDate = harvestDate,
+                        harvestTime = harvestTime,
+                        expectedDateTime = expectedDateTime,
+                        sellImmediately = sellImmediately,
+                        quantityKg = qVal,
+                        hasStorageAccess = !needsStorage,
+                        storageRequirementNeeded = needsStorage,
+                        farmerLatitude = 13.133,
+                        farmerLongitude = 78.133,
+                        locationSource = if (isGpsGranted) "GPS (Verified)" else "PIN: $locationPinCode"
+                    )
+                )
+
+                // Navigate with needsStorage parameter
+                onHarvestSubmitted(uniqueHarvestId, needsStorage, crop, qVal)
+            } catch (e: Exception) {
+                val fallbackLot = "FR-KLR-20261113-0001"
+                val qVal = quantityKg.toDoubleOrNull() ?: 200.0
+                val needsStorage = !sellImmediately
+                UserSession.setHarvest(
+                    HarvestDeclaration(
+                        harvestId = fallbackLot,
+                        crop = crop,
+                        harvestDate = harvestDate,
+                        harvestTime = harvestTime,
+                        expectedDateTime = expectedDateTime,
+                        sellImmediately = sellImmediately,
+                        quantityKg = qVal,
+                        hasStorageAccess = !needsStorage,
+                        storageRequirementNeeded = needsStorage
+                    )
+                )
+                onHarvestSubmitted(fallbackLot, needsStorage, crop, qVal)
+            } finally {
+                isSubmitting = false
+            }
+        }
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            currentLangCode = UserSession.selectedLanguageCode,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = { lang ->
+                UserSession.setLanguage(lang)
+                showLanguageDialog = false
+            }
+        )
+    }
+
+    Scaffold(
+        containerColor = SoilFieldPaper,
+        bottomBar = {
+            // ================================================================
+            // STICKY BOTTOM ACTION BAR (RESPECTS NAVIGATION INSETS, NO OVERLAP)
+            // ================================================================
+            Surface(
+                color = Color.White,
+                shadowElevation = 12.dp,
+                border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.08f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        onClick = { submitHarvest() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SoilCropGreen,
+                            contentColor = Color.White
+                        ),
+                        enabled = !isSubmitting
+                    ) {
+                        if (isSubmitting) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            val btnText = if (sellImmediately) {
+                                AppLocalization.t("btn_confirm_sell_now")
+                            } else {
+                                AppLocalization.t("btn_confirm_cold_storage")
+                            }
+                            Text(
+                                text = btnText,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    TextButton(
+                        onClick = { onSkip() },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = AppLocalization.t("skip_questionnaire"),
+                            color = SoilDeepEarth.copy(alpha = 0.7f),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Card
-            Box(
+            // Top Navigation & Branding Bar
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))
-                    .background(
-                        Brush.verticalGradient(listOf(ForestGreenDeep, FreshLeafGreen))
-                    )
-                    .padding(horizontal = 20.dp, vertical = 24.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                // Brand Sprout Pill
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.15f)),
+                    shadowElevation = 2.dp
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                shape = CircleShape,
-                                color = HarvestGold,
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text("🌾", fontSize = 22.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = if (isKannada) "ಕೊಯ್ಲು ವಿವರಗಳ ಪ್ರಶ್ನಾವಳಿ" else "Harvest Questionnaire",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                                Text(
-                                    text = if (isKannada) "ರೈತ: ${farmer?.name ?: "ಕಿಸಾನ್"}" else "Farmer: ${farmer?.name ?: "Kisan"}",
-                                    fontSize = 12.sp,
-                                    color = Color.White.copy(alpha = 0.85f)
-                                )
-                            }
-                        }
-
-                        // Language Toggle Pill
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = HarvestGold,
-                            modifier = Modifier.clickable {
-                                isKannada = !isKannada
-                                UserSession.isKannadaPreferred = isKannada
-                            }
-                        ) {
-                            Text(
-                                text = if (isKannada) "🌐 ಕನ್ನಡ" else "🌐 English",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = ForestGreenDeep,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            )
-                        }
+                        Text("🌱", fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "FarmRoute",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SoilDeepEarth
+                        )
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = if (isKannada)
-                            "ನಿಮ್ಮ ಇಂದಿನ ಬೆಳೆ ಕೊಯ್ಲು ವಿವರಗಳನ್ನು ನಮೂದಿಸಿ ಅಥವಾ ಕೆಳಗಿನ ಧ್ವನಿ ಮೈಕ್ರೊಫೋನ್ ಬಳಸಿ ಮಾತನಾಡಿ."
-                        else
-                            "Declare your current crop harvest details below, or speak naturally using the Sarvam Voice AI mic.",
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.90f)
-                    )
+                // Dynamic Language Selector Pill
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White,
+                    border = BorderStroke(1.2.dp, SoilCropGreen),
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.clickable { showLanguageDialog = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🌐 ", fontSize = 12.sp)
+                        Text(
+                            text = "${selectedLang.nativeName} (${selectedLang.code.uppercase()})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SoilCropGreen
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Header Title Card
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color.White,
+                    border = BorderStroke(2.dp, SoilHarvestGold),
+                    shadowElevation = 4.dp,
+                    modifier = Modifier.size(50.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("🌾", fontSize = 24.sp)
+                    }
+                }
 
-            // ==========================================
-            // SARVAM SPEECH-TO-TEXT VOICE ASSISTANT CARD
-            // ==========================================
-            ElevatedCard(
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = AppLocalization.t("questionnaire_title"),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = SoilDeepEarth
+                )
+
+                Text(
+                    text = AppLocalization.t("questionnaire_sub"),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = SoilCropGreen,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ================================================================
+            // VOICE ASSISTANT CARD (SARVAM SAARAS AI)
+            // ================================================================
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
+                shadowElevation = 3.dp
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🎙️", fontSize = 22.sp)
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್ ಧ್ವನಿ ಸಹಾಯಕ" else "FarmRoute Voice Assistant",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp,
-                                    color = ForestGreenDeep
-                                )
-                                Text(
-                                    text = if (isKannada) "ನಿಮ್ಮ ಕೊಯ್ಲಿನ ವಿವರಗಳನ್ನು ಮಾತನಾಡಿ" else "Speak Your Harvest Details",
-                                    fontSize = 11.5.sp,
-                                    color = Color.Gray
-                                )
-                            }
+                            Text("🎙️", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = AppLocalization.t("voice_card_title"),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = SoilDeepEarth
+                            )
                         }
 
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = FreshLeafGreen.copy(alpha = 0.15f)
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isRecordingAudio) Color(0xFFFEE2E2) else SoilCropGreen.copy(alpha = 0.12f)
                         ) {
                             Text(
-                                text = "SARVAM AI",
-                                fontSize = 9.5.sp,
+                                text = if (isRecordingAudio) "● LIVE REC" else "Sarvam AI",
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = ForestGreenDeep,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                color = if (isRecordingAudio) Color(0xFFDC2626) else SoilCropGreen,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Voice Recording Hardware Button (Records audio file and sends to Sarvam STT)
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = when {
-                            isRecordingAudio -> Color(0xFFEF4444).copy(alpha = 0.20f)
-                            isUploadingAudio -> HarvestGold.copy(alpha = 0.25f)
-                            else -> ForestGreenDeep.copy(alpha = 0.06f)
-                        },
-                        border = BorderStroke(
-                            1.5.dp,
-                            when {
-                                isRecordingAudio -> Color(0xFFEF4444)
-                                isUploadingAudio -> HarvestGold
-                                else -> ForestGreenDeep.copy(alpha = 0.3f)
-                            }
+                    // Big Mic Button
+                    val micInfiniteTransition = rememberInfiniteTransition(label = "micPulse")
+                    val pulseScale by micInfiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = if (isRecordingAudio) 1.15f else 1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(600, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
                         ),
+                        label = "pulse"
+                    )
+
+                    Surface(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { toggleAudioRecording() }
+                            .size(64.dp)
+                            .clickable { toggleAudioRecording() },
+                        shape = CircleShape,
+                        color = if (isRecordingAudio) Color(0xFFDC2626) else SoilCropGreen,
+                        shadowElevation = 6.dp
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 14.dp, horizontal = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                if (isRecordingAudio) "🔴" else if (isUploadingAudio) "⏳" else "🎙️",
-                                fontSize = 22.sp
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = when {
-                                    isRecordingAudio -> if (isKannada) "ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Recording Audio... Tap to Stop & Send"
-                                    isUploadingAudio -> if (isKannada) "ಧ್ವನಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ..." else "Sarvam AI Analyzing Audio..."
-                                    else -> if (isKannada) "ಧ್ವನಿ ಮೂಲಕ ಮಾತನಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap to Speak Harvest Details"
-                                },
-                                fontWeight = FontWeight.Bold,
-                                color = if (isRecordingAudio) Color(0xFFDC2626) else ForestGreenDeep,
-                                fontSize = 14.sp
-                            )
+                        Box(contentAlignment = Alignment.Center) {
+                            if (isUploadingAudio) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(28.dp))
+                            } else {
+                                Text(
+                                    text = if (isRecordingAudio) "⏹" else "🎙",
+                                    fontSize = 26.sp,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
 
-                    // Recording File info banner
-                    if (audioSavedFileName != null) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "📁 Local Recording: $audioSavedFileName",
-                            fontSize = 10.sp,
-                            color = Color.Gray
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Spoken Feedback Banner
-                    if (voiceFeedback != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (isRecordingAudio) "Tap to finish recording" else "Tap microphone to speak",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isRecordingAudio) Color(0xFFDC2626) else SoilCropGreen
+                    )
+
+                    voiceFeedback?.let { fb ->
+                        Spacer(modifier = Modifier.height(6.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = ForestGreenDeep.copy(alpha = 0.08f),
+                            color = SoilFieldPaper,
+                            border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.1f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = voiceFeedback ?: "",
-                                color = ForestGreenDeep,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                                text = fb,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = SoilDeepEarth,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                             )
                         }
                     }
 
-                    // Enlarged Editable Spoken Transcript / Text input bar
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Voice transcript box
                     OutlinedTextField(
                         value = voiceTranscriptInput,
-                        onValueChange = { input ->
-                            voiceTranscriptInput = input
-                            // Dynamically update UI language if Kannada is typed in custom input
-                            val hasKannadaChars = input.any { it in '\u0C80'..'\u0CFF' }
-                            if (hasKannadaChars) {
-                                isKannada = true
-                                UserSession.isKannadaPreferred = true
-                            }
-                        },
+                        onValueChange = { voiceTranscriptInput = it },
                         label = {
                             Text(
-                                if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ ಅಥವಾ ವಿವರಗಳು" else "Harvest Details Transcript",
-                                fontSize = 12.sp
+                                "Transcript / Voice Notes",
+                                fontSize = 11.sp,
+                                color = SoilDeepEarth.copy(alpha = 0.7f)
                             )
                         },
                         placeholder = {
                             Text(
-                                if (isKannada) "ನಿಮ್ಮ ಕೊಯ್ಲು ವಿವರಗಳನ್ನು ಇಲ್ಲಿ ಮಾತನಾಡಿ ಅಥವಾ ಬರೆಯಿರಿ..."
-                                else "Speak or type your harvest details here...",
-                                fontSize = 12.sp
+                                "Speak or type harvest details...",
+                                fontSize = 11.sp,
+                                color = Color.Gray
                             )
                         },
                         trailingIcon = {
-                            IconButton(onClick = {
-                                if (voiceTranscriptInput.isNotBlank()) processSpeechInput(voiceTranscriptInput)
-                            }) {
-                                Text("⚡", fontSize = 20.sp)
+                            if (voiceTranscriptInput.isNotBlank()) {
+                                IconButton(onClick = { processSpeechInput(voiceTranscriptInput) }) {
+                                    Text("⚡", fontSize = 18.sp)
+                                }
                             }
                         },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1B2A1E),
+                            unfocusedTextColor = Color(0xFF1B2A1E),
+                            focusedContainerColor = Color(0xFFFCFBF9),
+                            unfocusedContainerColor = Color(0xFFFCFBF9),
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.2f),
+                            cursorColor = SoilCropGreen,
+                            focusedLabelColor = SoilCropGreen,
+                            unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.7f)
+                        ),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B2A1E)
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 80.dp),
+                            .heightIn(min = 72.dp),
                         shape = RoundedCornerShape(12.dp),
                         maxLines = 3
                     )
                 }
             }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // ==========================================
-            // HARVEST PARAMETERS QUESTIONNAIRE FORM
-            // ==========================================
-            ElevatedCard(
+            // ================================================================
+            // HARVEST PARAMETERS FORM CARD
+            // ================================================================
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                shape = RoundedCornerShape(22.dp),
+                color = Color.White,
+                border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
+                shadowElevation = 3.dp
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
 
                     // 1. CROP SELECTION
                     Text(
-                        text = if (isKannada) "1. ಬೆಳೆ (Crop)" else "1. Select Crop",
+                        text = AppLocalization.t("select_crop_title"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = ForestGreenDeep
+                        color = SoilDeepEarth
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     val cropsList = listOf("Tomato", "Onion", "Potato", "Cabbage", "Carrot", "Chilli")
@@ -564,25 +691,62 @@ fun HarvestQuestionnaireScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         cropsList.take(3).forEach { c ->
-                            FilterChip(
-                                selected = crop == c,
-                                onClick = { crop = c },
-                                label = { Text(c, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                                modifier = Modifier.weight(1f)
-                            )
+                            val isSelected = crop == c
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) SoilCropGreen else Color.White,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { crop = c }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 9.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = c,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else SoilDeepEarth
+                                    )
+                                }
+                            }
                         }
                     }
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         cropsList.drop(3).forEach { c ->
-                            FilterChip(
-                                selected = crop == c,
-                                onClick = { crop = c },
-                                label = { Text(c, fontSize = 11.sp, fontWeight = FontWeight.Bold) },
-                                modifier = Modifier.weight(1f)
-                            )
+                            val isSelected = crop == c
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) SoilCropGreen else Color.White,
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { crop = c }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 9.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = c,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else SoilDeepEarth
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -590,438 +754,449 @@ fun HarvestQuestionnaireScreen(
 
                     // 2. HARVEST DATE
                     Text(
-                        text = if (isKannada) "2. ಕೊಯ್ಲು ದಿನಾಂಕ (Harvest Date)" else "2. Harvest Date",
+                        text = AppLocalization.t("harvest_date_title"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = ForestGreenDeep
+                        color = SoilDeepEarth
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = harvestDate,
                         onValueChange = { harvestDate = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showDatePicker { harvestDate = it } },
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        leadingIcon = {
-                            IconButton(onClick = { showDatePicker { harvestDate = it } }) {
-                                Text("📅", fontSize = 18.sp)
-                            }
-                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Text("📅", fontSize = 16.sp) },
                         trailingIcon = {
                             TextButton(onClick = { showDatePicker { harvestDate = it } }) {
-                                Text(if (isKannada) "ಕ್ಯಾಲೆಂಡರ್" else "Pick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Pick", color = SoilCropGreen, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1B2A1E),
+                            unfocusedTextColor = Color(0xFF1B2A1E),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
+                            cursorColor = SoilCropGreen
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B2A1E)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(
+                            "Today" to "2026-11-13",
+                            "Yesterday" to "2026-11-12",
+                            "Tomorrow" to "2026-11-14"
+                        ).forEach { (label, dt) ->
+                            val isSelected = harvestDate == dt
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) SoilCropGreen.copy(alpha = 0.12f) else SoilFieldPaper,
+                                border = BorderStroke(1.dp, if (isSelected) SoilCropGreen else Color.Transparent),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { harvestDate = dt }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) SoilCropGreen else SoilDeepEarth
+                                    )
+                                }
                             }
                         }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(
-                            onClick = { harvestDate = "2026-11-13" },
-                            label = { Text("Today (ಇಂದು)", fontSize = 10.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { harvestDate = "2026-11-12" },
-                            label = { Text("Yesterday (ನಿನ್ನೆ)", fontSize = 10.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { harvestDate = "2026-11-14" },
-                            label = { Text("Tomorrow (ನಾಳೆ)", fontSize = 10.sp) }
-                        )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     // 3. HARVEST TIME
                     Text(
-                        text = if (isKannada) "3. ಕೊಯ್ಲು ಸಮಯ (Harvest Time)" else "3. Harvest Time",
+                        text = AppLocalization.t("harvest_time_title"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = ForestGreenDeep
+                        color = SoilDeepEarth
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = harvestTime,
                         onValueChange = { harvestTime = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { showTimePicker { harvestTime = it } },
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        leadingIcon = {
-                            IconButton(onClick = { showTimePicker { harvestTime = it } }) {
-                                Text("⏰", fontSize = 18.sp)
-                            }
-                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Text("⏰", fontSize = 16.sp) },
                         trailingIcon = {
                             TextButton(onClick = { showTimePicker { harvestTime = it } }) {
-                                Text(if (isKannada) "ಗಡಿಯಾರ" else "Pick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Text("Pick", color = SoilCropGreen, fontWeight = FontWeight.Bold)
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1B2A1E),
+                            unfocusedTextColor = Color(0xFF1B2A1E),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
+                            cursorColor = SoilCropGreen
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B2A1E)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("06:00 AM", "07:30 AM", "11:00 AM", "04:30 PM").forEach { t ->
+                            val isSelected = harvestTime == t
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) SoilCropGreen.copy(alpha = 0.12f) else SoilFieldPaper,
+                                border = BorderStroke(1.dp, if (isSelected) SoilCropGreen else Color.Transparent),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { harvestTime = t }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = t,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) SoilCropGreen else SoilDeepEarth
+                                    )
+                                }
                             }
                         }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(onClick = { harvestTime = "06:00 AM" }, label = { Text("06:00 AM", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { harvestTime = "07:30 AM" }, label = { Text("07:30 AM", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { harvestTime = "11:00 AM" }, label = { Text("11:00 AM", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { harvestTime = "04:30 PM" }, label = { Text("04:30 PM", fontSize = 10.sp) })
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 4. EXPECTED DATE / TIME
+                    // 4. EXPECTED DATE & TIME
                     Text(
-                        text = if (isKannada) "4. ನಿರೀಕ್ಷಿತ ಸಾಗಣೆ ಸಮಯ (Expected Pickup/Delivery)" else "4. Expected Date & Time",
+                        text = AppLocalization.t("expected_time_title"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = ForestGreenDeep
+                        color = SoilDeepEarth
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedTextField(
                         value = expectedDateTime,
                         onValueChange = { expectedDateTime = it },
                         modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Text("🚚", fontSize = 16.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1B2A1E),
+                            unfocusedTextColor = Color(0xFF1B2A1E),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
+                            cursorColor = SoilCropGreen
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B2A1E)
+                        ),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        leadingIcon = { Text("🚚") }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(
-                            onClick = { expectedDateTime = "2026-11-14 09:00 AM" },
-                            label = { Text("+24h Morning", fontSize = 10.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { expectedDateTime = "2026-11-14 05:00 PM" },
-                            label = { Text("+24h Evening", fontSize = 10.sp) }
-                        )
-                        SuggestionChip(
-                            onClick = { expectedDateTime = "2026-11-13 06:00 PM" },
-                            label = { Text("Today Evening", fontSize = 10.sp) }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 5. PLANNING TO SELL IMMEDIATELY?
-                    Text(
-                        text = if (isKannada) "5. ತಕ್ಷಣ ಮಾರಾಟ ಮಾಡಲು ಯೋಜಿಸುತ್ತಿದ್ದೀರಾ?" else "5. Planning to Sell Immediately?",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = ForestGreenDeep
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        // Yes Option
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (sellImmediately) ForestGreenDeep else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, if (sellImmediately) ForestGreenDeep else Color.LightGray),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { sellImmediately = true }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("⚡", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isKannada) "ಹೌದು, ತಕ್ಷಣ ಮಾರಾಟ" else "Yes, Sell Now",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (sellImmediately) Color.White else Color.Black
-                                )
-                                Text(
-                                    text = if (isKannada) "ವರ್ಚುವಲ್ FPO ಪೂಲಿಂಗ್" else "Virtual FPO Pool",
-                                    fontSize = 10.sp,
-                                    color = if (sellImmediately) Color.White.copy(alpha = 0.8f) else Color.Gray
-                                )
-                            }
-                        }
-
-                        // No Option
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (!sellImmediately) ForestGreenDeep else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, if (!sellImmediately) ForestGreenDeep else Color.LightGray),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { sellImmediately = false }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("❄️", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isKannada) "ಇಲ್ಲ, ಶೀತಲಾಗಾರ" else "No, Cold Storage",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (!sellImmediately) Color.White else Color.Black
-                                )
-                                Text(
-                                    text = if (isKannada) "ಶೇಖರಿಸಿಡಿ" else "Hold in Facility",
-                                    fontSize = 10.sp,
-                                    color = if (!sellImmediately) Color.White.copy(alpha = 0.8f) else Color.Gray
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 6. QUANTITY (KG)
-                    Text(
-                        text = if (isKannada) "6. ಅಂದಾಜು ತೂಕ (Quantity in kg)" else "6. Declared Quantity (kg)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = ForestGreenDeep
+                        singleLine = true
                     )
                     Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = quantityKg,
-                        onValueChange = { quantityKg = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        leadingIcon = { Text("⚖️") }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SuggestionChip(onClick = { quantityKg = "100" }, label = { Text("100 kg", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { quantityKg = "200" }, label = { Text("200 kg", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { quantityKg = "300" }, label = { Text("300 kg", fontSize = 10.sp) })
-                        SuggestionChip(onClick = { quantityKg = "500" }, label = { Text("500 kg", fontSize = 10.sp) })
-                    }
-
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // ==========================================
-                    // 7. STORAGE ACCESS (CORE REQUIREMENT)
-                    // ==========================================
-                    Text(
-                        text = if (isKannada) "7. ಸಂಗ್ರಹಣಾ ಸೌಲಭ್ಯ (Storage Access)" else "7. Storage Access",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = ForestGreenDeep
-                    )
-                    Text(
-                        text = if (isKannada)
-                            "ನಿಮ್ಮ ಕೊಯ್ಲು ಮಾಡಿದ ಉತ್ಪನ್ನಕ್ಕೆ ಸಂಗ್ರಹಣಾ ವ್ಯವಸ್ಥೆ ಇದೆಯೇ?"
-                        else
-                            "Do you have access to storage for your harvested produce?",
-                        fontSize = 12.sp,
-                        color = Color.DarkGray,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (hasStorageAccess) ForestGreenDeep else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, if (hasStorageAccess) ForestGreenDeep else Color.LightGray),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { hasStorageAccess = true }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("🏠", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isKannada) "ಹೌದು, ನನ್ನ ಬಳಿ ದಾಸ್ತಾನು ಇದೆ" else "Yes, I have storage",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (hasStorageAccess) Color.White else Color.Black
-                                )
-                                Text(
-                                    text = if (isKannada) "ಆನ್‌ಫಾರ್ಮ್ ಶೆಡ್" else "On-farm shade / room",
-                                    fontSize = 10.sp,
-                                    color = if (hasStorageAccess) Color.White.copy(alpha = 0.8f) else Color.Gray
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (!hasStorageAccess) ForestGreenDeep else MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.5.dp, if (!hasStorageAccess) ForestGreenDeep else Color.LightGray),
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { hasStorageAccess = false }
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text("❄️", fontSize = 20.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isKannada) "ಇಲ್ಲ, ನನಗೆ ಶೀತಲಾಗಾರ ಬೇಕು" else "No, I need storage",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (!hasStorageAccess) Color.White else Color.Black
-                                )
-                                Text(
-                                    text = if (isKannada) "ಶೀತಲಾಗಾರ ಶೋಧಿಸಿ" else "Find Cold Storage",
-                                    fontSize = 10.sp,
-                                    color = if (!hasStorageAccess) Color.White.copy(alpha = 0.8f) else Color.Gray
-                                )
-                            }
-                        }
-                    }
-
-                    // If NO storage access: show location permission & fallback guidance
-                    AnimatedVisibility(visible = !hasStorageAccess) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 10.dp)
-                        ) {
+                        listOf(
+                            "+24h Morning" to "2026-11-14 09:00 AM",
+                            "+24h Evening" to "2026-11-14 05:00 PM",
+                            "Today Evening" to "2026-11-13 06:00 PM"
+                        ).forEach { (label, dt) ->
+                            val isSelected = expectedDateTime == dt
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = HarvestGoldLight.copy(alpha = 0.25f),
-                                border = BorderStroke(1.dp, HarvestGold)
+                                color = if (isSelected) SoilCropGreen.copy(alpha = 0.12f) else SoilFieldPaper,
+                                border = BorderStroke(1.dp, if (isSelected) SoilCropGreen else Color.Transparent),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { expectedDateTime = dt }
                             ) {
-                                Column(modifier = Modifier.padding(10.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text("📍", fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = if (isKannada) "ಸ್ಥಳ ಗುರುತಿಸುವಿಕೆ (Location Selection)" else "Smart Location Detection",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            color = ForestGreenDeep
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text(
-                                        text = if (isKannada)
-                                            "ಜಿಪಿಎಸ್ ಸಕ್ರಿಯವಾಗಿದೆ: ಕೋಲಾರ (13.133° N, 78.133° E). ಸಮೀಪದ ಎನ್‌ಎಚ್‌ಬಿ ಶೀತಲಾಗಾರಗಳನ್ನು ರಸ್ತೆ ದೂರದಿಂದ ಶ್ರೇಣೀಕರಿಸಲಾಗುವುದು."
-                                        else
-                                            "GPS active: Kolar (13.133° N, 78.133° E). Nearby NHB facilities will be ranked with road distances to Mandi A, B, and C.",
+                                        text = label,
                                         fontSize = 10.sp,
-                                        color = Color.DarkGray,
-                                        lineHeight = 14.sp
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) SoilCropGreen else SoilDeepEarth
                                     )
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            // ==========================================
-            // ACTION BUTTONS: CONFIRM OR SKIP
-            // ==========================================
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            ) {
-                Button(
-                    onClick = {
-                        isSubmitting = true
-                        scope.launch {
-                            val fId = farmer?.phone ?: "9845012345"
-                            val qVal = quantityKg.toDoubleOrNull() ?: 200.0
-
-                            val res = ApiClient.declareHarvest(
-                                farmerId = fId,
-                                crop = crop,
-                                quantityKg = qVal,
-                                harvestDate = harvestDate,
-                                harvestTime = harvestTime,
-                                expectedDateTime = expectedDateTime,
-                                sellImmediately = sellImmediately
-                            )
-                            isSubmitting = false
-
-                            // Extract Unique Harvest ID from response
-                            val uniqueHarvestId = if (res.contains("\"harvest_id\":\"")) {
-                                res.substringAfter("\"harvest_id\":\"").substringBefore("\"")
-                            } else if (res.contains("\"lot_id\":\"")) {
-                                res.substringAfter("\"lot_id\":\"").substringBefore("\"")
-                            } else {
-                                "FR-KLR-20261113-0001"
+                    // 5. DECLARED QUANTITY (KG)
+                    Text(
+                        text = AppLocalization.t("declared_qty_title"),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = SoilDeepEarth
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = quantityKg,
+                        onValueChange = { input ->
+                            if (input.all { it.isDigit() }) quantityKg = input
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Text("⚖️", fontSize = 16.sp) },
+                        suffix = { Text("kg", fontWeight = FontWeight.Bold, color = SoilCropGreen) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color(0xFF1B2A1E),
+                            unfocusedTextColor = Color(0xFF1B2A1E),
+                            focusedContainerColor = Color.White,
+                            unfocusedContainerColor = Color.White,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
+                            cursorColor = SoilCropGreen
+                        ),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B2A1E)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf("100", "200", "300", "500").forEach { q ->
+                            val isSelected = quantityKg == q
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) SoilCropGreen.copy(alpha = 0.12f) else SoilFieldPaper,
+                                border = BorderStroke(1.dp, if (isSelected) SoilCropGreen else Color.Transparent),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { quantityKg = q }
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$q kg",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) SoilCropGreen else SoilDeepEarth
+                                    )
+                                }
                             }
-
-                            // Store in UserSession for the entire app!
-                            UserSession.setHarvest(
-                                HarvestDeclaration(
-                                    harvestId = uniqueHarvestId,
-                                    crop = crop,
-                                    harvestDate = harvestDate,
-                                    harvestTime = harvestTime,
-                                    expectedDateTime = expectedDateTime,
-                                    sellImmediately = sellImmediately,
-                                    quantityKg = qVal,
-                                    hasStorageAccess = hasStorageAccess,
-                                    storageRequirementNeeded = !hasStorageAccess,
-                                    farmerLatitude = 13.133,
-                                    farmerLongitude = 78.133,
-                                    locationSource = if (isGpsGranted) "GPS (Verified)" else "PIN: $locationPinCode"
-                                )
-                            )
-
-                            // Navigate with needsStorage parameter
-                            onHarvestSubmitted(uniqueHarvestId, !hasStorageAccess, crop, qVal)
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
-                    enabled = !isSubmitting
-                ) {
-                    if (isSubmitting) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                    } else {
-                        Text(
-                            text = if (isKannada) {
-                                if (!hasStorageAccess) "❄️ ಕೊಯ್ಲು ಮತ್ತು ಶೀತಲಾಗಾರ ಶೋಧನೆ (CONFIRM & DISCOVER STORAGE)"
-                                else "🌾 ಕೊಯ್ಲು ದೃಢೀಕರಿಸಿ (DECLARE HARVEST)"
-                            } else {
-                                if (!hasStorageAccess) "❄️ CONFIRM & FIND COLD STORAGE"
-                                else "🌾 CONFIRM & DECLARE HARVEST"
-                            },
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // ================================================================
+                    // 6. UNIFIED STORAGE / SELLING ACTION (EXACTLY 2 OPTIONS)
+                    // ================================================================
+                    Text(
+                        text = AppLocalization.t("action_heading"),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.5.sp,
+                        color = SoilDeepEarth
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Option 1: Sell Now ⚡
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (sellImmediately) SoilCropGreen.copy(alpha = 0.08f) else Color.White,
+                        border = BorderStroke(
+                            width = if (sellImmediately) 2.dp else 1.dp,
+                            color = if (sellImmediately) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.18f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { sellImmediately = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .background(
+                                        if (sellImmediately) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.08f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "⚡",
+                                    fontSize = 20.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = AppLocalization.t("sell_now_title"),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = if (sellImmediately) SoilCropGreen else SoilDeepEarth
+                                    )
+                                    if (sellImmediately) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = SoilCropGreen,
+                                            modifier = Modifier.size(20.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = AppLocalization.t("sell_now_desc"),
+                                    fontSize = 11.5.sp,
+                                    color = SoilDeepEarth.copy(alpha = 0.75f),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Option 2: Find Cold Storage ❄️
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (!sellImmediately) SoilCropGreen.copy(alpha = 0.08f) else Color.White,
+                        border = BorderStroke(
+                            width = if (!sellImmediately) 2.dp else 1.dp,
+                            color = if (!sellImmediately) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.18f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { sellImmediately = false }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.dp)
+                                    .background(
+                                        if (!sellImmediately) SoilCropGreen else SoilDeepEarth.copy(alpha = 0.08f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "❄️",
+                                    fontSize = 20.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = AppLocalization.t("cold_storage_title"),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = if (!sellImmediately) SoilCropGreen else SoilDeepEarth
+                                    )
+                                    if (!sellImmediately) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = SoilCropGreen,
+                                            modifier = Modifier.size(20.dp)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text("✓", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = AppLocalization.t("cold_storage_desc"),
+                                    fontSize = 11.5.sp,
+                                    color = SoilDeepEarth.copy(alpha = 0.75f),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Location notice badge
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SoilFieldPaper,
+                        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.1f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("📍", fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Kolar Corridor (13.133° N, 78.133° E)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SoilDeepEarth
+                                )
+                                Text(
+                                    text = "Connected to APMC Mandis & NHB Cold Storage facilities.",
+                                    fontSize = 11.sp,
+                                    color = SoilDeepEarth.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                TextButton(
-                    onClick = { onSkip() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (isKannada) "ಈಗಲೇ ಬಿಟ್ಟುಬಿಡಿ (ಡೀಫಾಲ್ಟ್ ಲಾಟ್ ಬಳಸಿ)" else "Skip for now (Use default lot FR-KLR-20261113-0001)",
-                        color = Color.Gray,
-                        fontSize = 13.sp
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
