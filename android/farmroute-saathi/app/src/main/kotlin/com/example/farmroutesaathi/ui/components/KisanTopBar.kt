@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,30 +41,44 @@ fun KisanTopBar(
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
-    val gradientBrush = if (isDarkTheme) {
-        Brush.horizontalGradient(listOf(SoilDeepEarth, Color(0xFF1F2F26), OledBackgroundDark))
-    } else {
-        Brush.horizontalGradient(listOf(SoilDeepEarth, SoilCropGreen, ForestGreenPrimary))
-    }
-
     val currentFarmer = UserSession.currentFarmer
     val activeHarvestId = UserSession.activeHarvestId
     val unreadCount = UserSession.unreadNotificationCount
+
+    // Subtle breathing animation for unread notification badge
+    val unreadTransition = rememberInfiniteTransition(label = "unreadPulse")
+    val unreadScale by unreadTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (unreadCount > 0) 1.18f else 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "unreadScale"
+    )
+
+    val barBackground = if (isDarkTheme) SurfaceDarkCard else Color.White
+    val barBorder = if (isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)
+    val titleColor = if (isDarkTheme) SoilFieldPaper else SoilDeepEarth
+    val tagColor = if (isDarkTheme) SoilHarvestGold else SoilCropGreen
+    val controlBg = if (isDarkTheme) SurfaceDarkCardHigh else SoilFieldPaper
+    val controlBorder = if (isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.15f)
+    val controlText = if (isDarkTheme) SoilFieldPaper else SoilDeepEarth
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
-                elevation = 6.dp,
+                elevation = 4.dp,
                 shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
             ),
         shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
-        color = Color.Transparent
+        color = barBackground,
+        border = BorderStroke(1.dp, barBorder)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(gradientBrush)
                 .statusBarsPadding()
                 .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 12.dp)
         ) {
@@ -79,15 +94,16 @@ fun KisanTopBar(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.20f),
-                        modifier = Modifier.size(38.dp)
+                        color = if (isDarkTheme) SoilCropGreen.copy(alpha = 0.25f) else SoilHarvestGold.copy(alpha = 0.20f),
+                        border = BorderStroke(1.5.dp, if (isDarkTheme) SoilFreshLeaf else SoilHarvestGold),
+                        modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = "🌾", fontSize = 20.sp)
+                            Text(text = "🌾", fontSize = 21.sp)
                         }
                     }
 
@@ -95,15 +111,15 @@ fun KisanTopBar(
                         Text(
                             text = AppLocalization.t("app_name"),
                             style = MaterialTheme.typography.titleMedium,
-                            color = Color.White,
+                            color = titleColor,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.3.sp
                         )
                         Text(
                             text = AppLocalization.t("tagline"),
                             style = MaterialTheme.typography.bodySmall,
-                            color = SoilHarvestGold,
-                            fontSize = 10.sp,
+                            color = tagColor,
+                            fontSize = 10.5.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -117,8 +133,8 @@ fun KisanTopBar(
                     // 1. Notification Center Bell with Badge
                     Surface(
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.18f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
+                        color = controlBg,
+                        border = BorderStroke(1.dp, controlBorder),
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
@@ -130,8 +146,9 @@ fun KisanTopBar(
                                 Box(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(top = 2.dp, end = 2.dp)
+                                        .padding(top = 1.dp, end = 1.dp)
                                         .size(14.dp)
+                                        .scale(unreadScale)
                                         .background(Color(0xFFE53935), CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -150,7 +167,7 @@ fun KisanTopBar(
                     Surface(
                         shape = CircleShape,
                         color = SoilHarvestGold,
-                        shadowElevation = 3.dp,
+                        shadowElevation = 2.dp,
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
@@ -170,7 +187,8 @@ fun KisanTopBar(
                     // 3. Theme Toggle Button
                     Surface(
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.18f),
+                        color = controlBg,
+                        border = BorderStroke(1.dp, controlBorder),
                         modifier = Modifier
                             .size(36.dp)
                             .clip(CircleShape)
@@ -187,8 +205,8 @@ fun KisanTopBar(
                     // 4. Dynamic Language Selector Pill
                     Surface(
                         shape = RoundedCornerShape(16.dp),
-                        color = Color.White.copy(alpha = 0.22f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                        color = if (isDarkTheme) SurfaceDarkCardHigh else Color.White,
+                        border = BorderStroke(1.2.dp, SoilCropGreen),
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
                             .clickable { showLanguageDialog = true }
@@ -200,7 +218,7 @@ fun KisanTopBar(
                             Text("🌐 ", fontSize = 10.sp)
                             Text(
                                 text = UserSession.selectedLanguage.code.uppercase(),
-                                color = Color.White,
+                                color = if (isDarkTheme) SoilFreshLeaf else SoilCropGreen,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -228,7 +246,8 @@ fun KisanTopBar(
                     // Farmer Name Badge
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.16f)
+                        color = controlBg,
+                        border = BorderStroke(1.dp, controlBorder)
                     ) {
                         Text(
                             text = if (currentFarmer != null)
@@ -236,7 +255,7 @@ fun KisanTopBar(
                             else
                                 "👤 Farmer Hub",
                             fontSize = 11.sp,
-                            color = Color.White,
+                            color = controlText,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
@@ -245,8 +264,8 @@ fun KisanTopBar(
                     // Active Harvest ID Badge
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = SoilHarvestGold,
-                        border = BorderStroke(1.dp, Color(0xFFB45309)),
+                        color = SoilHarvestGold.copy(alpha = if (isDarkTheme) 0.25f else 0.20f),
+                        border = BorderStroke(1.dp, SoilHarvestGold),
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .clickable { onHarvestClick?.invoke() }
@@ -259,7 +278,7 @@ fun KisanTopBar(
                             Text("🌾", fontSize = 10.sp)
                             Text(
                                 text = activeHarvestId,
-                                color = SoilDeepEarth,
+                                color = if (isDarkTheme) SoilHarvestGold else SoilDeepEarth,
                                 fontSize = 10.5.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
@@ -271,8 +290,8 @@ fun KisanTopBar(
                 if (onLogout != null) {
                     Surface(
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFFEF4444).copy(alpha = 0.28f),
-                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.55f)),
+                        color = if (isDarkTheme) Color(0xFFEF4444).copy(alpha = 0.25f) else Color(0xFFFFEBEE),
+                        border = BorderStroke(1.dp, Color(0xFFEF5350).copy(alpha = 0.55f)),
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .clickable { onLogout() }
@@ -280,7 +299,7 @@ fun KisanTopBar(
                         Text(
                             text = "🚪 " + AppLocalization.t("logout"),
                             fontSize = 10.5.sp,
-                            color = Color.White,
+                            color = if (isDarkTheme) Color(0xFFFFCDD2) else Color(0xFFC62828),
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
                         )

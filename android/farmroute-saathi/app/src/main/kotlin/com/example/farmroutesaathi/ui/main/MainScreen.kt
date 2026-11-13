@@ -1,10 +1,11 @@
 package com.example.farmroutesaathi.ui.main
 
 import androidx.compose.animation.*
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -15,7 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -29,6 +33,38 @@ import com.example.farmroutesaathi.ui.harvest.HarvestHistoryScreen
 import com.example.farmroutesaathi.ui.components.*
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
+
+// Reusable tactile press-scale animation modifier
+@Composable
+fun Modifier.pressScaleEffect(onClick: () -> Unit): Modifier {
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "pressScale"
+    )
+    return this
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    isPressed = true
+                    try {
+                        awaitRelease()
+                    } finally {
+                        isPressed = false
+                    }
+                },
+                onTap = { onClick() }
+            )
+        }
+}
 
 enum class RoleTab(val labelEn: String, val labelKn: String, val icon: String) {
     FARMER("Farmer", "ರೈತ", "👨‍🌾"),
@@ -211,6 +247,7 @@ fun FarmerDashboardView(
     onViewPoolingClick: (() -> Unit)? = null,
     onViewWeatherClick: (() -> Unit)? = null
 ) {
+    val isDark = UserSession.isDarkTheme
     val currentLot = UserSession.activeHarvestId
     val farmerProfile = UserSession.currentFarmer
     val farmerName = farmerProfile?.name ?: "Manjunatha Gowda"
@@ -220,6 +257,18 @@ fun FarmerDashboardView(
     val activeCrop = activeHarvest?.crop ?: "Tomato"
     val activeQty = activeHarvest?.quantityKg ?: 200.0
 
+    // Dashboard entrance animation state
+    var isEntered by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isEntered = true
+    }
+
+    val cardBg = if (isDark) SurfaceDarkCard else Color.White
+    val cardBorder = if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)
+    val textPrimary = if (isDark) SoilFieldPaper else SoilDeepEarth
+    val textSecondary = if (isDark) SoilFreshLeaf else SoilCropGreen
+    val textMuted = if (isDark) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.75f)
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(14.dp)
@@ -227,197 +276,222 @@ fun FarmerDashboardView(
         // ====================================================================
         // SECTION 1: WELCOME & RURAL AGRICULTURAL LOCATION
         // ====================================================================
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
-            ),
-            shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, if (UserSession.isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        AnimatedVisibility(
+            visible = isEntered,
+            enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 8 }
         ) {
-            Row(
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.2.dp, cardBorder),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .pressScaleEffect { }
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Surface(
-                        shape = CircleShape,
-                        color = SoilHarvestGold.copy(alpha = 0.18f),
-                        border = BorderStroke(1.5.dp, SoilHarvestGold),
-                        modifier = Modifier.size(46.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("👨‍🌾", fontSize = 22.sp)
-                        }
-                    }
-                    Column {
-                        Text(
-                            text = AppLocalization.t("welcome_farmer", "name" to farmerName),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "📍 $farmerLocation, $farmerState • Agri Cluster #12",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = SoilCropGreen.copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.35f))
-                ) {
-                    Text(
-                        text = if (isKannada) "ಕಿಸಾನ್ ಹಬ್" else "Farmer Hub",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SoilCropGreen,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
-
-        // ====================================================================
-        // SECTION 2: ACTIVE HARVEST HERO FOCUS
-        // ====================================================================
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCardHigh else SoilFieldPaper
-            ),
-            shape = RoundedCornerShape(18.dp),
-            border = BorderStroke(1.2.dp, SoilFreshLeaf.copy(alpha = 0.45f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                // Header Row: Harvest Focus Badge + Lot ID Pill
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Text("🌱", fontSize = 14.sp)
-                        Text(
-                            text = AppLocalization.t("active_harvest_focus"),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 0.8.sp,
-                            color = SoilCropGreen
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = SoilCropGreen,
-                        shadowElevation = 1.dp
-                    ) {
-                        Text(
-                            text = "Lot #$currentLot",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                // Crop Main Profile Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.15f)),
-                        modifier = Modifier.size(54.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
+                        Surface(
+                            shape = CircleShape,
+                            color = if (isDark) SoilHarvestGold.copy(alpha = 0.22f) else SoilHarvestGold.copy(alpha = 0.18f),
+                            border = BorderStroke(1.5.dp, SoilHarvestGold),
+                            modifier = Modifier.size(46.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text("👨‍🌾", fontSize = 22.sp)
+                            }
+                        }
+                        Column {
                             Text(
-                                text = if (activeCrop.contains("Tomato", ignoreCase = true)) "🍅" else "🌾",
-                                fontSize = 28.sp
+                                text = AppLocalization.t("welcome_farmer", "name" to farmerName),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "📍 $farmerLocation, $farmerState • Agri Cluster #12",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = textSecondary
                             )
                         }
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SoilCropGreen.copy(alpha = if (isDark) 0.25f else 0.12f),
+                        border = BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.45f))
+                    ) {
                         Text(
-                            text = "$activeCrop (${if (isKannada) "ಹೈಬ್ರಿಡ್ ಪ್ರೀಮಿಯಂ" else "Hybrid Premium"})",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "${activeQty.toInt()} kg • ${activeHarvest?.qualityGrade ?: "Grade A (Firm)"}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SoilCropGreen
-                        )
-                        Text(
-                            text = if (isKannada)
-                                "ಕೊಯ್ಲು: ${activeHarvest?.harvestDate ?: "2026-11-13"} (${activeHarvest?.harvestTime ?: "07:00 AM"})"
-                            else
-                                "Harvested: ${activeHarvest?.harvestDate ?: "2026-11-13"} at ${activeHarvest?.harvestTime ?: "07:00 AM"}",
+                            text = if (isKannada) "ಕಿಸಾನ್ ಹಬ್" else "Farmer Hub",
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = FontWeight.Bold,
+                            color = if (isDark) SoilFreshLeaf else SoilCropGreen,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }
                 }
+            }
+        }
 
-                HorizontalDivider(color = SoilDeepEarth.copy(alpha = 0.1f))
-
-                // Status Pills
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // ====================================================================
+        // SECTION 2: ACTIVE HARVEST HERO FOCUS (MAJOR READABILITY OVERHAUL)
+        // ====================================================================
+        AnimatedVisibility(
+            visible = isEntered,
+            enter = fadeIn(tween(400, delayMillis = 100)) + slideInVertically(tween(400, delayMillis = 100)) { it / 8 }
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.5.dp, if (isDark) BorderDarkSubtle else SoilCropGreen.copy(alpha = 0.35f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pressScaleEffect { onDeclareHarvestClick?.invoke() }
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = SoilHarvestGold.copy(alpha = 0.18f),
-                        border = BorderStroke(1.dp, SoilHarvestGold.copy(alpha = 0.5f)),
-                        modifier = Modifier.weight(1f)
+                    // Header Row: Harvest Focus Badge + Lot ID Pill
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (isKannada) "🏷️ ತಕ್ಷಣ ಮಾರಾಟಕ್ಕೆ ಸಿದ್ಧ" else "🏷️ Ready for Mandi Sale",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = HarvestGoldDark,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text("🌱", fontSize = 15.sp)
+                            Text(
+                                text = AppLocalization.t("active_harvest_focus"),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                letterSpacing = 0.8.sp,
+                                color = if (isDark) SoilFreshLeaf else SoilCropGreen
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SoilHarvestGold.copy(alpha = if (isDark) 0.25f else 0.20f),
+                            border = BorderStroke(1.2.dp, SoilHarvestGold),
+                            shadowElevation = 1.dp
+                        ) {
+                            Text(
+                                text = "Lot #$currentLot",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (isDark) SoilHarvestGold else SoilDeepEarth,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                            )
+                        }
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = SoilNaturalSky.copy(alpha = 0.25f),
-                        border = BorderStroke(1.dp, SoilNaturalSky.copy(alpha = 0.7f)),
-                        modifier = Modifier.weight(1f)
+                    // Crop Main Profile Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = if (isKannada) "❄️ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಲಭ್ಯ" else "❄️ Cold Storage Option",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SoilDeepEarth,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
+                            border = BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else SoilCropGreen.copy(alpha = 0.25f)),
+                            modifier = Modifier.size(56.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                val cropEmoji = when {
+                                    activeCrop.contains("Tomato", ignoreCase = true) || activeCrop.contains("ಟೊಮೆಟೊ") -> "🍅"
+                                    activeCrop.contains("Onion", ignoreCase = true) || activeCrop.contains("ಈರುಳ್ಳಿ") -> "🧅"
+                                    activeCrop.contains("Potato", ignoreCase = true) || activeCrop.contains("ಆಲೂ") -> "🥔"
+                                    activeCrop.contains("Cabbage", ignoreCase = true) || activeCrop.contains("ಕೋಸು") -> "🥬"
+                                    activeCrop.contains("Carrot", ignoreCase = true) || activeCrop.contains("ಕ್ಯಾರೆಟ್") -> "🥕"
+                                    activeCrop.contains("Chilli", ignoreCase = true) || activeCrop.contains("ಮೆಣಸಿನ") -> "🌶️"
+                                    else -> "🌾"
+                                }
+                                Text(cropEmoji, fontSize = 28.sp)
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "$activeCrop (${if (isKannada) "ಹೈಬ್ರಿಡ್ ಪ್ರೀಮಿಯಂ" else "Hybrid Premium"})",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = textPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${activeQty.toInt()} kg • ${activeHarvest?.qualityGrade ?: (if (isKannada) "ಗ್ರೇಡ್ A (ಉತ್ತಮ)" else "Grade A (Firm)")}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) SoilFreshLeaf else SoilCropGreen
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isKannada)
+                                    "📅 ಕೊಯ್ಲು: ${activeHarvest?.harvestDate ?: "2026-11-13"} (${activeHarvest?.harvestTime ?: "07:00 AM"})"
+                                else
+                                    "📅 Harvested: ${activeHarvest?.harvestDate ?: "2026-11-13"} at ${activeHarvest?.harvestTime ?: "07:00 AM"}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = textMuted
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.08f))
+
+                    // Status Pills - HIGH CONTRAST & READABLE
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SoilHarvestGold.copy(alpha = if (isDark) 0.22f else 0.18f),
+                            border = BorderStroke(1.2.dp, SoilHarvestGold),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (isKannada) "🏷️ ತಕ್ಷಣ ಮಾರಾಟಕ್ಕೆ ಸಿದ್ಧ" else "🏷️ Ready for Mandi Sale",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) SoilHarvestGold else SoilDeepEarth,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = SoilNaturalSky.copy(alpha = if (isDark) 0.22f else 0.25f),
+                            border = BorderStroke(1.2.dp, if (isDark) SoilNaturalSky else Color(0xFF6A99A2)),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (isKannada) "❄️ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಲಭ್ಯ" else "❄️ Cold Storage Option",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isDark) SoilNaturalSky else SoilDeepEarth,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -432,8 +506,8 @@ fun FarmerDashboardView(
         Text(
             text = if (isKannada) "ಮುಖ್ಯ ಕೃಷಿ ನಿರ್ಧಾರಗಳು (Core Actions):" else "Core Farmer Decision Actions:",
             fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface
+            fontSize = 14.5.sp,
+            color = textPrimary
         )
 
         // CTA 1: Register Harvest
@@ -444,6 +518,8 @@ fun FarmerDashboardView(
             badgeText = AppLocalization.t("register_cta_sub"),
             containerColor = SoilCropGreen,
             contentColor = Color.White,
+            badgeBgColor = Color.White,
+            badgeTextColor = SoilCropGreen,
             onClick = { onDeclareHarvestClick?.invoke() }
         )
 
@@ -455,6 +531,8 @@ fun FarmerDashboardView(
             badgeText = AppLocalization.t("compare_mandi_cta_sub"),
             containerColor = SoilHarvestGold,
             contentColor = SoilDeepEarth,
+            badgeBgColor = SoilDeepEarth,
+            badgeTextColor = Color.White,
             onClick = { onMandiComparisonClick?.invoke(currentLot) }
         )
 
@@ -466,17 +544,19 @@ fun FarmerDashboardView(
             badgeText = AppLocalization.t("cold_storage_cta_sub"),
             containerColor = SoilDeepEarth,
             contentColor = Color.White,
+            badgeBgColor = SoilHarvestGold,
+            badgeTextColor = SoilDeepEarth,
             onClick = { onColdStorageClick?.invoke(currentLot, activeCrop, activeQty) }
         )
 
         // ====================================================================
-        // SECTION 4: SECONDARY AGRICULTURAL SHORTCUTS (2x2 GRID)
+        // SECTION 4: SECONDARY AGRICULTURAL SHORTCUTS (2x2 GRID - HIGH CONTRAST)
         // ====================================================================
         Text(
             text = if (isKannada) "ತ್ವರಿತ ಸೇವೆಗಳು (Quick Services):" else "Secondary Services & Advisory:",
             fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface
+            fontSize = 14.sp,
+            color = textPrimary
         )
 
         Row(
@@ -487,6 +567,8 @@ fun FarmerDashboardView(
                 icon = "📜",
                 title = AppLocalization.t("harvest_history"),
                 subtitle = if (isKannada) "ಹಿಂದಿನ ಲಾಟ್‌ಗಳು" else "Past lot records",
+                iconBg = SoilHarvestGold.copy(alpha = if (isDark) 0.22f else 0.18f),
+                iconBorder = SoilHarvestGold.copy(alpha = 0.45f),
                 modifier = Modifier.weight(1f),
                 onClick = { onViewHistoryClick?.invoke() }
             )
@@ -494,6 +576,8 @@ fun FarmerDashboardView(
                 icon = "🏛️",
                 title = AppLocalization.t("schemes_cta"),
                 subtitle = if (isKannada) "ಪಿಎಂ-ಕಿಸಾನ್, ವಿಮೆ" else "PM-KISAN, PMFBY",
+                iconBg = SoilNaturalSky.copy(alpha = if (isDark) 0.22f else 0.25f),
+                iconBorder = SoilNaturalSky.copy(alpha = 0.55f),
                 modifier = Modifier.weight(1f),
                 onClick = { onViewBenefitsClick?.invoke() }
             )
@@ -507,6 +591,8 @@ fun FarmerDashboardView(
                 icon = "👥",
                 title = AppLocalization.t("pooling_cta"),
                 subtitle = if (isKannada) "ಸಾಗಾಟ ವೆಚ್ಚ ಕಡಿತ" else "Save 67% freight",
+                iconBg = SoilCropGreen.copy(alpha = if (isDark) 0.22f else 0.14f),
+                iconBorder = SoilCropGreen.copy(alpha = 0.45f),
                 modifier = Modifier.weight(1f),
                 onClick = { onViewPoolingClick?.invoke() }
             )
@@ -514,6 +600,8 @@ fun FarmerDashboardView(
                 icon = "⛅",
                 title = AppLocalization.t("weather_cta"),
                 subtitle = if (isKannada) "ಐಎಂಡಿ ಮಳೆ ಎಚ್ಚರಿಕೆ" else "IMD 48h rain alert",
+                iconBg = SoilFreshLeaf.copy(alpha = if (isDark) 0.22f else 0.18f),
+                iconBorder = SoilFreshLeaf.copy(alpha = 0.45f),
                 modifier = Modifier.weight(1f),
                 onClick = { onViewWeatherClick?.invoke() }
             )
@@ -529,13 +617,15 @@ private fun FarmerActionTile(
     badgeText: String,
     containerColor: Color,
     contentColor: Color,
+    badgeBgColor: Color,
+    badgeTextColor: Color,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
+            .pressScaleEffect { onClick() },
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
@@ -547,9 +637,9 @@ private fun FarmerActionTile(
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = contentColor.copy(alpha = 0.15f),
-                modifier = Modifier.size(48.dp)
+                shape = RoundedCornerShape(14.dp),
+                color = contentColor.copy(alpha = 0.18f),
+                modifier = Modifier.size(50.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(icon, fontSize = 24.sp)
@@ -557,36 +647,32 @@ private fun FarmerActionTile(
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = title,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = contentColor
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor
+                )
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 11.5.sp,
-                    color = contentColor.copy(alpha = 0.85f),
-                    lineHeight = 15.sp
+                    fontSize = 12.sp,
+                    color = contentColor.copy(alpha = 0.90f),
+                    lineHeight = 16.sp
                 )
             }
 
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = contentColor.copy(alpha = 0.2f)
+                shape = RoundedCornerShape(12.dp),
+                color = badgeBgColor,
+                shadowElevation = 2.dp
             ) {
                 Text(
-                    text = "$badgeText ➔",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = contentColor,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    text = badgeText,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = badgeTextColor,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                 )
             }
         }
@@ -598,46 +684,52 @@ private fun SecondaryServiceCard(
     icon: String,
     title: String,
     subtitle: String,
+    iconBg: Color,
+    iconBorder: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val isDark = UserSession.isDarkTheme
     Card(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.pressScaleEffect { onClick() },
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
+            containerColor = if (isDark) SurfaceDarkCard else Color.White
         ),
-        border = BorderStroke(1.dp, if (UserSession.isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)),
+        border = BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = SoilFreshLeaf.copy(alpha = 0.15f),
-                modifier = Modifier.size(38.dp)
+                shape = RoundedCornerShape(12.dp),
+                color = iconBg,
+                border = BorderStroke(1.dp, iconBorder),
+                modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    Text(icon, fontSize = 18.sp)
+                    Text(icon, fontSize = 20.sp)
                 }
             }
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,
-                    fontSize = 12.5.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = if (isDark) SoilFieldPaper else SoilDeepEarth
                 )
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
-                    fontSize = 10.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isDark) SoilFreshLeaf else SoilCropGreen
                 )
             }
         }

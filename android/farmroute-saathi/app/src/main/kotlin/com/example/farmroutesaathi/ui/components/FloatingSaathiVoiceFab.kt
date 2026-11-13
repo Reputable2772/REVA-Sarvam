@@ -33,9 +33,13 @@ fun FloatingSaathiVoiceFab(
     val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = if (voiceState == SaathiVoiceState.LISTENING) 1.25f else 1.05f,
+        targetValue = when (voiceState) {
+            SaathiVoiceState.LISTENING -> 1.25f
+            SaathiVoiceState.PROCESSING -> 1.15f
+            SaathiVoiceState.IDLE -> 1.04f
+        },
         animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
+            animation = tween(if (voiceState == SaathiVoiceState.LISTENING) 600 else 1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "PulseScale"
@@ -46,12 +50,15 @@ fun FloatingSaathiVoiceFab(
         contentAlignment = Alignment.Center
     ) {
         // Outer Pulsing Glow
-        if (voiceState == SaathiVoiceState.LISTENING) {
+        if (voiceState == SaathiVoiceState.LISTENING || voiceState == SaathiVoiceState.PROCESSING) {
             Box(
                 modifier = Modifier
                     .size(68.dp)
                     .scale(pulseScale)
-                    .background(HarvestGold.copy(alpha = 0.35f), CircleShape)
+                    .background(
+                        if (voiceState == SaathiVoiceState.LISTENING) SoilHarvestGold.copy(alpha = 0.40f) else SoilCropGreen.copy(alpha = 0.30f),
+                        CircleShape
+                    )
             )
         }
 
@@ -62,12 +69,13 @@ fun FloatingSaathiVoiceFab(
             shadowElevation = 8.dp,
             modifier = Modifier
                 .size(56.dp)
+                .scale(if (voiceState == SaathiVoiceState.IDLE) pulseScale else 1f)
                 .clickable { onVoiceFabClick() }
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Brush.radialGradient(listOf(FreshLimeAccent, ForestGreenPrimary))),
+                    .background(Brush.radialGradient(listOf(SoilFreshLeaf, SoilCropGreen))),
                 contentAlignment = Alignment.Center
             ) {
                 when (voiceState) {
