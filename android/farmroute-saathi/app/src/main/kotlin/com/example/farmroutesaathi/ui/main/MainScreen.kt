@@ -90,8 +90,8 @@ fun MainScreen(
                 // Living Intelligence Role Tab Row
                 ScrollableTabRow(
                     selectedTabIndex = selectedTab.ordinal,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.primary,
                     edgePadding = 12.dp
                 ) {
                     RoleTab.values().forEach { tab ->
