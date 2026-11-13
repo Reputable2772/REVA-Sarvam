@@ -1,7 +1,12 @@
 import math
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+
+from backend.app.database import get_db
+from backend.app.models.models import HarvestLot
+from backend.app.services.harvest_alignment_service import HarvestAlignmentService
 
 router = APIRouter(prefix="/logistics", tags=["Logistics Intelligence & Shared Freight"])
 
@@ -154,3 +159,79 @@ def plan_route(req: RoutePlanRequest):
         "farmer_logistics_savings": round(3292.0 - shared_per_farmer, 2),
         "waypoints": waypoints
     }
+
+class CheckOpportunityRequest(BaseModel):
+    lot_id: str
+    target_mandi: Optional[str] = "Kolar APMC"
+
+class OpportunityConsentRequest(BaseModel):
+    farmer_id: str
+    consent: bool
+
+@router.post("/opportunities/check")
+def check_pooling_opportunity(
+    req: CheckOpportunityRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Evaluates opportunistic co-transport pooling for a harvest lot heading to a target mandi.
+    Checks if waiting 1 day to pool with a pre-scheduled partner yields genuine freight savings.
+    """
+    lot = db.query(HarvestLot).filter(HarvestLot.lot_id == req.lot_id).first()
+    if not lot:
+        raise HTTPException(status_code=404, detail=f"Harvest lot {req.lot_id} not found.")
+
+    mandi = req.target_mandi or "Kolar APMC"
+    opp = HarvestAlignmentService.evaluate_alignment_opportunity(lot, mandi, db)
+    if not opp:
+        return {
+            "success": True,
+            "opportunity_found": False,
+            "message": "No scheduled partners with net freight savings found for this harvest date.",
+            "opportunity": None
+        }
+
+    return {
+        "success": True,
+        "opportunity_found": True,
+        "message": f"Co-transport partner found! Save ₹{opp['my_savings']} by pooling.",
+        "opportunity": opp
+    }
+
+@router.get("/opportunities/farmer/{farmer_id}")
+def get_farmer_pooling_opportunities(
+    farmer_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Lists active co-transport pooling proposals and mutual agreements for a farmer.
+    """
+    opps = HarvestAlignmentService.get_farmer_opportunities(farmer_id, db)
+    return {
+        "success": True,
+        "farmer_id": farmer_id,
+        "count": len(opps),
+        "opportunities": opps
+    }
+
+@router.post("/opportunities/{opportunity_id}/consent")
+def submit_opportunity_consent(
+    opportunity_id: str,
+    req: OpportunityConsentRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Records farmer bilateral consent (ACCEPT / DECLINE).
+    When both accept, dispatches mutual Android notifications exchanging contact phone numbers.
+    """
+    try:
+        res = HarvestAlignmentService.record_farmer_consent(
+            opportunity_id=opportunity_id,
+            farmer_id=req.farmer_id,
+            consent=req.consent,
+            db=db
+        )
+        return res
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+

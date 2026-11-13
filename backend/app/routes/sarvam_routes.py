@@ -213,7 +213,12 @@ def register_by_voice(
     extracted_res = SarvamService.extract_harvest_entities(transcript)
     entities = extracted_res.get("extracted", {})
 
-    farmer_obj = db.query(Farmer).filter(Farmer.farmer_id == req.farmer_id).first()
+    clean_fid = str(req.farmer_id).strip()
+    farmer_obj = db.query(Farmer).filter(
+        (Farmer.farmer_id == clean_fid) |
+        (Farmer.phone == clean_fid) |
+        (Farmer.phone.endswith(clean_fid))
+    ).first()
     default_village = farmer_obj.village if (farmer_obj and farmer_obj.village) else "Local Farm"
 
     crop = entities.get("crop") or "Tomato"

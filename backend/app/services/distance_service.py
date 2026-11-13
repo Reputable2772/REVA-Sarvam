@@ -8,6 +8,7 @@ DISTRICT_COORDINATES: Dict[str, Tuple[float, float]] = {
     # Karnataka Districts & Major APMCs
     "kolar": (13.1378, 78.1294),
     "mulbagal": (13.1645, 78.3957),
+    "devarayasamudra": (13.1250, 78.2917),
     "bangarpet": (12.9833, 78.2000),
     "srinivaspur": (13.3333, 78.2167),
     "malur": (13.0033, 77.9400),

@@ -204,9 +204,41 @@ class NotificationRecord(Base):
     recipient_id = Column(String(50), nullable=False)
     title = Column(String(200), nullable=False)
     body = Column(Text, nullable=False)
-    type = Column(String(50), default="general") # offer_match, weather_alert, simulated_payment, logistics
+    type = Column(String(50), default="general") # offer_match, weather_alert, simulated_payment, logistics, pooling_proposal, contact_exchange
     read = Column(Boolean, default=False)
+    metadata_json = Column(Text, nullable=True, default="{}")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class PoolingOpportunity(Base):
+    """
+    Opportunistic Co-Transport Pooling with Bilateral Consent
+    """
+    __tablename__ = "pooling_opportunities"
+
+    opportunity_id = Column(String(50), primary_key=True)
+    crop = Column(String(50), nullable=False)
+    target_mandi = Column(String(100), nullable=False)
+    target_date = Column(String(20), nullable=False)
+
+    farmer_a_id = Column(String(50), ForeignKey("farmers.farmer_id"), nullable=False)
+    farmer_a_lot_id = Column(String(50), ForeignKey("harvest_lots.lot_id"), nullable=False)
+    farmer_a_consent = Column(String(20), default="PENDING") # PENDING, ACCEPTED, DECLINED
+    farmer_a_solo_cost = Column(Float, default=0.0)
+    farmer_a_pooled_cost = Column(Float, default=0.0)
+    farmer_a_savings = Column(Float, default=0.0)
+
+    farmer_b_id = Column(String(50), ForeignKey("farmers.farmer_id"), nullable=False)
+    farmer_b_lot_id = Column(String(50), ForeignKey("harvest_lots.lot_id"), nullable=False)
+    farmer_b_consent = Column(String(20), default="PENDING") # PENDING, ACCEPTED, DECLINED
+    farmer_b_solo_cost = Column(Float, default=0.0)
+    farmer_b_pooled_cost = Column(Float, default=0.0)
+    farmer_b_savings = Column(Float, default=0.0)
+
+    combined_weight_kg = Column(Float, nullable=False)
+    recommended_vehicle_id = Column(String(50), nullable=False, default="VEH-ACE")
+    status = Column(String(30), default="PROPOSED") # PROPOSED, MUTUALLY_ACCEPTED, DECLINED, EXPIRED
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    settled_at = Column(DateTime, nullable=True)
 
 # Scheme & Opportunity Intelligence Models
 from backend.app.models.scheme_models import (

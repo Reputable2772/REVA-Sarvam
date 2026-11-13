@@ -562,6 +562,16 @@ class SarvamService:
                 except (ValueError, TypeError):
                     pass
 
+            # Normalize quality grade to standard Grade A / Grade B / Grade C
+            if "quality_grade" in normalized and normalized["quality_grade"]:
+                qg = str(normalized["quality_grade"]).strip().upper()
+                if qg in ["A", "GRADE A", "GRADE-A", "ಗ್ರೇಡ್ ಎ", "ಗ್ರೇಡ್ A"]:
+                    normalized["quality_grade"] = "Grade A"
+                elif qg in ["B", "GRADE B", "GRADE-B", "ಗ್ರೇಡ್ ಬಿ", "ಗ್ರೇಡ್ B"]:
+                    normalized["quality_grade"] = "Grade B"
+                elif qg in ["C", "GRADE C", "GRADE-C", "ಗ್ರೇಡ್ ಸಿ", "ಗ್ರೇಡ್ C"]:
+                    normalized["quality_grade"] = "Grade C"
+
             # Fill in any missing or null fields from heuristic
             for key, h_val in heuristic.items():
                 if key not in normalized or normalized[key] is None or normalized[key] == "":

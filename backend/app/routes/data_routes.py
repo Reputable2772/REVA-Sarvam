@@ -66,11 +66,42 @@ def load_local_agmarknet_dataset(
     """
     return DatasetImporter.load_local_agmarknet_csv(db, filepath or "datasets/9ef84268-d588-465a-a308-a864a43d0070.csv")
 
+@router.post("/load-all-agmarknet")
+def load_all_agmarknet_dataset(
+    filepath: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests all 13,073 AGMARKNET records across all Indian states and commodities.
+    """
+    return DatasetImporter.import_all_agmarknet_prices(db, filepath)
+
+@router.post("/load-cold-storages")
+def load_cold_storages_dataset(
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests all 330+ MoFPI and NHB cold storage facilities from datasets/.
+    """
+    return DatasetImporter.import_cold_storage_facilities(db)
+
+@router.post("/load-all-datasets")
+def load_all_datasets(
+    db: Session = Depends(get_db)
+):
+    """
+    Comprehensive ingestion of all official datasets: Pan-India Mandi Prices,
+    National Cold Storage facilities, and Government Schemes.
+    """
+    return DatasetImporter.import_all_datasets(db)
+
 @router.get("/mandi-prices")
 def get_mandi_prices(
     commodity: Optional[str] = None,
     market: Optional[str] = None,
+    state: Optional[str] = None,
     date: Optional[str] = None,
+    limit: Optional[int] = 200,
     db: Session = Depends(get_db)
 ):
     query = db.query(MandiPriceRecord)
@@ -78,10 +109,16 @@ def get_mandi_prices(
         query = query.filter(MandiPriceRecord.commodity.ilike(f"%{commodity}%"))
     if market:
         query = query.filter(MandiPriceRecord.market_name.ilike(f"%{market}%"))
+    if state:
+        query = query.filter(MandiPriceRecord.state.ilike(f"%{state}%"))
     if date:
         query = query.filter(MandiPriceRecord.arrival_date == date)
 
-    records = query.all()
+    if limit:
+        records = query.limit(limit).all()
+    else:
+        records = query.all()
+
     return {
         "success": True,
         "count": len(records),

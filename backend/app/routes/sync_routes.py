@@ -37,8 +37,19 @@ def sync_harvest_batch(
 
     for item in req.lots:
         # Check idempotency via metadata
+        clean_fid = str(item.farmer_id).strip()
+        farmer = db.query(Farmer).filter(
+            (Farmer.farmer_id == clean_fid) |
+            (Farmer.phone == clean_fid) |
+            (Farmer.phone.endswith(clean_fid))
+        ).first()
+
+        f_ids = [clean_fid]
+        if farmer:
+            f_ids.append(farmer.farmer_id)
+
         existing = db.query(HarvestLot).filter(
-            HarvestLot.farmer_id == item.farmer_id,
+            HarvestLot.farmer_id.in_(f_ids),
             HarvestLot.metadata_json.like(f"%{item.client_uuid}%")
         ).first()
 
@@ -51,20 +62,24 @@ def sync_harvest_batch(
             })
             continue
 
-        # Ensure farmer exists
-        farmer = db.query(Farmer).filter(Farmer.farmer_id == item.farmer_id).first()
         if not farmer:
-            # Generate deterministic unique phone based on farmer_id to respect unique constraint
-            phone_num = f"+91 {abs(hash(item.farmer_id)) % 9000000000 + 1000000000}"
-            farmer = Farmer(
-                farmer_id=item.farmer_id,
-                name=f"Farmer {item.farmer_id}",
-                village=item.village or "",
-                district=item.village or "",
-                phone=phone_num
-            )
-            db.add(farmer)
-            db.commit()
+            phone_num = clean_fid if (clean_fid.isdigit() and len(clean_fid) == 10) else f"98{abs(hash(clean_fid)) % 100000000:08d}"
+            existing_by_phone = db.query(Farmer).filter(
+                (Farmer.phone == phone_num) | (Farmer.phone.endswith(phone_num))
+            ).first()
+
+            if existing_by_phone:
+                farmer = existing_by_phone
+            else:
+                farmer = Farmer(
+                    farmer_id=clean_fid,
+                    name=f"Farmer {clean_fid}",
+                    village=item.village or "",
+                    district=item.village or "",
+                    phone=phone_num
+                )
+                db.add(farmer)
+                db.commit()
 
         # Generate unique Lot ID with dynamic district prefix
         dist_map = {"kolar": "KLR", "bangalore": "BLR", "bengaluru": "BLR", "mysore": "MYS", "mysuru": "MYS", "belgaum": "BEL", "belagavi": "BEL", "tumkur": "TUM", "mandya": "MDY", "hassan": "HAS"}
@@ -76,7 +91,7 @@ def sync_harvest_batch(
 
         new_lot = HarvestLot(
             lot_id=lot_id,
-            farmer_id=item.farmer_id,
+            farmer_id=farmer.farmer_id,
             crop=item.crop,
             variety=item.variety,
             quantity_kg=item.quantity_kg,
@@ -90,7 +105,7 @@ def sync_harvest_batch(
         log = AuditLog(
             action="OFFLINE_HARVEST_SYNCED",
             actor_role="FARMER",
-            actor_id=item.farmer_id,
+            actor_id=farmer.farmer_id,
             details=f"Synced offline lot {lot_id} (UUID: {item.client_uuid}) from device {req.device_id}"
         )
         db.add(log)

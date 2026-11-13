@@ -129,8 +129,10 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if not is_valid:
         raise HTTPException(status_code=400, detail=err_msg)
 
-    # Check if account already exists
-    existing = db.query(Farmer).filter(Farmer.phone == phone).first()
+    # Check if account already exists by phone
+    existing = db.query(Farmer).filter(
+        (Farmer.phone == phone) | (Farmer.phone.endswith(phone))
+    ).first()
     if existing:
         existing.name = req.name.strip()
         existing.state = req.state.strip()
@@ -141,7 +143,12 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         farmer = existing
     else:
         dist_code = req.district[:3].upper() if len(req.district) >= 3 else "KLR"
-        farmer_id = f"FR-{dist_code}-{phone[-6:]}"
+        base_id = f"FR-{dist_code}-{phone[-6:]}"
+        if db.query(Farmer).filter(Farmer.farmer_id == base_id).first():
+            farmer_id = f"FR-{dist_code}-{phone[-6:]}-{uuid.uuid4().hex[:4].upper()}"
+        else:
+            farmer_id = base_id
+
         farmer = Farmer(
             farmer_id=farmer_id,
             phone=phone,

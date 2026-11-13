@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+import json
 from datetime import datetime, timezone
 from backend.app.database import get_db
 from backend.app.models.models import DevicePushToken, NotificationRecord, AuditLog
@@ -18,7 +19,8 @@ class SendAlertRequest(BaseModel):
     recipient_id: str
     title: str
     body: str
-    notification_type: Optional[str] = "general" # offer_match, weather_alert, simulated_payment, logistics
+    notification_type: Optional[str] = "general" # offer_match, weather_alert, simulated_payment, logistics, pooling_proposal, contact_exchange
+    metadata: Optional[Dict[str, Any]] = None
 
 @router.post("/register-token")
 def register_push_token(
@@ -67,6 +69,7 @@ def send_push_alert(
         body=req.body,
         type=req.notification_type or "general",
         read=False,
+        metadata_json=json.dumps(req.metadata or {}),
         created_at=datetime.now(timezone.utc)
     )
     db.add(notification)
@@ -84,7 +87,8 @@ def send_push_alert(
         "dispatched_to_devices": device_count,
         "mode": "FCM Simulated Broadcast" if device_count > 0 else "Stored to In-App Inbox",
         "title": req.title,
-        "body": req.body
+        "body": req.body,
+        "metadata": req.metadata or {}
     }
 
 @router.get("/inbox/{user_id}")
@@ -99,19 +103,29 @@ def get_user_notifications(
         NotificationRecord.recipient_id == user_id
     ).order_by(NotificationRecord.id.desc()).all()
 
+    formatted = []
+    for n in notifications:
+        meta = {}
+        try:
+            if n.metadata_json:
+                meta = json.loads(n.metadata_json)
+        except Exception:
+            meta = {}
+
+        formatted.append({
+            "id": n.id,
+            "title": n.title,
+            "body": n.body,
+            "type": n.type,
+            "read": n.read,
+            "metadata": meta,
+            "created_at": n.created_at.isoformat() if n.created_at else None
+        })
+
     return {
         "success": True,
         "user_id": user_id,
-        "count": len(notifications),
-        "notifications": [
-            {
-                "id": n.id,
-                "title": n.title,
-                "body": n.body,
-                "type": n.type,
-                "read": n.read,
-                "created_at": n.created_at.isoformat() if n.created_at else None
-            }
-            for n in notifications
-        ]
+        "count": len(formatted),
+        "notifications": formatted
     }
+

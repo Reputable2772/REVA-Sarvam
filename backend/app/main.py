@@ -18,6 +18,32 @@ from backend.app.routes.scheme_routes import router as scheme_router
 
 # Initialize database schema
 Base.metadata.create_all(bind=engine)
+with engine.connect() as conn:
+    try:
+        from sqlalchemy import text
+        cols = [r[1] for r in conn.execute(text("PRAGMA table_info(notification_records)")).fetchall()]
+        if "metadata_json" not in cols:
+            conn.execute(text("ALTER TABLE notification_records ADD COLUMN metadata_json TEXT DEFAULT '{}'"))
+            conn.commit()
+    except Exception:
+        pass
+
+# Ensure verified seeds & official datasets are loaded
+from backend.app.database import SessionLocal
+from backend.app.services.dataset_importer import DatasetImporter
+from backend.app.services.scheme_seed_service import seed_verified_schemes
+from backend.app.routes.cold_storage_routes import ensure_seeded_facilities
+from backend.app.models.models import MandiPriceRecord
+
+with SessionLocal() as init_db:
+    try:
+        ensure_seeded_facilities(init_db)
+        seed_verified_schemes(init_db)
+        if init_db.query(MandiPriceRecord).count() < 1000:
+            DatasetImporter.import_all_agmarknet_prices(init_db)
+    except Exception as init_err:
+        print(f"Warning during startup dataset seeding: {init_err}")
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

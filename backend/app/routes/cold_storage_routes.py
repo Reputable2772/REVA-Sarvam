@@ -57,6 +57,11 @@ def ensure_seeded_facilities(db: Session):
             db.add(ColdStorageFacility(**f))
         db.commit()
 
+    # Automatically ingest national cold storage facilities from datasets if only seed facilities are present
+    if db.query(ColdStorageFacility).count() <= len(INITIAL_COLD_STORAGE_FACILITIES):
+        from backend.app.services.dataset_importer import DatasetImporter
+        DatasetImporter.import_cold_storage_facilities(db)
+
 class ColdStorageBookingRequest(BaseModel):
     farmer_id: str
     facility_id: str
@@ -67,17 +72,29 @@ class ColdStorageBookingRequest(BaseModel):
 @router.get("/facilities")
 def get_facilities(
     district: Optional[str] = Query(None, description="Optional district filter"),
+    state: Optional[str] = Query(None, description="Optional state filter"),
+    query: Optional[str] = Query(None, description="Optional keyword search across name and location"),
+    limit: Optional[int] = Query(200, ge=1, le=1000, description="Max facilities to return"),
     db: Session = Depends(get_db)
 ):
     """
     Lists cold storage facilities with real-time bay capacity tracking and pricing.
+    Supports nationwide searching by district, state, or name keyword.
     """
     ensure_seeded_facilities(db)
-    query = db.query(ColdStorageFacility)
+    q = db.query(ColdStorageFacility)
     if district:
-        query = query.filter(ColdStorageFacility.district.ilike(f"%{district}%"))
+        q = q.filter(ColdStorageFacility.district.ilike(f"%{district}%"))
+    if state:
+        q = q.filter(ColdStorageFacility.location.ilike(f"%{state}%"))
+    if query:
+        q = q.filter(
+            (ColdStorageFacility.name.ilike(f"%{query}%")) |
+            (ColdStorageFacility.location.ilike(f"%{query}%")) |
+            (ColdStorageFacility.district.ilike(f"%{query}%"))
+        )
 
-    facilities = query.all()
+    facilities = q.limit(limit).all() if limit else q.all()
     return {
         "success": True,
         "count": len(facilities),

@@ -29,22 +29,44 @@ def register_harvest(
     req: HarvestRegistrationRequest,
     db: Session = Depends(get_db)
 ):
-    # Ensure farmer exists
-    farmer = db.query(Farmer).filter(Farmer.farmer_id == req.farmer_id).first()
+    # Ensure farmer exists by farmer_id or phone
+    clean_id = str(req.farmer_id).strip()
+    farmer = db.query(Farmer).filter(
+        (Farmer.farmer_id == clean_id) |
+        (Farmer.phone == clean_id) |
+        (Farmer.phone.endswith(clean_id))
+    ).first()
+
     if not farmer:
-        f_dist = req.district or req.village or ""
-        f_state = req.state or "Karnataka"
-        farmer = Farmer(
-            farmer_id=req.farmer_id,
-            name=f"Farmer {req.farmer_id}",
-            village=req.village or "",
-            district=f_dist,
-            state=f_state,
-            pincode="",
-            phone=f"98450{req.farmer_id[-5:]}" if len(req.farmer_id) >= 5 else f"98{abs(hash(req.farmer_id)) % 100000000:08d}"
-        )
-        db.add(farmer)
-        db.commit()
+        # Determine unique phone number
+        if clean_id.isdigit() and len(clean_id) == 10:
+            target_phone = clean_id
+        elif len(clean_id) >= 5 and clean_id[-5:].isdigit():
+            target_phone = f"98450{clean_id[-5:]}"
+        else:
+            target_phone = f"98{abs(hash(clean_id)) % 100000000:08d}"
+
+        # Guard against duplicate phone constraint
+        existing_by_phone = db.query(Farmer).filter(
+            (Farmer.phone == target_phone) | (Farmer.phone.endswith(target_phone))
+        ).first()
+
+        if existing_by_phone:
+            farmer = existing_by_phone
+        else:
+            f_dist = req.district or req.village or ""
+            f_state = req.state or "Karnataka"
+            farmer = Farmer(
+                farmer_id=clean_id,
+                name=f"Farmer {clean_id}",
+                village=req.village or "",
+                district=f_dist,
+                state=f_state,
+                pincode="",
+                phone=target_phone
+            )
+            db.add(farmer)
+            db.commit()
 
     # Generate dynamic unique Lot ID: FR-{DIST}-{YYYYMMDD}-{XXXX}
     dist_map = {"kolar": "KLR", "bangalore": "BLR", "bengaluru": "BLR", "mysore": "MYS", "mysuru": "MYS", "belgaum": "BEL", "belagavi": "BEL", "tumkur": "TUM", "mandya": "MDY", "hassan": "HAS"}
@@ -67,7 +89,7 @@ def register_harvest(
 
     new_lot = HarvestLot(
         lot_id=lot_id,
-        farmer_id=req.farmer_id,
+        farmer_id=farmer.farmer_id,
         crop=req.crop,
         variety=req.variety or "Hybrid Red",
         quantity_kg=req.quantity_kg,
@@ -85,7 +107,7 @@ def register_harvest(
     log = AuditLog(
         action="HARVEST_REGISTERED",
         actor_role="FARMER",
-        actor_id=req.farmer_id,
+        actor_id=farmer.farmer_id,
         details=f"Registered {req.quantity_kg}kg {req.variety} {req.crop} with Lot ID {lot_id} (Date: {h_date} {h_time}, Immediate: {sell_imm})"
     )
     db.add(log)
@@ -94,6 +116,18 @@ def register_harvest(
 
     # Calculate instant comparative netback
     netback = NetbackService.calculate_comparison(quantity_kg=req.quantity_kg, crop=req.crop)
+
+    # Check for opportunistic co-transport pooling if selling immediately
+    pooling_opportunity = None
+    try:
+        from backend.app.services.harvest_alignment_service import HarvestAlignmentService
+        pooling_opportunity = HarvestAlignmentService.evaluate_alignment_opportunity(
+            lot=new_lot,
+            target_mandi=req.village or "Kolar APMC",
+            db=db
+        )
+    except Exception:
+        pooling_opportunity = None
 
     return {
         "success": True,
@@ -113,8 +147,32 @@ def register_harvest(
             "sell_immediately": new_lot.sell_immediately,
             "status": new_lot.status
         },
-        "netback_comparison": netback
+        "netback_comparison": netback,
+        "pooling_opportunity": pooling_opportunity
     }
+
+class WeatherRescheduleRequest(BaseModel):
+    new_date: Optional[str] = None
+
+@router.post("/lot/{lot_id}/weather-reschedule")
+def reschedule_harvest_weather(
+    lot_id: str,
+    req: WeatherRescheduleRequest = WeatherRescheduleRequest(),
+    db: Session = Depends(get_db)
+):
+    """
+    One-tap harvest rescheduling when an adverse weather event / heavy rainfall is predicted.
+    """
+    try:
+        from backend.app.services.weather_protection_service import WeatherProtectionService
+        return WeatherProtectionService.reschedule_harvest_for_weather(
+            lot_id=lot_id,
+            new_date=req.new_date,
+            db=db
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 
 @router.get("/lot/{lot_id}")
 def get_harvest_lot(lot_id: str, db: Session = Depends(get_db)):
@@ -168,13 +226,24 @@ def list_farmer_harvests(
     """
     query = db.query(HarvestLot)
     if phone:
-        farmer = db.query(Farmer).filter(Farmer.phone == phone).first()
+        farmer = db.query(Farmer).filter(
+            (Farmer.phone == phone) | (Farmer.phone.endswith(phone))
+        ).first()
         if farmer:
-            query = query.filter(HarvestLot.farmer_id == farmer.farmer_id)
+            query = query.filter(HarvestLot.farmer_id.in_([farmer.farmer_id, phone]))
         else:
-            return {"success": True, "count": 0, "harvests": []}
+            query = query.filter(HarvestLot.farmer_id == phone)
     elif farmer_id:
-        query = query.filter(HarvestLot.farmer_id == farmer_id)
+        clean_fid = str(farmer_id).strip()
+        farmer = db.query(Farmer).filter(
+            (Farmer.farmer_id == clean_fid) |
+            (Farmer.phone == clean_fid) |
+            (Farmer.phone.endswith(clean_fid))
+        ).first()
+        if farmer:
+            query = query.filter(HarvestLot.farmer_id.in_([farmer.farmer_id, clean_fid]))
+        else:
+            query = query.filter(HarvestLot.farmer_id == clean_fid)
 
     lots = query.order_by(HarvestLot.created_at.desc()).all()
     return {

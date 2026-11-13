@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.services.sarvam_service import SarvamService
@@ -82,7 +83,7 @@ def test_process_universal_voice_command_kannada():
     assert data["action"] in ["UPDATE_HARVEST", "SUBMIT_HARVEST"]
     assert data["entities"]["crop"] == "Tomato"
     assert data["entities"]["quantity_kg"] == 250.0
-    assert data["entities"]["harvest_date"] == "2026-11-13"
+    assert data["entities"]["harvest_date"] == datetime.now().strftime("%Y-%m-%d")
     assert data["entities"]["harvest_time"] == "07:00 AM"
     assert data["entities"]["sell_immediately"] is True
     assert len(data["audio_base64"]) > 0
