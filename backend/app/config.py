@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api"
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./farmroute.db")
     SARVAM_API_KEY: str = os.getenv("SARVAM_API_KEY", "")
+    SARVAM_API_KEYS: str = os.getenv("SARVAM_API_KEYS", "")  # Comma-separated keys
+    OPENAI_COMPATIBLE_API_KEY: str = os.getenv("OPENAI_COMPATIBLE_API_KEY", "")
+    OPENAI_COMPATIBLE_BASE_URL: str = os.getenv("OPENAI_COMPATIBLE_BASE_URL", "https://api.openai.com/v1")
+    OPENAI_COMPATIBLE_MODEL: str = os.getenv("OPENAI_COMPATIBLE_MODEL", "gpt-3.5-turbo")
     DEMO_MODE: bool = True
 
     class Config:

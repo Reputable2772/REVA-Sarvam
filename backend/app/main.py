@@ -14,6 +14,7 @@ from backend.app.routes.weather_routes import router as weather_router
 from backend.app.routes.cold_storage_routes import router as cold_storage_router
 from backend.app.routes.sync_routes import router as sync_router
 from backend.app.routes.notification_routes import router as notification_router
+from backend.app.routes.pan_india_mandi_routes import router as pan_india_mandi_router
 
 # Initialize database schema
 Base.metadata.create_all(bind=engine)
@@ -60,6 +61,7 @@ app.include_router(weather_router, prefix=settings.API_V1_PREFIX)
 app.include_router(cold_storage_router, prefix=settings.API_V1_PREFIX)
 app.include_router(sync_router, prefix=settings.API_V1_PREFIX)
 app.include_router(notification_router, prefix=settings.API_V1_PREFIX)
+app.include_router(pan_india_mandi_router)
 
 if __name__ == "__main__":
     import uvicorn

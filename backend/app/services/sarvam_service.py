@@ -11,6 +11,9 @@ class SarvamService:
     """
     Unified Sarvam AI Voice Service
     Handles:
+    - Multi-Key API Key Rotation pool across SARVAM_API_KEYS & SARVAM_API_KEY
+    - Automatic cycling on 401/403/429/5xx errors
+    - OpenAI-Compatible Fallback for LLM entity extraction & Whisper STT
     - Speech-to-Text (STT) via Saaras v4
     - Text-to-Speech (TTS) via Bulbul v4-flash
     - Structured Agricultural Entity Extraction via Sarvam-105b or robust NLP heuristics
@@ -20,9 +23,42 @@ class SarvamService:
     TTS_URL = "https://api.sarvam.ai/text-to-speech"
     COMPLETIONS_URL = "https://api.sarvam.ai/v1/chat/completions"
 
+    _key_index: int = 0
+
+    @classmethod
+    def get_api_keys(cls) -> list:
+        keys = []
+        raw_keys = os.getenv("SARVAM_API_KEYS", getattr(settings, "SARVAM_API_KEYS", "") or "")
+        if raw_keys:
+            keys.extend([k.strip() for k in raw_keys.split(",") if k.strip()])
+        single_key = os.getenv("SARVAM_API_KEY", getattr(settings, "SARVAM_API_KEY", "") or "").strip()
+        if single_key and single_key not in keys:
+            keys.append(single_key)
+        return keys
+
     @classmethod
     def get_api_key(cls) -> str:
-        return os.getenv("SARVAM_API_KEY", settings.SARVAM_API_KEY or "")
+        keys = cls.get_api_keys()
+        if not keys:
+            return ""
+        cls._key_index = cls._key_index % len(keys)
+        return keys[cls._key_index]
+
+    @classmethod
+    def rotate_api_key(cls) -> str:
+        keys = cls.get_api_keys()
+        if not keys:
+            return ""
+        cls._key_index = (cls._key_index + 1) % len(keys)
+        return keys[cls._key_index]
+
+    @classmethod
+    def get_openai_fallback_config(cls) -> Dict[str, str]:
+        return {
+            "api_key": os.getenv("OPENAI_COMPATIBLE_API_KEY", getattr(settings, "OPENAI_COMPATIBLE_API_KEY", "") or ""),
+            "base_url": os.getenv("OPENAI_COMPATIBLE_BASE_URL", getattr(settings, "OPENAI_COMPATIBLE_BASE_URL", "https://api.openai.com/v1") or "https://api.openai.com/v1").rstrip("/"),
+            "model": os.getenv("OPENAI_COMPATIBLE_MODEL", getattr(settings, "OPENAI_COMPATIBLE_MODEL", "gpt-3.5-turbo") or "gpt-3.5-turbo")
+        }
 
     @classmethod
     def transcribe_audio(
@@ -32,56 +68,87 @@ class SarvamService:
         language_code: str = "kn-IN"
     ) -> Dict[str, Any]:
         """
-        Transcribes speech using Sarvam Saaras v4 model.
-        Falls back to realistic mock if API key is absent or call fails.
+        Transcribes speech using Sarvam Saaras v4 model with multi-key cycling.
+        Falls back to OpenAI-compatible Whisper if configured, or realistic simulated speech if both fail.
         """
-        api_key = cls.get_api_key()
+        keys = cls.get_api_keys()
+        if keys:
+            boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+            body = bytearray()
+            body.extend(f"--{boundary}\r\n".encode())
+            body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode())
+            body.extend(b"Content-Type: audio/wav\r\n\r\n")
+            body.extend(audio_bytes)
+            body.extend(b"\r\n")
+            body.extend(f"--{boundary}\r\n".encode())
+            body.extend(b'Content-Disposition: form-data; name="model"\r\n\r\n')
+            body.extend(b"saaras:v4\r\n")
+            body.extend(f"--{boundary}\r\n".encode())
+            body.extend(b'Content-Disposition: form-data; name="language_code"\r\n\r\n')
+            body.extend(language_code.encode() + b"\r\n")
+            body.extend(f"--{boundary}--\r\n".encode())
+            data_bytes = bytes(body)
 
-        if api_key:
+            for _ in range(len(keys)):
+                current_key = cls.get_api_key()
+                try:
+                    req = urllib.request.Request(
+                        cls.STT_URL,
+                        data=data_bytes,
+                        headers={
+                            "api-subscription-key": current_key,
+                            "Content-Type": f"multipart/form-data; boundary={boundary}"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        res_data = json.loads(response.read().decode())
+                        return {
+                            "success": True,
+                            "transcript": res_data.get("transcript", ""),
+                            "language_code": res_data.get("language_code", language_code),
+                            "model": "saaras:v4",
+                            "is_live_api": True
+                        }
+                except (urllib.error.HTTPError, urllib.error.URLError, Exception):
+                    cls.rotate_api_key()
+
+        # Fallback to OpenAI-compatible Whisper if available
+        openai_cfg = cls.get_openai_fallback_config()
+        if openai_cfg.get("api_key"):
             try:
-                boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-                body = bytearray()
-                
-                # File field
-                body.extend(f"--{boundary}\r\n".encode())
-                body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode())
-                body.extend(b"Content-Type: audio/wav\r\n\r\n")
-                body.extend(audio_bytes)
-                body.extend(b"\r\n")
+                whisper_url = f"{openai_cfg['base_url']}/audio/transcriptions"
+                w_boundary = "----WebKitFormBoundaryWhisper7MA4YW"
+                w_body = bytearray()
+                w_body.extend(f"--{w_boundary}\r\n".encode())
+                w_body.extend(f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode())
+                w_body.extend(b"Content-Type: audio/wav\r\n\r\n")
+                w_body.extend(audio_bytes)
+                w_body.extend(b"\r\n")
+                w_body.extend(f"--{w_boundary}\r\n".encode())
+                w_body.extend(b'Content-Disposition: form-data; name="model"\r\n\r\n')
+                w_body.extend(b"whisper-1\r\n")
+                w_body.extend(f"--{w_boundary}--\r\n".encode())
 
-                # Model field
-                body.extend(f"--{boundary}\r\n".encode())
-                body.extend(b'Content-Disposition: form-data; name="model"\r\n\r\n')
-                body.extend(b"saaras:v4\r\n")
-
-                # Language field
-                body.extend(f"--{boundary}\r\n".encode())
-                body.extend(b'Content-Disposition: form-data; name="language_code"\r\n\r\n')
-                body.extend(language_code.encode() + b"\r\n")
-
-                body.extend(f"--{boundary}--\r\n".encode())
-
-                req = urllib.request.Request(
-                    cls.STT_URL,
-                    data=bytes(body),
+                w_req = urllib.request.Request(
+                    whisper_url,
+                    data=bytes(w_body),
                     headers={
-                        "api-subscription-key": api_key,
-                        "Content-Type": f"multipart/form-data; boundary={boundary}"
+                        "Authorization": f"Bearer {openai_cfg['api_key']}",
+                        "Content-Type": f"multipart/form-data; boundary={w_boundary}"
                     },
                     method="POST"
                 )
-
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    res_data = json.loads(response.read().decode())
+                with urllib.request.urlopen(w_req, timeout=12) as response:
+                    w_res = json.loads(response.read().decode())
                     return {
                         "success": True,
-                        "transcript": res_data.get("transcript", ""),
-                        "language_code": res_data.get("language_code", language_code),
-                        "model": "saaras:v4",
+                        "transcript": w_res.get("text", ""),
+                        "language_code": language_code,
+                        "model": "whisper-1 (openai-fallback)",
                         "is_live_api": True
                     }
-            except Exception as e:
-                # Log and fallback gracefully
+            except Exception:
                 pass
 
         # Intelligent Fallback Simulation (Kannada / English)
@@ -106,45 +173,46 @@ class SarvamService:
         speaker: str = "pavithra"
     ) -> Dict[str, Any]:
         """
-        Synthesizes text to speech using Sarvam Bulbul v4-flash model.
+        Synthesizes text to speech using Sarvam Bulbul v4-flash model with multi-key cycling.
         Returns base64 encoded audio.
         """
-        api_key = cls.get_api_key()
-
-        if api_key:
-            try:
-                payload = {
-                    "inputs": [text],
-                    "target_language_code": language_code,
-                    "speaker": speaker,
-                    "model": "bulbul:v4-flash"
-                }
-                req = urllib.request.Request(
-                    cls.TTS_URL,
-                    data=json.dumps(payload).encode(),
-                    headers={
-                        "api-subscription-key": api_key,
-                        "Content-Type": "application/json"
-                    },
-                    method="POST"
-                )
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    res_data = json.loads(response.read().decode())
-                    audios = res_data.get("audios", [])
-                    audio_b64 = audios[0] if audios else ""
-                    return {
-                        "success": True,
-                        "audio_base64": audio_b64,
-                        "language_code": language_code,
-                        "speaker": speaker,
-                        "model": "bulbul:v4-flash",
-                        "is_live_api": True
-                    }
-            except Exception:
-                pass
+        keys = cls.get_api_keys()
+        if keys:
+            payload = {
+                "inputs": [text],
+                "target_language_code": language_code,
+                "speaker": speaker,
+                "model": "bulbul:v4-flash"
+            }
+            data_payload = json.dumps(payload).encode()
+            for _ in range(len(keys)):
+                current_key = cls.get_api_key()
+                try:
+                    req = urllib.request.Request(
+                        cls.TTS_URL,
+                        data=data_payload,
+                        headers={
+                            "api-subscription-key": current_key,
+                            "Content-Type": "application/json"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        res_data = json.loads(response.read().decode())
+                        audios = res_data.get("audios", [])
+                        audio_b64 = audios[0] if audios else ""
+                        return {
+                            "success": True,
+                            "audio_base64": audio_b64,
+                            "language_code": language_code,
+                            "speaker": speaker,
+                            "model": "bulbul:v4-flash",
+                            "is_live_api": True
+                        }
+                except (urllib.error.HTTPError, urllib.error.URLError, Exception):
+                    cls.rotate_api_key()
 
         # Generate minimal valid WAV header + silence as fallback base64
-        # 44-byte standard PCM WAV header
         wav_header = bytes([
             0x52, 0x49, 0x46, 0x46,  # "RIFF"
             0x24, 0x00, 0x00, 0x00,  # size
@@ -330,41 +398,76 @@ class SarvamService:
         """
         Extracts structured crop registration fields from unstructured voice transcript.
         Fields: crop, variety, quantity_kg, quality_grade, village, harvest_date, harvest_time, expected_date_time, sell_immediately.
+        Rotates across Sarvam API keys, falls back to OpenAI-compatible LLM, and finally to robust heuristics.
         """
-        api_key = cls.get_api_key()
+        keys = cls.get_api_keys()
         parsed = None
+        system_prompt = (
+            "You are an agricultural AI parser. Extract harvest registration details from the farmer statement. "
+            "Return strict JSON with keys: crop, variety, quantity_kg, quality_grade, village, "
+            "harvest_date (YYYY-MM-DD), harvest_time (e.g. 07:00 AM), expected_date_time, sell_immediately (boolean). "
+            "Always use standard English names for crops (e.g. Tomato, Onion, Potato, Cabbage, Carrot, Chilli)."
+        )
 
-        if api_key:
-            try:
-                system_prompt = (
-                    "You are an agricultural AI parser. Extract harvest registration details from the farmer statement. "
-                    "Return strict JSON with keys: crop, variety, quantity_kg, quality_grade, village, "
-                    "harvest_date (YYYY-MM-DD), harvest_time (e.g. 07:00 AM), expected_date_time, sell_immediately (boolean). "
-                    "Always use standard English names for crops (e.g. Tomato, Onion, Potato, Cabbage, Carrot, Chilli)."
-                )
-                payload = {
-                    "model": "sarvam-105b",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": text}
-                    ],
-                    "temperature": 0.1
-                }
-                req = urllib.request.Request(
-                    cls.COMPLETIONS_URL,
-                    data=json.dumps(payload).encode(),
-                    headers={
-                        "api-subscription-key": api_key,
-                        "Content-Type": "application/json"
-                    },
-                    method="POST"
-                )
-                with urllib.request.urlopen(req, timeout=10) as response:
-                    res_data = json.loads(response.read().decode())
-                    content = res_data["choices"][0]["message"]["content"]
-                    parsed = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
-            except Exception:
-                parsed = None
+        if keys:
+            payload = {
+                "model": "sarvam-105b",
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ],
+                "temperature": 0.1
+            }
+            data_payload = json.dumps(payload).encode()
+            for _ in range(len(keys)):
+                current_key = cls.get_api_key()
+                try:
+                    req = urllib.request.Request(
+                        cls.COMPLETIONS_URL,
+                        data=data_payload,
+                        headers={
+                            "api-subscription-key": current_key,
+                            "Content-Type": "application/json"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as response:
+                        res_data = json.loads(response.read().decode())
+                        content = res_data["choices"][0]["message"]["content"]
+                        parsed = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
+                        break
+                except (urllib.error.HTTPError, urllib.error.URLError, Exception):
+                    cls.rotate_api_key()
+
+        # Fallback to OpenAI-compatible LLM
+        if not parsed:
+            openai_cfg = cls.get_openai_fallback_config()
+            if openai_cfg.get("api_key"):
+                try:
+                    llm_url = f"{openai_cfg['base_url']}/chat/completions"
+                    payload = {
+                        "model": openai_cfg.get("model", "gpt-3.5-turbo"),
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": text}
+                        ],
+                        "temperature": 0.1
+                    }
+                    req = urllib.request.Request(
+                        llm_url,
+                        data=json.dumps(payload).encode(),
+                        headers={
+                            "Authorization": f"Bearer {openai_cfg['api_key']}",
+                            "Content-Type": "application/json"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=12) as response:
+                        res_data = json.loads(response.read().decode())
+                        content = res_data["choices"][0]["message"]["content"]
+                        parsed = json.loads(re.search(r"\{.*\}", content, re.DOTALL).group(0))
+                except Exception:
+                    pass
 
         heuristic = cls._extract_heuristic(text)
 

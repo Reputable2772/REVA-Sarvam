@@ -1,7 +1,6 @@
 import pytest
 from backend.marketplace_service import MarketplaceService
 from backend.escrow_service import EscrowService
-from backend.models import UpiPayoutRequest
 
 def test_marketplace_matching_and_recommendation():
     service = MarketplaceService()
@@ -87,34 +86,4 @@ def test_invalid_negotiation_transition():
             role="farmer"
         )
 
-def test_instant_upi_payout_execution():
-    escrow = EscrowService()
-    req = UpiPayoutRequest(
-        lot_id="FR-KLR-00251",
-        farmer_id="FARMER-01",
-        farmer_name="Manjunath Gowda",
-        upi_vpa="manjunath@upi",
-        gross_amount=2800.0,
-        transport_deduction=150.0,
-        platform_fee=0.0
-    )
-    
-    payout = escrow.execute_instant_upi_payout(req)
-    assert payout.status == "SUCCESS"
-    assert payout.gross_amount == 2800.0
-    assert payout.total_deductions == 150.0
-    assert payout.net_payout == 2650.0
-    assert payout.rrn_reference.startswith("NPCI")
 
-def test_payout_deduction_exceeding_gross():
-    escrow = EscrowService()
-    req = UpiPayoutRequest(
-        lot_id="FR-KLR-00251",
-        farmer_id="FARMER-01",
-        farmer_name="Manjunath Gowda",
-        upi_vpa="manjunath@upi",
-        gross_amount=100.0,
-        transport_deduction=200.0
-    )
-    with pytest.raises(ValueError, match="cannot exceed gross"):
-        escrow.execute_instant_upi_payout(req)

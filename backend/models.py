@@ -77,25 +77,4 @@ class OfferNegotiation(BaseModel):
     created_at: str
     updated_at: str
 
-class UpiPayoutRequest(BaseModel):
-    lot_id: str
-    farmer_id: str
-    farmer_name: str
-    upi_vpa: str
-    gross_amount: float
-    transport_deduction: float = 0.0
-    platform_fee: float = 0.0
-    notes: Optional[str] = None
 
-class UpiPayoutResponse(BaseModel):
-    payout_id: str
-    lot_id: str
-    farmer_id: str
-    farmer_name: str
-    upi_vpa: str
-    gross_amount: float
-    total_deductions: float
-    net_payout: float
-    rrn_reference: str
-    status: Literal['SUCCESS', 'FAILED']
-    timestamp: str

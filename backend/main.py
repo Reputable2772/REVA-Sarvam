@@ -5,13 +5,12 @@ from .models import (
     BuyerRequirement,
     MatchResult,
     OfferNegotiation,
-    NegotiationStatus,
-    UpiPayoutRequest,
-    UpiPayoutResponse
+    NegotiationStatus
 )
 from .marketplace_service import MarketplaceService
 from .escrow_service import EscrowService
 from .agmarknet_service import AgmarknetImporter
+from backend.app.routes.pan_india_mandi_routes import router as pan_india_mandi_router
 
 app = FastAPI(
     title="FarmRoute AI - Marketplace & Escrow API",
@@ -82,13 +81,6 @@ def transition_offer_state(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@app.post("/api/v1/escrow/payout/instant", response_model=UpiPayoutResponse)
-def execute_instant_payout(payout_req: UpiPayoutRequest):
-    try:
-        return escrow.execute_instant_upi_payout(payout_req)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
 @app.post("/api/v1/market-data/import/json")
 def import_market_data_json():
     try:
@@ -108,3 +100,5 @@ def import_market_data_csv():
 @app.get("/api/v1/market-data/mandi-netbacks")
 def get_mandi_netback_evaluations(quantity_kg: float = 100.0):
     return agmarknet.evaluate_mandi_netbacks(quantity_kg=quantity_kg)
+
+app.include_router(pan_india_mandi_router)
