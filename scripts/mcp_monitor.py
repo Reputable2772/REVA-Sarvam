@@ -3,6 +3,7 @@ import json
 import ssl
 import os
 import sys
+import time
 from datetime import datetime, timezone
 
 MCP_URL = 'https://shared-context-mcp.astra-1.atlas-oracle.dedyn.io/mcp'
@@ -12,6 +13,15 @@ CONTEXT = 'farmroute-ai'
 STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mcp_state.json')
 
 ctx = ssl.create_default_context()
+
+def safe_urlopen(req, timeout=20, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout, context=ctx)
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(1.5 * (attempt + 1))
 
 def check_mcp():
     payload_init = {
@@ -26,7 +36,7 @@ def check_mcp():
     }
     headers = {'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream'}
     req = urllib.request.Request(MCP_URL, data=json.dumps(payload_init).encode('utf-8'), headers=headers)
-    with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+    with safe_urlopen(req, timeout=20) as resp:
         sid = resp.headers.get('mcp-session-id')
         resp.read()
 
@@ -35,7 +45,7 @@ def check_mcp():
         data=json.dumps({'jsonrpc': '2.0', 'method': 'notifications/initialized'}).encode('utf-8'),
         headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'mcp-session-id': sid}
     )
-    with urllib.request.urlopen(req_notif, timeout=15, context=ctx) as resp:
+    with safe_urlopen(req_notif, timeout=20) as resp:
         resp.read()
 
     def call_tool(name, args={}):
@@ -44,7 +54,7 @@ def check_mcp():
             data=json.dumps({'jsonrpc': '2.0', 'id': 2, 'method': 'tools/call', 'params': {'name': name, 'arguments': args}}).encode('utf-8'),
             headers={'Content-Type': 'application/json', 'Accept': 'application/json, text/event-stream', 'mcp-session-id': sid}
         )
-        with urllib.request.urlopen(r, timeout=15, context=ctx) as resp:
+        with safe_urlopen(r, timeout=20) as resp:
             content = resp.read().decode('utf-8')
             for line in content.splitlines():
                 if line.startswith('data: '):
