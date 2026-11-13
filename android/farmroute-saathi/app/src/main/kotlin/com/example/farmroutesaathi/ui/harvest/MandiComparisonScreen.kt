@@ -186,7 +186,7 @@ fun MandiComparisonScreen(
         isPlayingAudio = true
         scope.launch {
             try {
-                val langCode = if (isKannada) "kn-IN" else "en-IN"
+                val langCode = UserSession.selectedLanguage.sarvamCode
                 val audioRes = ApiClient.getMandiSpokenAudio(harvestId = harvestId, language = langCode)
                 val json = JSONObject(audioRes)
                 val text = json.optString("summary_text", "")
@@ -348,7 +348,7 @@ fun MandiComparisonScreen(
                             ) {
                                 Text("🌐 ", fontSize = 11.sp)
                                 Text(
-                                    text = if (isKannada) "ಕನ್ನಡ" else "EN",
+                                    text = UserSession.selectedLanguage.code.uppercase(),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
                                     color = if (isDark) Color(0xFF689F60) else SoilCropGreen
@@ -388,14 +388,14 @@ fun MandiComparisonScreen(
                                 Text("🎙️", fontSize = 15.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (isKannada) "ಧ್ವನಿ ಮಾರ್ಗದರ್ಶಿ (ಸರ್ವಂ AI ಸಾಥಿ)" else "Spoken Analysis (Sarvam AI Saathi)",
+                                    text = AppLocalization.t("spoken_analysis_title"),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Text(
-                                text = if (isKannada) "ಯಾವ ಮಾರುಕಟ್ಟೆ ಹೆಚ್ಚು ಲಾಭ ನೀಡುತ್ತದೆ ಎಂದು ಕೇಳಿ" else "Tap to hear transparent net profit & trap comparison",
+                                text = AppLocalization.t("tap_to_listen"),
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 2.dp)
@@ -412,7 +412,7 @@ fun MandiComparisonScreen(
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (isPlayingAudio) (if (isKannada) "■ ನಿಲ್ಲಿಸಿ" else "■ Stop") else (if (isKannada) "▶ ಆಲಿಸಿ 🔊" else "▶ Listen 🔊"),
+                                text = if (isPlayingAudio) AppLocalization.t("stop_audio") else "▶ " + AppLocalization.t("listen_btn"),
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )

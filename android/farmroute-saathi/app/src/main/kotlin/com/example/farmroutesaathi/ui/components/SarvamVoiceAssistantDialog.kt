@@ -1,5 +1,7 @@
 package com.example.farmroutesaathi.ui.components
 
+import android.media.MediaPlayer
+import android.util.Base64
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -7,385 +9,577 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.farmroutesaathi.audio.VoiceRecorder
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.HarvestDeclaration
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 
+data class AssistantChatMessage(
+    val id: String = UUID.randomUUID().toString(),
+    val text: String,
+    val isUser: Boolean,
+    val audioBase64: String? = null,
+    val timestamp: String = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SarvamVoiceAssistantDialog(
-    isKannada: Boolean,
+    isKannada: Boolean = false,
     onDismiss: () -> Unit,
     onNavigateAction: ((String) -> Unit)? = null
 ) {
-    var isRecordingAudio by remember { mutableStateOf(false) }
-    var isUploading by remember { mutableStateOf(false) }
-    var audioFileName by remember { mutableStateOf<String?>(null) }
-    var transcript by remember { mutableStateOf("") }
-    var spokenResponse by remember { mutableStateOf<String?>(null) }
-    var detectedAction by remember { mutableStateOf<String?>(null) }
-    var manualVoiceInput by remember { mutableStateOf("") }
-
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     val voiceRecorder = remember { VoiceRecorder(context) }
 
-    fun processVoiceCommandText(speechText: String) {
-        if (speechText.isBlank()) return
-        transcript = speechText
-        manualVoiceInput = speechText
-        isUploading = true
+    val selectedLang = UserSession.selectedLanguage
+    val sarvamLangCode = selectedLang.sarvamCode
+    val activeHarvest = UserSession.activeHarvest
+    val harvestCrop = activeHarvest?.crop ?: "Tomato"
+    val harvestQty = (activeHarvest?.quantityKg ?: 200.0).toInt()
+    val harvestId = UserSession.activeHarvestId
+
+    var isRecordingAudio by remember { mutableStateOf(false) }
+    var isProcessing by remember { mutableStateOf(false) }
+    var isPlayingAudio by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var manualInput by remember { mutableStateOf("") }
+    var lastSpokenAudioBase64 by remember { mutableStateOf<String?>(null) }
+
+    val messages = remember {
+        mutableStateListOf(
+            AssistantChatMessage(
+                text = AppLocalization.t("assistant_greeting"),
+                isUser = false
+            )
+        )
+    }
+
+    // Mic Pulsing Animation
+    val infiniteTransition = rememberInfiniteTransition(label = "micPulse")
+    val micScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = if (isRecordingAudio) 1.25f else 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "micScale"
+    )
+
+    fun stopAudioPlayback() {
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            isPlayingAudio = false
+        } catch (_: Exception) {}
+    }
+
+    fun playAudioBase64(b64: String) {
+        if (b64.isBlank()) return
+        stopAudioPlayback()
+        scope.launch(Dispatchers.IO) {
+            try {
+                val audioBytes = Base64.decode(b64, Base64.DEFAULT)
+                val tempFile = File.createTempFile("sarvam_voice_", ".wav", context.cacheDir)
+                FileOutputStream(tempFile).use { it.write(audioBytes) }
+
+                withContext(Dispatchers.Main) {
+                    val player = MediaPlayer().apply {
+                        setDataSource(tempFile.absolutePath)
+                        prepare()
+                        start()
+                        setOnCompletionListener {
+                            isPlayingAudio = false
+                            try { release() } catch (_: Exception) {}
+                            mediaPlayer = null
+                        }
+                        setOnErrorListener { _, _, _ ->
+                            isPlayingAudio = false
+                            try { release() } catch (_: Exception) {}
+                            mediaPlayer = null
+                            false
+                        }
+                    }
+                    mediaPlayer = player
+                    isPlayingAudio = true
+                    lastSpokenAudioBase64 = b64
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    isPlayingAudio = false
+                }
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            stopAudioPlayback()
+        }
+    }
+
+    // Scroll to bottom when new messages arrive
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    fun handleAssistantResponse(responseText: String, audioB64: String?, action: String? = null) {
+        messages.add(
+            AssistantChatMessage(
+                text = responseText,
+                isUser = false,
+                audioBase64 = audioB64
+            )
+        )
+        if (!audioB64.isNullOrBlank()) {
+            playAudioBase64(audioB64)
+        }
+        if (!action.isNullOrBlank() && action.startsWith("NAVIGATE_") && onNavigateAction != null) {
+            onNavigateAction(action)
+        }
+    }
+
+    fun executeVoiceQuery(queryText: String) {
+        if (queryText.isBlank() || isProcessing) return
+        stopAudioPlayback()
+        messages.add(AssistantChatMessage(text = queryText, isUser = true))
+        manualInput = ""
+        isProcessing = true
+
         scope.launch {
             try {
-                val res = ApiClient.processVoiceCommand(speechText, if (isKannada) "kn-IN" else "en-IN")
+                val res = ApiClient.processVoiceCommand(queryText, sarvamLangCode)
                 val jsonObj = JSONObject(res)
-                val act = jsonObj.optString("action", "UPDATE_HARVEST")
-                detectedAction = act
-                val feedback = jsonObj.optString("spoken_feedback", "")
-                spokenResponse = feedback
+                val feedback = jsonObj.optString("spoken_feedback", jsonObj.optString("message_en", "Information retrieved."))
+                val audioB64 = jsonObj.optString("audio_base64", "")
+                val action = jsonObj.optString("action", "")
 
+                // Extract any harvest updates
                 val entities = jsonObj.optJSONObject("entities")
                 if (entities != null) {
                     val currentH = UserSession.activeHarvest ?: HarvestDeclaration()
                     var newCrop = currentH.crop
                     var newQty = currentH.quantityKg
-                    var newDate = currentH.harvestDate
-                    var newTime = currentH.harvestTime
-                    var newImm = currentH.sellImmediately
-
                     if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
-                        val c = entities.getString("crop")
-                        newCrop = when {
-                            c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
-                            c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
-                            c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
-                            c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
-                            c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
-                            c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
-                            else -> c
-                        }
+                        newCrop = entities.getString("crop")
                     }
                     if (entities.has("quantity_kg")) {
                         val q = entities.optDouble("quantity_kg", 0.0)
                         if (q > 0) newQty = q
                     }
-                    if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
-                        newDate = entities.getString("harvest_date")
-                    }
-                    if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
-                        newTime = entities.getString("harvest_time")
-                    }
-                    if (entities.has("sell_immediately")) {
-                        newImm = entities.getBoolean("sell_immediately")
-                    }
-
-                    UserSession.setHarvest(
-                        currentH.copy(
-                            crop = newCrop,
-                            quantityKg = newQty,
-                            harvestDate = newDate,
-                            harvestTime = newTime,
-                            sellImmediately = newImm
-                        )
-                    )
+                    UserSession.setHarvest(currentH.copy(crop = newCrop, quantityKg = newQty))
                 }
 
-                if (act.startsWith("NAVIGATE_") && onNavigateAction != null) {
-                    onNavigateAction(act)
-                }
+                handleAssistantResponse(feedback, audioB64, action)
             } catch (e: Exception) {
-                spokenResponse = "Error: ${e.localizedMessage}"
+                handleAssistantResponse("Error: ${e.localizedMessage ?: "Could not connect to Sarvam AI"}", null)
             } finally {
-                isUploading = false
+                isProcessing = false
+            }
+        }
+    }
+
+    fun executeQuickWeather() {
+        if (isProcessing) return
+        stopAudioPlayback()
+        val userPrompt = AppLocalization.t("quick_weather")
+        messages.add(AssistantChatMessage(text = userPrompt, isUser = true))
+        isProcessing = true
+
+        scope.launch {
+            try {
+                val promptText = "Kolar farmland weather conditions and harvest protection advisory"
+                val res = ApiClient.processVoiceCommand(promptText, sarvamLangCode)
+                val jsonObj = JSONObject(res)
+                val feedback = jsonObj.optString("spoken_feedback", jsonObj.optString("message_en", "Weather advisory retrieved."))
+                val audioB64 = jsonObj.optString("audio_base64", "")
+                handleAssistantResponse(feedback, audioB64, "NAVIGATE_WEATHER")
+            } catch (e: Exception) {
+                handleAssistantResponse("Unable to fetch weather intelligence right now.", null)
+            } finally {
+                isProcessing = false
+            }
+        }
+    }
+
+    fun executeQuickRates() {
+        if (isProcessing) return
+        stopAudioPlayback()
+        val userPrompt = AppLocalization.t("quick_rates")
+        messages.add(AssistantChatMessage(text = userPrompt, isUser = true))
+        isProcessing = true
+
+        scope.launch {
+            try {
+                val res = ApiClient.getMandiVoiceExplanation(harvestId, sarvamLangCode)
+                val jsonObj = JSONObject(res)
+                val summary = jsonObj.optString("summary_text", "Comparing live mandi rates.")
+                val audioB64 = jsonObj.optString("audio_base64", "")
+                handleAssistantResponse(summary, audioB64, "NAVIGATE_MARKETPLACE")
+            } catch (e: Exception) {
+                // Fallback via general process command
+                try {
+                    val fallbackRes = ApiClient.processVoiceCommand("Compare APMC mandi rates for $harvestCrop", sarvamLangCode)
+                    val jsonObj = JSONObject(fallbackRes)
+                    val feedback = jsonObj.optString("spoken_feedback", "Mandi rates evaluated.")
+                    val audioB64 = jsonObj.optString("audio_base64", "")
+                    handleAssistantResponse(feedback, audioB64, "NAVIGATE_MARKETPLACE")
+                } catch (err: Exception) {
+                    handleAssistantResponse("Unable to retrieve mandi comparison right now.", null)
+                }
+            } finally {
+                isProcessing = false
+            }
+        }
+    }
+
+    fun executeQuickHarvest() {
+        if (isProcessing) return
+        stopAudioPlayback()
+        val userPrompt = AppLocalization.t("quick_harvest", "qty" to "$harvestQty", "crop" to harvestCrop)
+        messages.add(AssistantChatMessage(text = userPrompt, isUser = true))
+        isProcessing = true
+
+        scope.launch {
+            try {
+                val promptText = "What is the status and next step for active harvest $harvestCrop $harvestQty kg"
+                val res = ApiClient.processVoiceCommand(promptText, sarvamLangCode)
+                val jsonObj = JSONObject(res)
+                val feedback = jsonObj.optString("spoken_feedback", "Active harvest details retrieved.")
+                val audioB64 = jsonObj.optString("audio_base64", "")
+                handleAssistantResponse(feedback, audioB64)
+            } catch (e: Exception) {
+                handleAssistantResponse("Active harvest lot: $harvestQty kg Grade-A $harvestCrop. Ready for Mandi sale or cold storage.", null)
+            } finally {
+                isProcessing = false
             }
         }
     }
 
     fun toggleAudioRecording() {
         if (!isRecordingAudio) {
+            stopAudioPlayback()
             try {
-                val file = voiceRecorder.startRecording()
+                voiceRecorder.startRecording()
                 isRecordingAudio = true
-                audioFileName = file.name
-                spokenResponse = if (isKannada)
-                    "🔴 ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ಮಾತನಾಡಿ (ನಿಲ್ಲಿಸಲು ಮತ್ತೆ ಟ್ಯಾಪ್ ಮಾಡಿ)"
-                else
-                    "🔴 Recording from microphone... Speak now (tap mic again to stop & send to Sarvam)"
             } catch (e: Exception) {
-                spokenResponse = "Recording error: ${e.localizedMessage}"
+                Toast.makeText(context, "Microphone error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         } else {
             val audioFile = voiceRecorder.stopRecording()
             isRecordingAudio = false
 
             if (audioFile != null && audioFile.exists() && audioFile.length() > 44) {
-                audioFileName = audioFile.name
-                isUploading = true
-                spokenResponse = if (isKannada)
-                    "⏳ ಸರ್ವಂ ಸಾರಸ್ v4 ಗೆ ಅಪ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ..."
-                else
-                    "⏳ Audio saved (${audioFile.length() / 1024} KB). Uploading to Sarvam Saaras AI..."
-
+                isProcessing = true
                 scope.launch {
                     try {
-                        val res = ApiClient.uploadVoiceAudio(audioFile, if (isKannada) "kn-IN" else "en-IN")
+                        val res = ApiClient.uploadVoiceAudio(audioFile, sarvamLangCode)
                         val jsonObj = JSONObject(res)
                         val rawTranscript = jsonObj.optString("raw_transcript", "")
                         if (rawTranscript.isNotBlank()) {
-                            transcript = rawTranscript
-                            manualVoiceInput = rawTranscript
+                            messages.add(AssistantChatMessage(text = rawTranscript, isUser = true))
                         }
-                        val act = jsonObj.optString("action", "UPDATE_HARVEST")
-                        detectedAction = act
-                        val feedback = jsonObj.optString("spoken_feedback", "")
-                        spokenResponse = feedback
-
-                        val entities = jsonObj.optJSONObject("entities")
-                        if (entities != null) {
-                            val currentH = UserSession.activeHarvest ?: HarvestDeclaration()
-                            var newCrop = currentH.crop
-                            var newQty = currentH.quantityKg
-                            var newDate = currentH.harvestDate
-                            var newTime = currentH.harvestTime
-                            var newImm = currentH.sellImmediately
-
-                            if (entities.has("crop") && entities.getString("crop").isNotBlank()) {
-                                val c = entities.getString("crop")
-                                newCrop = when {
-                                    c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
-                                    c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
-                                    c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
-                                    c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
-                                    c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
-                                    c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
-                                    else -> c
-                                }
-                            }
-                            if (entities.has("quantity_kg")) {
-                                val q = entities.optDouble("quantity_kg", 0.0)
-                                if (q > 0) newQty = q
-                            }
-                            if (entities.has("harvest_date") && entities.getString("harvest_date").isNotBlank()) {
-                                newDate = entities.getString("harvest_date")
-                            }
-                            if (entities.has("harvest_time") && entities.getString("harvest_time").isNotBlank()) {
-                                newTime = entities.getString("harvest_time")
-                            }
-                            if (entities.has("sell_immediately")) {
-                                newImm = entities.getBoolean("sell_immediately")
-                            }
-
-                            UserSession.setHarvest(
-                                currentH.copy(
-                                    crop = newCrop,
-                                    quantityKg = newQty,
-                                    harvestDate = newDate,
-                                    harvestTime = newTime,
-                                    sellImmediately = newImm
-                                )
-                            )
-                        }
-
-                        if (act.startsWith("NAVIGATE_") && onNavigateAction != null) {
-                            onNavigateAction(act)
-                        }
+                        val feedback = jsonObj.optString("spoken_feedback", jsonObj.optString("message_en", "Voice command processed."))
+                        val audioB64 = jsonObj.optString("audio_base64", "")
+                        val action = jsonObj.optString("action", "")
+                        handleAssistantResponse(feedback, audioB64, action)
                     } catch (e: Exception) {
-                        spokenResponse = "Sarvam upload error: ${e.localizedMessage}"
+                        handleAssistantResponse("Audio recognition failed. Please try again or type below.", null)
                     } finally {
-                        isUploading = false
+                        isProcessing = false
                     }
                 }
-            } else {
-                spokenResponse = if (isKannada) "ಆಡಿಯೋ ರೆಕಾರ್ಡ್ ಆಗಿಲ್ಲ" else "No audio recorded"
             }
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = {
+            stopAudioPlayback()
+            onDismiss()
+        },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp,
+            shape = RoundedCornerShape(26.dp),
+            color = Color.White,
+            border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
+            shadowElevation = 10.dp,
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+                .fillMaxWidth(0.94f)
+                .fillMaxHeight(0.88f)
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxSize()
+                    .padding(18.dp)
             ) {
-                // Header
+                // ================================================================
+                // HEADER
+                // ================================================================
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Surface(
                             shape = CircleShape,
-                            color = ForestGreenDeep,
-                            modifier = Modifier.size(36.dp)
+                            color = SoilCropGreen,
+                            modifier = Modifier.size(42.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("🎙️", fontSize = 18.sp)
+                                Text("🎙️", fontSize = 20.sp)
                             }
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (isKannada) "ಸರ್ವಂ ಧ್ವನಿ ಸಹಾಯಕ" else "Sarvam Voice AI Assistant",
+                                text = AppLocalization.t("voice_assistant_title"),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = ForestGreenDeep
+                                fontSize = 16.sp,
+                                color = SoilDeepEarth
                             )
-                            Text(
-                                text = "STT (Saaras) + TTS (Bulbul)",
-                                fontSize = 10.sp,
-                                color = Color.Gray
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(
+                                    text = "${selectedLang.nativeName} (${selectedLang.englishName})",
+                                    fontSize = 11.5.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = SoilCropGreen
+                                )
+                                Text(
+                                    text = "• Bulbul TTS",
+                                    fontSize = 10.5.sp,
+                                    color = SoilDeepEarth.copy(alpha = 0.65f)
+                                )
+                            }
                         }
                     }
 
-                    IconButton(onClick = onDismiss) {
-                        Text("✕", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Pulsing Mic Circle (Direct Hardware Recording)
-                Surface(
-                    shape = CircleShape,
-                    color = when {
-                        isRecordingAudio -> Color(0xFFEF4444)
-                        isUploading -> HarvestGold
-                        else -> ForestGreenDeep
-                    },
-                    shadowElevation = if (isRecordingAudio || isUploading) 10.dp else 4.dp,
-                    modifier = Modifier
-                        .size(76.dp)
-                        .clip(CircleShape)
-                        .clickable { toggleAudioRecording() }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            if (isRecordingAudio) "🔴" else if (isUploading) "⏳" else "🎙️",
-                            fontSize = 34.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Text(
-                    text = when {
-                        isRecordingAudio -> if (isKannada) "ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Recording... Tap again to send to Sarvam"
-                        isUploading -> if (isKannada) "ಸರ್ವಂ AI ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ..." else "Sarvam AI Analyzing Audio..."
-                        else -> if (isKannada) "ರೆಕಾರ್ಡ್ ಮಾಡಲು ಮೈಕ್ ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap mic to record audio"
-                    },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = if (isRecordingAudio) Color(0xFFDC2626) else ForestGreenDeep
-                )
-
-                if (audioFileName != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "📁 Local WAV: $audioFileName",
-                        fontSize = 10.sp,
-                        color = Color.Gray
-                    )
-                }
-
-                // Editable Spoken Transcript / Text input bar
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = manualVoiceInput,
-                    onValueChange = { manualVoiceInput = it },
-                    label = {
-                        Text(
-                            if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ / ಆಜ್ಞೆ ನಮೂದಿಸಿ" else "Voice Speech / Command Input",
-                            fontSize = 11.sp
-                        )
-                    },
-                    placeholder = {
-                        Text(
-                            if (isKannada) "ಉದಾ: ಇಂದು 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ..."
-                            else "e.g. Harvested 200kg tomato today...",
-                            fontSize = 11.sp
-                        )
-                    },
-                    trailingIcon = {
-                        IconButton(onClick = {
-                            if (manualVoiceInput.isNotBlank()) processVoiceCommandText(manualVoiceInput)
-                        }) {
-                            Text("⚡", fontSize = 18.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = {
+                                stopAudioPlayback()
+                                messages.clear()
+                                messages.add(
+                                    AssistantChatMessage(
+                                        text = AppLocalization.t("assistant_greeting"),
+                                        isUser = false
+                                    )
+                                )
+                            },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Text("🔄", fontSize = 16.sp)
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                        IconButton(
+                            onClick = {
+                                stopAudioPlayback()
+                                onDismiss()
+                            },
+                            modifier = Modifier.size(34.dp)
+                        ) {
+                            Text("✕", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = SoilDeepEarth)
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = SoilDeepEarth.copy(alpha = 0.10f),
+                    modifier = Modifier.padding(vertical = 10.dp)
                 )
 
-                // AI Response & Spoken Confirmation
-                if (spokenResponse != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                // ================================================================
+                // ACTIVE AUDIO STATUS / PLAYBACK BANNER
+                // ================================================================
+                AnimatedVisibility(visible = isPlayingAudio || isProcessing || isRecordingAudio) {
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = ForestGreenDeep.copy(alpha = 0.10f),
-                        border = BorderStroke(1.dp, ForestGreenDeep.copy(alpha = 0.4f)),
-                        modifier = Modifier.fillMaxWidth()
+                        color = when {
+                            isRecordingAudio -> Color(0xFFFEE2E2)
+                            isProcessing -> SoilHarvestGold.copy(alpha = 0.15f)
+                            else -> SoilCropGreen.copy(alpha = 0.12f)
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            when {
+                                isRecordingAudio -> Color(0xFFEF4444)
+                                isProcessing -> SoilHarvestGold
+                                else -> SoilCropGreen
+                            }
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("🤖", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(
-                                    text = if (isKannada) "ಸರ್ವಂ ಧ್ವನಿ ಉತ್ತರ:" else "Sarvam Response:",
-                                    fontSize = 11.sp,
+                                    text = when {
+                                        isRecordingAudio -> "🔴"
+                                        isProcessing -> "⏳"
+                                        else -> "🔊"
+                                    },
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = when {
+                                        isRecordingAudio -> AppLocalization.t("recording_audio")
+                                        isProcessing -> AppLocalization.t("analyzing_audio")
+                                        else -> AppLocalization.t("sarvam_speaking")
+                                    },
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = ForestGreenDeep
+                                    color = when {
+                                        isRecordingAudio -> Color(0xFFDC2626)
+                                        isProcessing -> HarvestGoldDark
+                                        else -> SoilCropGreen
+                                    }
                                 )
-                                Text(
-                                    text = spokenResponse ?: "",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ForestGreenDeep
-                                )
+                            }
+
+                            if (isPlayingAudio) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Button(
+                                        onClick = { stopAudioPlayback() },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF4444)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(AppLocalization.t("stop_audio"), fontSize = 10.5.sp, color = Color.White)
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                // Quick Voice Test Chips
-                Spacer(modifier = Modifier.height(14.dp))
+                // ================================================================
+                // CONVERSATION HISTORY (BUBBLES)
+                // ================================================================
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(messages, key = { it.id }) { msg ->
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = if (msg.isUser) Alignment.End else Alignment.Start
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(
+                                    topStart = 16.dp,
+                                    topEnd = 16.dp,
+                                    bottomStart = if (msg.isUser) 16.dp else 2.dp,
+                                    bottomEnd = if (msg.isUser) 2.dp else 16.dp
+                                ),
+                                color = if (msg.isUser) SoilCropGreen else SoilFieldPaper,
+                                border = if (msg.isUser) null else BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.10f)),
+                                shadowElevation = 1.dp,
+                                modifier = Modifier.widthIn(max = 280.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = msg.text,
+                                        fontSize = 13.sp,
+                                        lineHeight = 18.sp,
+                                        color = if (msg.isUser) Color.White else SoilDeepEarth,
+                                        fontWeight = if (msg.isUser) FontWeight.Medium else FontWeight.Normal
+                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = msg.timestamp,
+                                            fontSize = 9.5.sp,
+                                            color = if (msg.isUser) Color.White.copy(alpha = 0.7f) else SoilDeepEarth.copy(alpha = 0.55f)
+                                        )
+                                        if (!msg.isUser && !msg.audioBase64.isNullOrBlank()) {
+                                            Text(
+                                                text = "🔊 " + AppLocalization.t("replay_audio"),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = SoilCropGreen,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .clickable { playAudioBase64(msg.audioBase64) }
+                                                    .padding(2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = SoilDeepEarth.copy(alpha = 0.10f),
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
+
+                // ================================================================
+                // QUICK COMMANDS (3 CONTEXTUAL PILLS)
+                // ================================================================
                 Text(
-                    text = if (isKannada) "ತ್ವರಿತ ಧ್ವನಿ ಪರೀಕ್ಷೆಗಳು:" else "Quick Voice Commands:",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
-                    fontWeight = FontWeight.Medium
+                    text = AppLocalization.t("quick_commands_label"),
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SoilDeepEarth.copy(alpha = 0.75f)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -394,42 +588,155 @@ fun SarvamVoiceAssistantDialog(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     AssistChip(
-                        onClick = {
-                            val prompt = if (isKannada) "ನಾನು ಇಂದು 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಮಾರಾಟ ಮಾಡಬೇಕು" else "I harvested 200kg tomato today, planning to sell immediately"
-                            processVoiceCommandText(prompt)
+                        onClick = { executeQuickWeather() },
+                        label = {
+                            Text(
+                                text = AppLocalization.t("quick_weather"),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         },
-                        label = { Text("🍅 200kg", fontSize = 10.sp) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = SoilFieldPaper,
+                            labelColor = SoilDeepEarth
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            borderColor = SoilDeepEarth.copy(alpha = 0.18f),
+                            enabled = true
+                        ),
                         modifier = Modifier.weight(1f)
                     )
+
                     AssistChip(
-                        onClick = {
-                            val prompt = if (isKannada) "ಕೋಲಾರದ ಮಾರುಕಟ್ಟೆ ದರ ತೋರಿಸಿ" else "Show Kolar market rates"
-                            processVoiceCommandText(prompt)
+                        onClick = { executeQuickRates() },
+                        label = {
+                            Text(
+                                text = AppLocalization.t("quick_rates"),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         },
-                        label = { Text("📊 Rates", fontSize = 10.sp) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = SoilFieldPaper,
+                            labelColor = SoilDeepEarth
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            borderColor = SoilDeepEarth.copy(alpha = 0.18f),
+                            enabled = true
+                        ),
                         modifier = Modifier.weight(1f)
                     )
+
                     AssistChip(
-                        onClick = {
-                            val prompt = if (isKannada) "ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ ತೋರಿಸಿ" else "Show weather advisory"
-                            processVoiceCommandText(prompt)
+                        onClick = { executeQuickHarvest() },
+                        label = {
+                            Text(
+                                text = "🌾 ${harvestQty}kg $harvestCrop",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         },
-                        label = { Text("🌦️ Weather", fontSize = 10.sp) },
-                        modifier = Modifier.weight(1f)
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = SoilFieldPaper,
+                            labelColor = SoilDeepEarth
+                        ),
+                        border = AssistChipDefaults.assistChipBorder(
+                            borderColor = SoilDeepEarth.copy(alpha = 0.18f),
+                            enabled = true
+                        ),
+                        modifier = Modifier.weight(1.15f)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
+                // ================================================================
+                // HARDWARE MIC RECORDING + TYPED INPUT ROW
+                // ================================================================
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Pulsing Hardware Mic Button
+                    Surface(
+                        shape = CircleShape,
+                        color = if (isRecordingAudio) Color(0xFFEF4444) else SoilCropGreen,
+                        shadowElevation = if (isRecordingAudio) 8.dp else 3.dp,
+                        modifier = Modifier
+                            .size(54.dp)
+                            .scale(if (isRecordingAudio) micScale else 1f)
+                            .clip(CircleShape)
+                            .clickable { toggleAudioRecording() }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = if (isRecordingAudio) "🔴" else "🎙️",
+                                fontSize = 24.sp
+                            )
+                        }
+                    }
+
+                    // Typed Question Field with Send Button
+                    OutlinedTextField(
+                        value = manualInput,
+                        onValueChange = { manualInput = it },
+                        modifier = Modifier.weight(1f),
+                        placeholder = {
+                            Text(
+                                text = AppLocalization.t("voice_input_placeholder"),
+                                fontSize = 11.5.sp,
+                                color = SoilDeepEarth.copy(alpha = 0.5f)
+                            )
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    if (manualInput.isNotBlank()) executeVoiceQuery(manualInput)
+                                },
+                                enabled = manualInput.isNotBlank() && !isProcessing
+                            ) {
+                                Text(
+                                    text = "➔",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (manualInput.isNotBlank()) SoilCropGreen else Color.Gray
+                                )
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                        keyboardActions = KeyboardActions(onSend = {
+                            if (manualInput.isNotBlank()) executeVoiceQuery(manualInput)
+                        }),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = SoilDeepEarth,
+                            unfocusedTextColor = SoilDeepEarth,
+                            focusedBorderColor = SoilCropGreen,
+                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
+                            focusedContainerColor = SoilFieldPaper,
+                            unfocusedContainerColor = SoilFieldPaper
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Done Button
                 Button(
-                    onClick = onDismiss,
+                    onClick = {
+                        stopAudioPlayback()
+                        onDismiss()
+                    },
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
+                    colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isKannada) "ಮುಗಿದಿದೆ (Done)" else "Done",
+                        text = AppLocalization.t("done_btn"),
                         fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
                         color = Color.White
                     )
                 }

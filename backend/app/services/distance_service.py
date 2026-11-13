@@ -1,6 +1,6 @@
 import math
 import re
-from typing import Dict, Any, Optional, Tuple, Union
+from typing import Dict, Any, Optional, Tuple, Union, List
 
 # Comprehensive pan-India district and major agricultural market center coordinates
 # Covers all 31 districts of Karnataka, major agricultural clusters in AP, TN, MH, TS, GJ, RJ, MP, UP, PB, etc.

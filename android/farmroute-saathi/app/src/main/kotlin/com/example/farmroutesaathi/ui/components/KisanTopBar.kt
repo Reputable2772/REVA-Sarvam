@@ -334,7 +334,8 @@ fun KisanTopBar(
     if (showInternalVoiceDialog) {
         SarvamVoiceAssistantDialog(
             isKannada = isKannada,
-            onDismiss = { showInternalVoiceDialog = false }
+            onDismiss = { showInternalVoiceDialog = false },
+            onNavigateAction = onNavigate
         )
     }
 }

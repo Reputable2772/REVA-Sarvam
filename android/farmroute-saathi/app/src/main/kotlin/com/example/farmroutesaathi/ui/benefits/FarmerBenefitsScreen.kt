@@ -165,7 +165,7 @@ fun FarmerBenefitsScreen(
                 val res = ApiClient.getSchemeVoiceGuidance(
                     query = query,
                     farmerId = UserSession.currentFarmer?.phone ?: "FARMER-01",
-                    languageCode = if (isKannada) "kn-IN" else "en-IN"
+                    languageCode = UserSession.selectedLanguage.sarvamCode
                 )
                 val json = JSONObject(res)
                 val answer = json.optString("answer", "")
@@ -259,7 +259,7 @@ fun FarmerBenefitsScreen(
                 ) {
                     Column {
                         Text(
-                            text = if (isKannada) "🏛️ AI ರೈತ ಯೋಜನೆಗಳು & ಸೌಲಭ್ಯಗಳು" else "🏛️ AI Farmer Benefits & Schemes",
+                            text = "🏛️ " + AppLocalization.t("benefits_screen_title"),
                             color = if (isDark) Color.White else SoilDeepEarth,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp
@@ -360,7 +360,7 @@ fun FarmerBenefitsScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isPlayingAudio) "⏹ Stop Audio / ನಿಲ್ಲಿಸಿ" else if (isKannada) "▶ ಧ್ವನಿ ಸಾರಾಂಶ ಕೇಳಿ (Bulbul TTS)" else "▶ Listen AI Scheme Summary 🔊",
+                        text = if (isPlayingAudio) AppLocalization.t("stop_audio") else AppLocalization.t("listen_summary_btn"),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp

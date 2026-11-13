@@ -195,7 +195,7 @@ fun HarvestHistoryScreen(
                 ) {
                     Column {
                         Text(
-                            text = if (isKannada) "📜 ಕೊಯ್ಲು ಇತಿಹಾಸ & ಹಿಂದಿನ ಲಾಟ್‌ಗಳು" else "📜 Harvest History & Past Lots",
+                            text = AppLocalization.t("harvest_history_title"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -213,7 +213,7 @@ fun HarvestHistoryScreen(
                         color = SoilCropGreen.copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = "${harvests.size} " + (if (isKannada) "ದಾಖಲೆಗಳು" else "Lots"),
+                            text = "${harvests.size} " + AppLocalization.t("active_lot_badge"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
                             color = SoilCropGreen,
@@ -230,7 +230,7 @@ fun HarvestHistoryScreen(
                     FilterChip(
                         selected = selectedFilter == "ALL",
                         onClick = { selectedFilter = "ALL" },
-                        label = { Text(if (isKannada) "ಎಲ್ಲವೂ" else "All (${harvests.size})", fontSize = 11.sp) },
+                        label = { Text(AppLocalization.t("all_filter") + " (${harvests.size})", fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
@@ -239,7 +239,7 @@ fun HarvestHistoryScreen(
                     FilterChip(
                         selected = selectedFilter == "TODAY",
                         onClick = { selectedFilter = "TODAY" },
-                        label = { Text(if (isKannada) "⚡ ಇಂದೇ ಮಾರಾಟ" else "⚡ Sell Today", fontSize = 11.sp) },
+                        label = { Text(AppLocalization.t("sell_today_filter"), fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
@@ -248,7 +248,7 @@ fun HarvestHistoryScreen(
                     FilterChip(
                         selected = selectedFilter == "LATER",
                         onClick = { selectedFilter = "LATER" },
-                        label = { Text(if (isKannada) "📅 ನಿಗದಿತ" else "📅 Scheduled", fontSize = 11.sp) },
+                        label = { Text(AppLocalization.t("scheduled_filter"), fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
@@ -280,7 +280,7 @@ fun HarvestHistoryScreen(
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
-                    text = if (isKannada) "➕ ಹೊಸ ಕೊಯ್ಲು ನೋಂದಾಯಿಸಿ" else "➕ Declare New Harvest",
+                    text = AppLocalization.t("declare_now_btn"),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -318,13 +318,12 @@ fun HarvestHistoryScreen(
                 ) {
                     Text("🌾", fontSize = 42.sp)
                     Text(
-                        text = if (isKannada) "ಯಾವುದೇ ಕೊಯ್ಲು ದಾಖಲೆಗಳಿಲ್ಲ" else "No harvests found for this filter",
+                        text = AppLocalization.t("empty_history_title"),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
                     Text(
-                        text = if (isKannada) "ನಿಮ್ಮ ಬೆಳೆ ಕೊಯ್ಲನ್ನು ನೋಂದಾಯಿಸಲು ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ"
-                        else "Declare your crop harvest via Kannada or English voice or typing",
+                        text = AppLocalization.t("empty_history_sub"),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -333,7 +332,7 @@ fun HarvestHistoryScreen(
                         colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (isKannada) "➕ ಈಗಲೇ ಕೊಯ್ಲು ನೋಂದಾಯಿಸಿ" else "➕ Declare Harvest Now", color = Color.White)
+                        Text(AppLocalization.t("declare_now_btn"), color = Color.White)
                     }
                 }
             }
@@ -481,8 +480,7 @@ fun HarvestHistoryCard(
                 ) {
                     Text("📊", fontSize = 13.sp)
                     Text(
-                        text = if (isKannada) "ಮಾರುಕಟ್ಟೆ ದರಗಳು & ಆದಾಯ ಪರಿಶೀಲಿಸಿ (${item.crop})"
-                        else "View Mandi Rates & Net Profit (${item.crop})",
+                        text = AppLocalization.t("compare_mandi_btn") + " (${item.crop})",
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         color = Color.White

@@ -234,7 +234,7 @@ fun ColdStorageDiscoveryScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         Column {
                             Text(
-                                text = if (isKannada) "ಸ್ಮಾರ್ಟ್ ಶೀತಲಾಗಾರ ಶೋಧನೆ" else "Smart Cold Storage Discovery",
+                                text = AppLocalization.t("cold_storage_screen_title"),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -282,7 +282,7 @@ fun ColdStorageDiscoveryScreen(
                             ) {
                                 Text("🌐 ", fontSize = 11.sp)
                                 Text(
-                                    text = if (isKannada) "ಕನ್ನಡ" else "EN",
+                                    text = UserSession.selectedLanguage.code.uppercase(),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
                                     color = if (isDark) Color(0xFF689F60) else SoilCropGreen

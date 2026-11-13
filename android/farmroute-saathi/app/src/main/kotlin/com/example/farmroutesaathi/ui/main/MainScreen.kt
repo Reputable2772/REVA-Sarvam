@@ -174,18 +174,33 @@ fun MainScreen(
                 // Living Intelligence Role Tab Row
                 TabRow(
                     selectedTabIndex = selectedTab.ordinal,
-                    containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary
+                    containerColor = if (isDarkTheme) SurfaceDarkCard else Color.White,
+                    contentColor = SoilCropGreen,
+                    indicator = { tabPositions ->
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab.ordinal]),
+                            color = SoilCropGreen,
+                            height = 3.dp
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     RoleTab.values().forEach { tab ->
+                        val isSelected = selectedTab == tab
+                        val tabTitle = when (tab) {
+                            RoleTab.FARMER -> AppLocalization.t("tab_farmer")
+                            RoleTab.HISTORY -> AppLocalization.t("tab_history")
+                            RoleTab.BENEFITS -> AppLocalization.t("tab_benefits")
+                        }
                         Tab(
-                            selected = selectedTab == tab,
+                            selected = isSelected,
                             onClick = { selectedTab = tab },
                             text = {
                                 Text(
-                                    text = "${tab.icon} " + if (isKannada) tab.labelKn else tab.labelEn,
-                                    fontSize = 12.sp,
-                                    fontWeight = if (selectedTab == tab) FontWeight.Bold else FontWeight.Medium
+                                    text = "${tab.icon} $tabTitle",
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) SoilCropGreen else (if (isDarkTheme) SoilNaturalSky else SoilDeepEarth.copy(alpha = 0.7f))
                                 )
                             }
                         )
