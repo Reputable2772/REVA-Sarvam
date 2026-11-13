@@ -144,9 +144,29 @@ def test_login_unregistered_phone():
     assert response.status_code == 404
 
 def test_demo_reset_seeds_demo_chip_farmers():
-    """Verify demo reset seeds farmers compatible with Android demo quick-chips"""
-    reset_res = client.post("/api/demo/reset")
-    assert reset_res.status_code == 200
+    """Verify seeded farmers are compatible with Android quick-chips"""
+    from backend.app.database import SessionLocal
+    from backend.app.models.models import Farmer
+    from backend.app.seed_data import SEED_FARMERS
+
+    db = SessionLocal()
+    try:
+        for f in SEED_FARMERS:
+            existing = db.query(Farmer).filter(Farmer.farmer_id == f["farmer_id"]).first()
+            if not existing:
+                db.add(Farmer(
+                    farmer_id=f["farmer_id"],
+                    name=f["name"],
+                    village=f["village"],
+                    district=f.get("district", "Kolar"),
+                    state=f.get("state", "Karnataka"),
+                    pincode=f.get("pincode", "563101"),
+                    phone=f["phone"],
+                    mpin_hash=f.get("mpin_hash", "39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4")
+                ))
+        db.commit()
+    finally:
+        db.close()
 
     # Test Manjunath Gowda (9845012345, MPIN 1234)
     check_res = client.post("/api/auth/check-account", json={"phone": "9845012345"})

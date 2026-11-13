@@ -21,6 +21,7 @@ import androidx.navigation3.runtime.NavKey
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.benefits.FarmerBenefitsScreen
+import com.example.farmroutesaathi.ui.harvest.HarvestHistoryScreen
 import com.example.farmroutesaathi.ui.components.*
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.delay
@@ -28,10 +29,8 @@ import kotlinx.coroutines.launch
 
 enum class RoleTab(val labelEn: String, val labelKn: String, val icon: String) {
     FARMER("Farmer", "ರೈತ", "👨‍🌾"),
-    BUYER("Buyer", "ಖರೀದಿದಾರ", "🛒"),
-    OPERATOR("Operator", "ಆಪರೇಟರ್", "⚖️"),
-    BENEFITS("Benefits", "ಯೋಜನೆಗಳು", "🏛️"),
-    DEMO("Demo Flow", "ಡೆಮೊ", "🚀")
+    HISTORY("History", "ಇತಿಹಾಸ", "📜"),
+    BENEFITS("Benefits", "ಯೋಜನೆಗಳು", "🏛️")
 }
 
 @Composable
@@ -46,8 +45,6 @@ fun MainScreen(
     var isDarkTheme by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(RoleTab.FARMER) }
     var backendStatus by remember { mutableStateOf("Checking backend...") }
-    var lastApiResponse by remember { mutableStateOf("No checkpoint executed yet. Click 'Demo Reset' to initialize.") }
-    var isLoading by remember { mutableStateOf(false) }
     var voiceState by remember { mutableStateOf(SaathiVoiceState.IDLE) }
     var showVoiceAssistantDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -87,16 +84,10 @@ fun MainScreen(
                     onDismiss = { showVoiceAssistantDialog = false },
                     onNavigateAction = { act ->
                         when (act) {
-                            "MARKETPLACE" -> selectedTab = RoleTab.BUYER
+                            "HISTORY", "PAST_HARVESTS", "LOTS" -> selectedTab = RoleTab.HISTORY
                             "WEATHER" -> selectedTab = RoleTab.FARMER
                             "COLD_STORAGE" -> selectedTab = RoleTab.FARMER
                             "NAVIGATE_SCHEMES", "SCHEMES", "BENEFITS" -> selectedTab = RoleTab.BENEFITS
-                            "DEMO_RESET" -> {
-                                scope.launch {
-                                    ApiClient.postDemoReset()
-                                    lastApiResponse = "Demo scenario reset via Voice AI."
-                                }
-                            }
                             "HARVEST" -> onDeclareHarvestClick?.invoke()
                         }
                     }
@@ -109,11 +100,10 @@ fun MainScreen(
                     .padding(innerPadding)
             ) {
                 // Living Intelligence Role Tab Row
-                ScrollableTabRow(
+                TabRow(
                     selectedTabIndex = selectedTab.ordinal,
                     containerColor = MaterialTheme.colorScheme.background,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    edgePadding = 12.dp
+                    contentColor = MaterialTheme.colorScheme.primary
                 ) {
                     RoleTab.values().forEach { tab ->
                         Tab(
@@ -151,34 +141,15 @@ fun MainScreen(
                                 isKannada = isKannada,
                                 onDeclareHarvestClick = onDeclareHarvestClick,
                                 onMandiComparisonClick = onMandiComparisonClick,
-                                onViewBenefitsClick = { selectedTab = RoleTab.BENEFITS }
+                                onViewBenefitsClick = { selectedTab = RoleTab.BENEFITS },
+                                onViewHistoryClick = { selectedTab = RoleTab.HISTORY }
                             )
-                            RoleTab.BUYER -> BuyerDashboardView(isKannada = isKannada)
-                            RoleTab.OPERATOR -> OperatorCollectionCenterView(isKannada = isKannada)
-                            RoleTab.BENEFITS -> FarmerBenefitsScreen(isKannada = isKannada)
-                            RoleTab.DEMO -> DemoWorkflowInteractiveView(
+                            RoleTab.HISTORY -> HarvestHistoryScreen(
                                 isKannada = isKannada,
-                                isLoading = isLoading,
-                                lastApiResponse = lastApiResponse,
-                                onExecuteReset = {
-                                    scope.launch {
-                                        isLoading = true
-                                        lastApiResponse = "Executing Demo Reset..."
-                                        val res = ApiClient.postDemoReset()
-                                        lastApiResponse = res
-                                        isLoading = false
-                                    }
-                                },
-                                onExecuteCheckpoint = { step ->
-                                    scope.launch {
-                                        isLoading = true
-                                        lastApiResponse = "Executing Checkpoint $step..."
-                                        val res = ApiClient.postCheckpoint(step)
-                                        lastApiResponse = res
-                                        isLoading = false
-                                    }
-                                }
+                                onMandiComparisonClick = onMandiComparisonClick,
+                                onDeclareHarvestClick = onDeclareHarvestClick
                             )
+                            RoleTab.BENEFITS -> FarmerBenefitsScreen(isKannada = isKannada)
                         }
                     }
                 }
@@ -195,7 +166,8 @@ fun FarmerDashboardView(
     isKannada: Boolean,
     onDeclareHarvestClick: (() -> Unit)? = null,
     onMandiComparisonClick: ((String) -> Unit)? = null,
-    onViewBenefitsClick: (() -> Unit)? = null
+    onViewBenefitsClick: (() -> Unit)? = null,
+    onViewHistoryClick: (() -> Unit)? = null
 ) {
     val currentLot = UserSession.activeHarvestId
     val farmerName = UserSession.currentFarmer?.name ?: "Manjunath Gowda"
@@ -319,6 +291,40 @@ fun FarmerDashboardView(
                         }
                     }
 
+                    // Past Harvests Quick CTA Card
+                    Surface(
+                        color = ForestGreenDeep.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onViewHistoryClick?.invoke() }
+                            .padding(top = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("📜", fontSize = 14.sp)
+                                Column {
+                                    Text(
+                                        text = if (isKannada) "ಹಿಂದಿನ ಕೊಯ್ಲು ಇತಿಹಾಸ & ದರಗಳು" else "View Past Harvests & Mandi Rates",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = ForestGreenDeep
+                                    )
+                                    Text(
+                                        text = if (isKannada) "ಎಲ್ಲಾ ನೋಂದಾಯಿತ ಲಾಟ್‌ಗಳು ಮತ್ತು ಮಾರುಕಟ್ಟೆ ಆದಾಯ ಪರಿಶೀಲಿಸಿ" else "Inspect all your previous lots and mandi net returns",
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text("➔", color = ForestGreenDeep, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
                     // Discover Govt Schemes Quick CTA
                     Surface(
                         color = HarvestGold.copy(alpha = 0.15f),
@@ -393,7 +399,7 @@ fun FarmerDashboardView(
 
             AnimatedNetbackChart(routes = netbackRoutes, isKannada = isKannada)
 
-            // Transparent Mandi Intelligence Card (Replacing Simulated Payout)
+            // Transparent Mandi Intelligence Card
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant,
@@ -428,300 +434,6 @@ fun FarmerDashboardView(
                         modifier = Modifier.padding(start = 8.dp)
                     )
                 }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 2. BUYER AGGREGATION SCREEN
-// ============================================================================
-@Composable
-fun BuyerDashboardView(isKannada: Boolean) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = if (isKannada) "🛒 ಖರೀದಿದಾರರ ಬೇಡಿಕೆ & ಪೂಲಿಂಗ್ ಹಂಚಿಕೆ" else "🛒 Buyer Requirements & Demand Aggregation",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("FreshDirect Supermarket (Bengaluru)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Target PO: Exactly 800.00 kg Grade A Tomato @ ₹26.00/kg", fontSize = 12.sp)
-                    Text("Aggregation Method: Hamilton-Hare Largest Remainder (Zero-Drift)", fontSize = 11.sp, color = FreshLeafGreen)
-                }
-            }
-
-            Text(
-                text = if (isKannada) "ರೈತರ ಪಾಲು ಹಂಚಿಕೆ (Farmer Allocation Breakdown):" else "Proportional Allocation per Farmer Lot:",
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp
-            )
-
-            val allocations = listOf(
-                Triple("FR-KLR-00251 (Manjunath)", 100.0, 66.67),
-                Triple("FR-KLR-00252 (Ramesh)", 200.0, 133.33),
-                Triple("FR-KLR-00253 (Suresh)", 250.0, 166.67),
-                Triple("FR-KLR-00254 (Venkatesh)", 150.0, 100.00),
-                Triple("FR-KLR-00255 (Anand)", 300.0, 200.00),
-                Triple("FR-KLR-00256 (Gowramma)", 200.0, 133.33)
-            )
-
-            allocations.forEach { (name, declared, allocated) ->
-                ProportionalAllocationRow(
-                    farmerName = name,
-                    declaredKg = declared,
-                    allocatedKg = allocated,
-                    poolTotalKg = 800.0
-                )
-            }
-
-            Surface(
-                color = FreshLeafGreen.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Total Pooled: Exactly 800.00 kg (0.00 kg Drift) | Full PO Fulfilled ✅",
-                    color = ForestGreenDeep,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 3. OPERATOR COLLECTION CENTER SCREEN
-// ============================================================================
-@Composable
-fun OperatorCollectionCenterView(isKannada: Boolean) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = if (isKannada) "⚖️ ಸಂಗ್ರಹಣಾ ಕೇಂದ್ರ ತೂಕ & ಗ್ರೇಡಿಂಗ್" else "⚖️ Collection Center Weighing & Grading",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Kolar Collection Node #04 (Manual Operator Inspection Verification)",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Lot: FR-KLR-00251", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Farmer: Manjunath Gowda", fontSize = 12.sp)
-                    Text("• Grade A: 85.0 kg @ ₹26.00", fontSize = 11.sp, color = FreshLeafGreen, fontWeight = FontWeight.SemiBold)
-                    Text("• Grade B: 15.0 kg @ ₹18.00", fontSize = 11.sp, color = HarvestGoldDark, fontWeight = FontWeight.SemiBold)
-                    Text("Gross Weighed: 100.0 kg", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
-
-                GradeDonutChart(
-                    gradeAPct = 85f,
-                    gradeBPct = 15f,
-                    centerValue = "100 kg",
-                    centerSubtitle = "Total Verified"
-                )
-            }
-
-            Surface(
-                color = FreshLeafGreen.copy(alpha = 0.12f),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Operator Seal Status: VERIFIED & SEALED 🔒 (Ready for Simulated Settlement)",
-                    color = ForestGreenDeep,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(10.dp)
-                )
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 4. GOVERNMENT BENEFITS & SAATHI OPPORTUNITIES SCREEN
-// ============================================================================
-@Composable
-fun GovernmentBenefitsOpportunityView(isKannada: Boolean) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = if (isKannada) "🏛️ ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು & ರೈತ ಅವಕಾಶಗಳು" else "🏛️ Government Schemes & Opportunities",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Verified official regional schemes for Kolar horticulture cluster:",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            // Scheme 1
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text("1. Karnataka Raitha Siri Scheme", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Horticulture & Millet Cultivation Support | Direct DBT to Farmer Bank Account", fontSize = 11.sp)
-                    Text("Status: Active Official Scheme (Verified 2026)", fontSize = 10.sp, color = FreshLeafGreen, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            // Scheme 2
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text("2. PM-KISAN Samman Nidhi", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Direct Income Support of ₹6,000/year in 3 tranches | e-KYC Linked", fontSize = 11.sp)
-                    Text("Status: Central Ongoing Benefit", fontSize = 10.sp, color = FreshLeafGreen, fontWeight = FontWeight.SemiBold)
-                }
-            }
-
-            // Scheme 3
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Text("3. NABARD / SFAC Virtual FPO Grant", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    Text("Shared Logistics & Micro-Aggregation Subsidy for smallholder clusters", fontSize = 11.sp)
-                    Text("Status: Institutional Application Open", fontSize = 10.sp, color = HarvestGoldDark, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
-
-// ============================================================================
-// 5. DEMO WORKFLOW INTERACTIVE SCREEN
-// ============================================================================
-@Composable
-fun DemoWorkflowInteractiveView(
-    isKannada: Boolean,
-    isLoading: Boolean,
-    lastApiResponse: String,
-    onExecuteReset: () -> Unit,
-    onExecuteCheckpoint: (Int) -> Unit
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = if (isKannada) "🚀 3-ನಿಮಿಷದ ಲೈವ್ ಡೆಮೊ ಹಂತಗಳು" else "🚀 3-Minute Live Hackathon Demo Workflow",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Deterministic execution calling live FastAPI backend on port 8000:",
-                fontSize = 11.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Button(
-                onClick = onExecuteReset,
-                enabled = !isLoading,
-                colors = ButtonDefaults.buttonColors(containerColor = SemanticErrorRed),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (isKannada) "🔄 ಡೆಮೊ ಮರುಹೊಂದಿಸಿ (Demo Reset)" else "🔄 Reset Demo Data (6 Seed Farmers)")
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onExecuteCheckpoint(1) },
-                    enabled = !isLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isKannada) "ಹಂತ 1: ರೈತ ನೋಂದಣಿ" else "CP 1: Farmer Register", fontSize = 11.sp)
-                }
-                Button(
-                    onClick = { onExecuteCheckpoint(2) },
-                    enabled = !isLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isKannada) "ಹಂತ 2: 800kg ಪೂಲಿಂಗ್" else "CP 2: 800kg Pool", fontSize = 11.sp)
-                }
-            }
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { onExecuteCheckpoint(3) },
-                    enabled = !isLoading,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isKannada) "ಹಂತ 3: ಗ್ರೇಡ್ ವಿಂಗಡಣೆ" else "CP 3: Operator Grading", fontSize = 11.sp)
-                }
-                Button(
-                    onClick = { onExecuteCheckpoint(4) },
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (isKannada) "ಹಂತ 4: ಸಿಮ್ಯುಲೇಟೆಡ್ ಪಾವತಿ" else "CP 4: Simulated Payment", fontSize = 11.sp)
-                }
-            }
-
-            if (isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            Divider()
-
-            Text(
-                text = "Live FastAPI Backend Response Log:",
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp
-            )
-            Surface(
-                color = OledBackgroundDark,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = lastApiResponse,
-                    fontSize = 11.sp,
-                    color = FreshLimeAccent,
-                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                    modifier = Modifier.padding(10.dp)
-                )
             }
         }
     }

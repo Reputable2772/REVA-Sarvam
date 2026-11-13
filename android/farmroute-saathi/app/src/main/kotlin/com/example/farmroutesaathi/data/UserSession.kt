@@ -39,6 +39,8 @@ object UserSession {
     val isLoggedIn: Boolean
         get() = currentFarmer != null
 
+    var isKannadaPreferred by mutableStateOf(true)
+
     fun login(farmer: FarmerProfile) {
         currentFarmer = farmer
     }

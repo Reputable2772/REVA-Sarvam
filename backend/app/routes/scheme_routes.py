@@ -15,8 +15,10 @@ router = APIRouter(prefix="/schemes", tags=["AI Farmer Benefits & Schemes"])
 class ProfileUpdateRequest(BaseModel):
     farmer_id: Optional[str] = None
     phone: Optional[str] = None
+    farmer_phone: Optional[str] = None
     landholding_hectares: Optional[float] = None
     fruits_id: Optional[str] = None
+    fruits_farmer_id: Optional[str] = None
     is_fpo_member: Optional[bool] = None
 
 class BookmarkRequest(BaseModel):
@@ -166,10 +168,11 @@ def update_voluntary_profile(req: ProfileUpdateRequest, db: Session = Depends(ge
     and immediately recalculates eligibility.
     """
     farmer = None
+    target_phone = req.phone or req.farmer_phone
     if req.farmer_id:
         farmer = db.query(Farmer).filter(Farmer.farmer_id == req.farmer_id).first()
-    elif req.phone:
-        farmer = db.query(Farmer).filter(Farmer.phone == req.phone).first()
+    elif target_phone:
+        farmer = db.query(Farmer).filter(Farmer.phone == target_phone).first()
 
     if not farmer:
         farmer = db.query(Farmer).first()
@@ -181,10 +184,11 @@ def update_voluntary_profile(req: ProfileUpdateRequest, db: Session = Depends(ge
     except Exception:
         meta = {}
 
+    target_fid = req.fruits_id or req.fruits_farmer_id
     if req.landholding_hectares is not None:
         meta["landholding_hectares"] = req.landholding_hectares
-    if req.fruits_id is not None:
-        meta["fruits_id"] = req.fruits_id
+    if target_fid is not None:
+        meta["fruits_id"] = target_fid
     if req.is_fpo_member is not None:
         meta["is_fpo_member"] = req.is_fpo_member
 

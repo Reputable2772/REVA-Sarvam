@@ -18,3 +18,5 @@ app/build/
 api_response.json
 scratch_page.html
 test.csv
+.direnv/
+.envrc

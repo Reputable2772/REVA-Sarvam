@@ -180,12 +180,16 @@ class SarvamService:
         cls,
         text: str,
         language_code: str = "kn-IN",
-        speaker: str = "pavithra"
+        speaker: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Synthesizes text to speech using Sarvam Bulbul v4-flash model with multi-key cycling.
         Returns base64 encoded audio.
         """
+        if not speaker or speaker in ("pavithra", "arvind"):
+            is_kn = "kn" in (language_code or "").lower()
+            speaker = "chaitra_kn_conversation" if is_kn else "aparna_en_companion"
+
         keys = cls.get_api_keys()
         if keys:
             payload = {

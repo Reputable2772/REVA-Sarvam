@@ -240,9 +240,16 @@ object ApiClient {
         postJson("$BASE_URL/api/demo/checkpoint/$step", "{}")
     }
 
-    suspend fun getFarmerHarvests(phone: String? = null): String = withContext(Dispatchers.IO) {
-        val queryParam = if (phone != null) "?farmer_phone=$phone" else ""
+    suspend fun getFarmerHarvests(phone: String? = null, farmerId: String? = null): String = withContext(Dispatchers.IO) {
+        val queryParams = mutableListOf<String>()
+        if (!phone.isNullOrBlank()) queryParams.add("phone=${URLEncoder.encode(phone, "UTF-8")}")
+        if (!farmerId.isNullOrBlank()) queryParams.add("farmer_id=${URLEncoder.encode(farmerId, "UTF-8")}")
+        val queryParam = if (queryParams.isNotEmpty()) "?" + queryParams.joinToString("&") else ""
         getJson("$BASE_URL/api/farmer/harvests$queryParam")
+    }
+
+    suspend fun getFarmerLots(farmerId: String): String = withContext(Dispatchers.IO) {
+        getJson("$BASE_URL/api/farmer/lots/$farmerId")
     }
 
     suspend fun getMandiAnalysis(harvestId: String, targetMandi: String? = null): String = withContext(Dispatchers.IO) {
@@ -299,13 +306,13 @@ object ApiClient {
         postJson("$BASE_URL/api/schemes/bookmark", jsonBody)
     }
 
-    private fun getJson(urlString: String): String {
+    private fun getJson(urlString: String, timeoutMs: Int = 10000): String {
         return try {
             val url = URL(urlString)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
+            conn.connectTimeout = 8000
+            conn.readTimeout = timeoutMs
             val stream = if (conn.responseCode in 200..299) conn.inputStream else conn.errorStream
             BufferedReader(InputStreamReader(stream)).use { it.readText() }
         } catch (e: Exception) {
@@ -313,15 +320,15 @@ object ApiClient {
         }
     }
 
-    private fun postJson(urlString: String, jsonBody: String): String {
+    private fun postJson(urlString: String, jsonBody: String, timeoutMs: Int = 20000): String {
         return try {
             val url = URL(urlString)
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
             conn.setRequestProperty("Content-Type", "application/json")
             conn.doOutput = true
-            conn.connectTimeout = 4000
-            conn.readTimeout = 4000
+            conn.connectTimeout = 8000
+            conn.readTimeout = timeoutMs
 
             OutputStreamWriter(conn.outputStream).use { it.write(jsonBody) }
 

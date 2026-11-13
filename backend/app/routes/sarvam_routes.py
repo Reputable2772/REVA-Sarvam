@@ -65,7 +65,7 @@ def synthesize_speech(req: SpeakRequest):
     return SarvamService.synthesize_speech(
         text=req.text,
         language_code=req.language_code or "kn-IN",
-        speaker=req.speaker or "pavithra"
+        speaker=req.speaker
     )
 
 @router.post("/process-command")
@@ -130,18 +130,22 @@ async def process_voice_audio(
             else "I have harvested 200 kg tomato today at 7 AM, planning to sell tomorrow morning."
         )
 
+    detected_lang = "kn-IN" if any("\u0C80" <= c <= "\u0CFF" for c in transcript) else ("en-IN" if any(c.isalpha() for c in transcript) else language_code)
+
     result = SarvamService.parse_universal_command(
         text=transcript,
-        language_code=language_code
+        language_code=detected_lang
     )
     result["stt_model"] = stt.get("model", "saaras:v4")
     result["is_live_api"] = stt.get("is_live_api", False)
     result["raw_transcript"] = transcript
+    result["detected_language"] = detected_lang
+    result["language_code"] = detected_lang
 
-    # Generate synthesized spoken audio response
+    # Generate synthesized spoken audio response in the exact spoken language
     tts = SarvamService.synthesize_speech(
         text=result["spoken_feedback"],
-        language_code=language_code
+        language_code=detected_lang
     )
     result["audio_base64"] = tts.get("audio_base64", "")
     return result

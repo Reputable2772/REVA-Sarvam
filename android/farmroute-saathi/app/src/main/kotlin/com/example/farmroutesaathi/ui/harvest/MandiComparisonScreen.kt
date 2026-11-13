@@ -1,6 +1,7 @@
 package com.example.farmroutesaathi.ui.harvest
 
 import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,6 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,12 +45,39 @@ fun MandiComparisonScreen(
     var mandisList by remember { mutableStateOf<List<MandiCardData>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
 
-    // Audio TTS playback state
+    // Audio TTS playback state (Dual-Layer: Sarvam Neural Audio + Android Native TTS)
     var isPlayingAudio by remember { mutableStateOf(false) }
     var spokenSummaryText by remember { mutableStateOf<String?>(null) }
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
+    val context = LocalContext.current
 
     val scope = rememberCoroutineScope()
+
+    // Initialize Android native TTS engine as fallback
+    DisposableEffect(context) {
+        var tts: TextToSpeech? = null
+        try {
+            tts = TextToSpeech(context) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    tts?.language = if (isKannada) Locale("kn", "IN") else Locale.ENGLISH
+                }
+            }
+            ttsEngine = tts
+        } catch (_: Exception) {}
+
+        onDispose {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (_: Exception) {}
+            try {
+                tts?.stop()
+                tts?.shutdown()
+            } catch (_: Exception) {}
+        }
+    }
 
     fun loadMandiData(targetQuery: String? = null) {
         isLoading = true
@@ -104,9 +134,14 @@ fun MandiComparisonScreen(
 
     fun playSpokenAudio() {
         if (isPlayingAudio) {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
-            mediaPlayer = null
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (_: Exception) {}
+            try {
+                ttsEngine?.stop()
+            } catch (_: Exception) {}
             isPlayingAudio = false
             return
         }
@@ -117,24 +152,61 @@ fun MandiComparisonScreen(
                 val res = ApiClient.getMandiVoiceExplanation(harvestId, if (isKannada) "kn-IN" else "en-IN")
                 val json = JSONObject(res)
                 val audioB64 = json.optString("audio_base64", "")
-                spokenSummaryText = json.optString("summary_text", "")
+                var text = json.optString("summary_text", "")
+                if (text.isBlank()) {
+                    text = if (isKannada) "ನಿಮ್ಮ ${quantityKg.toInt()} ಕೆಜಿ ${crop} ಬೆಳೆಗೆ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ಅತ್ಯುತ್ತಮ ನಿವ್ವಳ ಲಾಭ ಪಡೆಯಬಹುದು. ದೂರದ ಮಾರುಕಟ್ಟೆಗಳ ಸಾರಿಗೆ ವೆಚ್ಚ ಎಚ್ಚರಿಕೆಯಿಂದ ಪರಿಶೀಲಿಸಿ."
+                           else "For your ${quantityKg.toInt()} kg of ${crop}, direct pooled markets offer the best net take-home cash. Beware of freight traps at distant mandis."
+                }
+                spokenSummaryText = text
 
+                var playedViaMediaPlayer = false
                 if (audioB64.isNotBlank()) {
                     val audioBytes = Base64.decode(audioB64, Base64.DEFAULT)
-                    val tempFile = File.createTempFile("mandi_summary", ".wav")
-                    FileOutputStream(tempFile).use { it.write(audioBytes) }
+                    // Ensure it is not an empty header (< 100 bytes)
+                    if (audioBytes.size > 100) {
+                        try {
+                            val tempFile = File.createTempFile("mandi_summary", ".wav", context.cacheDir)
+                            FileOutputStream(tempFile).use { it.write(audioBytes) }
 
-                    val player = MediaPlayer().apply {
-                        setDataSource(tempFile.absolutePath)
-                        prepare()
-                        setOnCompletionListener {
-                            isPlayingAudio = false
-                            tempFile.delete()
+                            val player = MediaPlayer().apply {
+                                setDataSource(tempFile.absolutePath)
+                                prepare()
+                                setOnCompletionListener {
+                                    isPlayingAudio = false
+                                    tempFile.delete()
+                                }
+                                setOnErrorListener { _, _, _ ->
+                                    isPlayingAudio = false
+                                    tempFile.delete()
+                                    true
+                                }
+                                start()
+                            }
+                            mediaPlayer = player
+                            playedViaMediaPlayer = true
+                        } catch (e: Exception) {
+                            playedViaMediaPlayer = false
                         }
-                        start()
                     }
-                    mediaPlayer = player
-                } else {
+                }
+
+                // Fallback to Android Native TTS if Sarvam audio is missing or failed
+                if (!playedViaMediaPlayer && text.isNotBlank() && ttsEngine != null) {
+                    val loc = if (isKannada) Locale("kn", "IN") else Locale.ENGLISH
+                    ttsEngine?.language = loc
+                    ttsEngine?.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            isPlayingAudio = true
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            isPlayingAudio = false
+                        }
+                        override fun onError(utteranceId: String?) {
+                            isPlayingAudio = false
+                        }
+                    })
+                    ttsEngine?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "mandi_summary_tts")
+                } else if (!playedViaMediaPlayer) {
                     isPlayingAudio = false
                 }
             } catch (e: Exception) {
@@ -145,13 +217,6 @@ fun MandiComparisonScreen(
 
     LaunchedEffect(harvestId) {
         loadMandiData()
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            mediaPlayer?.release()
-            mediaPlayer = null
-        }
     }
 
     val filteredMandis = remember(mandisList, searchQuery) {
@@ -260,7 +325,29 @@ fun MandiComparisonScreen(
                         }
                     }
 
-                    if (spokenSummaryText != null) {
+                    if (isPlayingAudio && spokenSummaryText.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(ForestGreenDeep, RoundedCornerShape(8.dp))
+                                .border(1.dp, FreshLimeAccent, RoundedCornerShape(8.dp))
+                                .padding(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                color = FreshLimeAccent,
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = if (isKannada) "ಸರ್ವಂ AI ಸಾಥಿ ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ..." else "Sarvam AI is synthesizing spoken analysis...",
+                                fontSize = 11.sp,
+                                color = Color.White
+                            )
+                        }
+                    } else if (!spokenSummaryText.isNullOrBlank()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = spokenSummaryText!!,

@@ -36,7 +36,7 @@ fun HarvestQuestionnaireScreen(
     onHarvestSubmitted: (String) -> Unit,
     onSkip: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(false) }
+    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
 
     // Form states
     var crop by remember { mutableStateOf("Tomato") }
@@ -63,11 +63,21 @@ fun HarvestQuestionnaireScreen(
 
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
+        // Auto-detect spoken language: Kannada Unicode range (0x0C80 - 0x0CFF)
+        val hasKannadaChars = spokenText.any { it in '\u0C80'..'\u0CFF' }
+        if (hasKannadaChars) {
+            isKannada = true
+            UserSession.isKannadaPreferred = true
+        } else if (spokenText.any { it.isLetter() }) {
+            isKannada = false
+            UserSession.isKannadaPreferred = false
+        }
+
         voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) spokenText else "$voiceTranscriptInput | $spokenText"
         isUploadingAudio = true
         scope.launch {
             try {
-                val res = ApiClient.processVoiceCommand(spokenText, if (isKannada) "kn-IN" else "en-IN")
+                val res = ApiClient.processVoiceCommand(spokenText, if (isKannada || hasKannadaChars) "kn-IN" else "en-IN")
                 val jsonObj = JSONObject(res)
                 val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
                     (0 until arr.length()).map { arr.getString(it) }.toSet()
@@ -158,6 +168,15 @@ fun HarvestQuestionnaireScreen(
                         val jsonObj = JSONObject(res)
                         val rawTranscript = jsonObj.optString("raw_transcript", "")
                         if (rawTranscript.isNotBlank()) {
+                            // Ensure Voice Transcript is displayed in the exact language spoken by the user
+                            val hasKannadaChars = rawTranscript.any { it in '\u0C80'..'\u0CFF' }
+                            if (hasKannadaChars) {
+                                isKannada = true
+                                UserSession.isKannadaPreferred = true
+                            } else if (rawTranscript.any { it.isLetter() }) {
+                                isKannada = false
+                                UserSession.isKannadaPreferred = false
+                            }
                             voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) rawTranscript else "$voiceTranscriptInput | $rawTranscript"
                         }
                         val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
@@ -280,7 +299,10 @@ fun HarvestQuestionnaireScreen(
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = HarvestGold,
-                            modifier = Modifier.clickable { isKannada = !isKannada }
+                            modifier = Modifier.clickable {
+                                isKannada = !isKannada
+                                UserSession.isKannadaPreferred = isKannada
+                            }
                         ) {
                             Text(
                                 text = if (isKannada) "🌐 ಕನ್ನಡ" else "🌐 English",
@@ -429,7 +451,15 @@ fun HarvestQuestionnaireScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = voiceTranscriptInput,
-                        onValueChange = { voiceTranscriptInput = it },
+                        onValueChange = { input ->
+                            voiceTranscriptInput = input
+                            // Dynamically update UI language if Kannada is typed in custom input
+                            val hasKannadaChars = input.any { it in '\u0C80'..'\u0CFF' }
+                            if (hasKannadaChars) {
+                                isKannada = true
+                                UserSession.isKannadaPreferred = true
+                            }
+                        },
                         label = {
                             Text(
                                 if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ (ಸಂಪಾದಿಸಿ ಅಥವಾ ಬರೆಯಿರಿ)" else "Voice Transcript / Custom Input",
@@ -476,7 +506,7 @@ fun HarvestQuestionnaireScreen(
                                     "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
                                 processSpeechInput(phrase)
                             },
-                            label = { Text("🍅 250kg Tomato", fontSize = 10.sp) },
+                            label = { Text(if (isKannada) "🍅 250 ಕೆಜಿ ಟೊಮೆಟೊ" else "🍅 250kg Tomato", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
@@ -487,7 +517,7 @@ fun HarvestQuestionnaireScreen(
                                     "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
                                 processSpeechInput(phrase)
                             },
-                            label = { Text("🧅 300kg Onion", fontSize = 10.sp) },
+                            label = { Text(if (isKannada) "🧅 300 ಕೆಜಿ ಈರುಳ್ಳಿ" else "🧅 300kg Onion", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
@@ -498,7 +528,7 @@ fun HarvestQuestionnaireScreen(
                                     "500 kg potato harvested, send to cold storage do not sell immediately"
                                 processSpeechInput(phrase)
                             },
-                            label = { Text("❄️ Cold Storage", fontSize = 10.sp) },
+                            label = { Text(if (isKannada) "❄️ ಶೀತಲ ಶೇಖರಣೆ" else "❄️ Cold Storage", fontSize = 10.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }

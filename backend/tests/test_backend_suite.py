@@ -55,35 +55,13 @@ def test_health_check_endpoint():
     data = res.json()
     assert data["status"] == "healthy"
     assert "FastAPI" in data["service"]
+    assert "schemes_intelligence" in data["modules"]
+    assert "pan_india_mandi" in data["modules"]
 
-def test_demo_reset_and_checkpoints():
-    # 1. Reset
-    res = client.post("/api/demo/reset")
-    assert res.status_code == 200
-    data = res.json()
-    assert data["success"] is True
-    assert data["total_declared_kg"] == 1200.0
-
-    # 2. Checkpoint 1
-    cp1 = client.post("/api/demo/checkpoint/1").json()
-    assert cp1["checkpoint"] == 1
-    assert cp1["total_declared_kg"] == 1200.0
-
-    # 3. Checkpoint 2 (800kg FPO allocation)
-    cp2 = client.post("/api/demo/checkpoint/2").json()
-    assert cp2["checkpoint"] == 2
-    assert cp2["total_allocated_kg"] == 800.0
-
-    # 4. Checkpoint 3 (Mutual acceptance & Tata Ace dispatch)
-    cp3 = client.post("/api/demo/checkpoint/3").json()
-    assert cp3["checkpoint"] == 3
-    assert "Tata Ace" in cp3["vehicle"]
-
-    # 5. Checkpoint 4 (Operator weighment & simulated escrow)
-    cp4 = client.post("/api/demo/checkpoint/4").json()
-    assert cp4["checkpoint"] == 4
-    assert cp4["status"] == "SETTLED"
-    assert cp4["simulated"] is True
+def test_streamlined_farmer_first_modules():
+    """Verify backend has removed obsolete demo endpoints and streamlined to farmer-first intelligence."""
+    res = client.get("/api/demo/checkpoint/1")
+    assert res.status_code in (404, 405)
 
 def test_flexible_dataset_importer():
     sample_csv = """Market,Commodity,Variety,Grade,Arrival_Date,Arrivals,Min_Price,Max_Price,Modal_Price
