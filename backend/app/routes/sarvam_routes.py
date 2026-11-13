@@ -14,7 +14,7 @@ class ExtractRequest(BaseModel):
 class SpeakRequest(BaseModel):
     text: str = Field(..., min_length=1)
     language_code: Optional[str] = "kn-IN"
-    speaker: Optional[str] = "pavithra"
+    speaker: Optional[str] = "chaitra_kn_conversation"
 
 class VoiceCommandRequest(BaseModel):
     text: Optional[str] = None
@@ -88,11 +88,23 @@ def process_voice_command(req: VoiceCommandRequest):
             pass
 
     if not transcript:
-        transcript = (
-            "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು."
-            if "kn" in (req.language_code or "kn-IN")
-            else "I have harvested 200 kg tomato today at 7 AM, planning to sell tomorrow morning."
+        is_kn = "kn" in (req.language_code or "kn-IN")
+        msg = "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ." if is_kn else "Could not detect clear speech. Please speak again."
+        tts = SarvamService.synthesize_speech(
+            text=msg,
+            language_code=req.language_code or "kn-IN"
         )
+        return {
+            "success": False,
+            "error": "NO_SPEECH_DETECTED",
+            "action": "PROMPT_RETRY",
+            "entities": {},
+            "fields_updated": [],
+            "message_en": "No clear speech detected. Please speak again.",
+            "message_kn": "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ.",
+            "spoken_feedback": msg,
+            "audio_base64": tts.get("audio_base64", "")
+        }
 
     result = SarvamService.parse_universal_command(
         text=transcript,
@@ -124,11 +136,26 @@ async def process_voice_audio(
     )
     transcript = (stt.get("transcript") or "").strip()
     if not transcript:
-        transcript = (
-            "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 200 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು."
-            if "kn" in language_code
-            else "I have harvested 200 kg tomato today at 7 AM, planning to sell tomorrow morning."
+        is_kn = "kn" in language_code
+        msg = "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ." if is_kn else "Could not detect clear speech. Please speak again."
+        tts = SarvamService.synthesize_speech(
+            text=msg,
+            language_code=language_code
         )
+        return {
+            "success": False,
+            "error": "NO_SPEECH_DETECTED",
+            "action": "PROMPT_RETRY",
+            "entities": {},
+            "fields_updated": [],
+            "message_en": "No clear speech detected. Please speak again.",
+            "message_kn": "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ.",
+            "spoken_feedback": msg,
+            "audio_base64": tts.get("audio_base64", ""),
+            "raw_transcript": "",
+            "detected_language": language_code,
+            "language_code": language_code
+        }
 
     detected_lang = "kn-IN" if any("\u0C80" <= c <= "\u0CFF" for c in transcript) else ("en-IN" if any(c.isalpha() for c in transcript) else language_code)
 
@@ -162,6 +189,7 @@ def register_by_voice(
     3. Register harvest lot into SQLite database.
     4. Synthesize spoken confirmation in farmer's preferred language.
     """
+    from backend.app.models.models import Farmer
     import base64
     audio_bytes = b""
     if req.audio_base64:
@@ -185,14 +213,23 @@ def register_by_voice(
     extracted_res = SarvamService.extract_harvest_entities(transcript)
     entities = extracted_res.get("extracted", {})
 
+    farmer_obj = db.query(Farmer).filter(Farmer.farmer_id == req.farmer_id).first()
+    default_village = farmer_obj.village if (farmer_obj and farmer_obj.village) else "Local Farm"
+
+    crop = entities.get("crop") or "Tomato"
+    variety = entities.get("variety") or "Standard Variety"
+    qty_kg = float(entities.get("quantity_kg") or 100.0)
+    grade = entities.get("quality_grade") or "Grade A"
+    village = entities.get("village") or default_village
+
     # 3. Register lot in DB
     reg_req = HarvestRegistrationRequest(
         farmer_id=req.farmer_id,
-        crop=entities.get("crop", "Tomato"),
-        variety=entities.get("variety", "Hybrid Red"),
-        quantity_kg=float(entities.get("quantity_kg", 500.0)),
-        quality_grade=entities.get("quality_grade", "Grade A"),
-        village=entities.get("village", "Mulbagal"),
+        crop=crop,
+        variety=variety,
+        quantity_kg=qty_kg,
+        quality_grade=grade,
+        village=village,
         metadata={
             "source": "sarvam_voice_ai",
             "transcript": transcript,
@@ -202,14 +239,13 @@ def register_by_voice(
     lot_response = register_harvest(req=reg_req, db=db)
 
     # 4. Spoken confirmation
-    kg = entities.get("quantity_kg", 500.0)
-    grade = entities.get("quality_grade", "Grade A")
     lot_id = lot_response.get("lot_id", "")
-    
+    crop_kn = "ಟೊಮೆಟೊ" if "tomat" in crop.lower() else ("ಈರುಳ್ಳಿ" if "onion" in crop.lower() else ("ಆಲೂಗಡ್ಡೆ" if "potato" in crop.lower() else crop))
+
     if "kn" in (req.language_code or "kn-IN"):
-        confirm_text = f"ನಿಮ್ಮ {kg} ಕೆಜಿ {grade} ಟೊಮೆಟೊ ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ. ಲಾಟ್ ಐಡಿ {lot_id}."
+        confirm_text = f"ನಿಮ್ಮ {qty_kg} ಕೆಜಿ {grade} {crop_kn} ಯಶಸ್ವಿಯಾಗಿ ನೋಂದಾಯಿಸಲಾಗಿದೆ. ಲಾಟ್ ಐಡಿ {lot_id}."
     else:
-        confirm_text = f"Your {kg} kg {grade} tomato has been successfully registered. Lot ID is {lot_id}."
+        confirm_text = f"Your {qty_kg} kg {grade} {crop} has been successfully registered. Lot ID is {lot_id}."
 
     tts_info = SarvamService.synthesize_speech(
         text=confirm_text,
@@ -229,9 +265,9 @@ def register_by_voice(
     }
 
 class MandiVoiceExplanationRequest(BaseModel):
-    harvest_id: Optional[str] = "FR-KLR-20261113-0001"
-    crop: Optional[str] = "Tomato"
-    quantity_kg: Optional[float] = 200.0
+    harvest_id: Optional[str] = None
+    crop: Optional[str] = None
+    quantity_kg: Optional[float] = None
     language_code: Optional[str] = "kn-IN"
 
 @router.post("/mandi-explanation")
@@ -246,14 +282,14 @@ def get_mandi_voice_explanation(
     from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
     from backend.app.models.models import HarvestLot
 
-    crop = req.crop or "Tomato"
+    crop = req.crop or "Produce"
     qty = req.quantity_kg or 200.0
 
     if req.harvest_id:
         lot = db.query(HarvestLot).filter(HarvestLot.lot_id == req.harvest_id).first()
         if lot:
-            crop = lot.crop
-            qty = lot.quantity_kg
+            crop = lot.crop or "Produce"
+            qty = lot.quantity_kg or 200.0
 
     mandis = PanIndiaMandiService.evaluate_mandi_options(
         crop=crop,

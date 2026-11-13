@@ -49,16 +49,8 @@ FLEET_SPECS = [
 ]
 
 def calculate_haversine_road_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0 # Earth radius in km
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-
-    a = math.sin(delta_phi / 2.0)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0)**2
-    c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(1.0 - a))
-    straight_line = R * c
-    # Apply 1.25x rural road curvature / tortuosity factor
-    return round(straight_line * 1.25, 1)
+    from backend.app.services.distance_service import DistanceService
+    return DistanceService.calculate_haversine_road_distance(lat1, lon1, lat2, lon2)
 
 class QuoteRequest(BaseModel):
     weight_kg: float = Field(..., gt=0)
@@ -104,14 +96,15 @@ def plan_route(req: RoutePlanRequest):
     if not req.villages:
         raise HTTPException(status_code=400, detail="At least one village required in route plan.")
 
-    dest_coords = VILLAGE_COORDINATES.get(req.destination, VILLAGE_COORDINATES["Bengaluru DC, Whitefield"])
+    from backend.app.services.distance_service import DistanceService
+    dest_coords = VILLAGE_COORDINATES.get(req.destination) or DistanceService.resolve_coordinates(req.destination)
     
     waypoints = []
     total_km = 0.0
     prev_coords = None
 
     for v in req.villages:
-        coords = VILLAGE_COORDINATES.get(v, VILLAGE_COORDINATES["Kolar Central Hub"])
+        coords = VILLAGE_COORDINATES.get(v) or DistanceService.resolve_coordinates(v)
         if prev_coords is None:
             leg_km = 0.0
         else:

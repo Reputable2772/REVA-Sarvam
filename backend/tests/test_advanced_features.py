@@ -1,18 +1,21 @@
 import pytest
+import uuid
+import time
 from fastapi.testclient import TestClient
 from backend.app.main import app
 
 client = TestClient(app)
 
 def test_mobile_mpin_auth_flow():
+    test_phone = f"98{int(time.time()) % 100000000:08d}"
     # 1. Check account for new phone
-    check_new = client.post("/api/auth/check-account", json={"phone": "9845077777"})
+    check_new = client.post("/api/auth/check-account", json={"phone": test_phone})
     assert check_new.status_code == 200
     assert check_new.json()["exists"] is False
 
     # 2. Register new farmer with AGMARKNET verified location
     reg = client.post("/api/auth/register", json={
-        "phone": "9845077777",
+        "phone": test_phone,
         "mpin": "4321",
         "name": "Kolar Test Farmer",
         "state": "Karnataka",
@@ -25,7 +28,7 @@ def test_mobile_mpin_auth_flow():
     assert "token" in reg_data
 
     # 3. Login with MPIN
-    login = client.post("/api/auth/login", json={"phone": "9845077777", "mpin": "4321"})
+    login = client.post("/api/auth/login", json={"phone": test_phone, "mpin": "4321"})
     assert login.status_code == 200
     assert login.json()["status"] == "authenticated"
 
@@ -83,20 +86,21 @@ def test_cold_storage_discovery_and_booking():
     assert len(query_res.json()["bookings"]) >= 1
 
 def test_offline_batch_sync_idempotency():
+    u_prefix = str(uuid.uuid4())[:8]
     batch_req = {
-        "device_id": "NOTHING-PHONE-1-TEST-001",
+        "device_id": f"NOTHING-PHONE-1-TEST-{u_prefix}",
         "lots": [
             {
-                "client_uuid": "offline-uuid-aaa-111",
-                "farmer_id": "FR-KLR-OFFLINE-01",
+                "client_uuid": f"offline-uuid-{u_prefix}-111",
+                "farmer_id": f"FR-KLR-OFFLINE-{u_prefix}",
                 "crop": "Tomato",
                 "variety": "Hybrid Red",
                 "quantity_kg": 450.0,
                 "quality_grade": "Grade A"
             },
             {
-                "client_uuid": "offline-uuid-bbb-222",
-                "farmer_id": "FR-KLR-OFFLINE-01",
+                "client_uuid": f"offline-uuid-{u_prefix}-222",
+                "farmer_id": f"FR-KLR-OFFLINE-{u_prefix}",
                 "crop": "Tomato",
                 "variety": "Hybrid Red",
                 "quantity_kg": 300.0,

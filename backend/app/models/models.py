@@ -10,9 +10,9 @@ class Farmer(Base):
     phone = Column(String(20), unique=True, index=True, nullable=False)
     name = Column(String(100), nullable=False)
     village = Column(String(100), nullable=True, default="")
-    district = Column(String(100), nullable=False, default="Kolar")
-    state = Column(String(100), nullable=False, default="Karnataka")
-    pincode = Column(String(10), nullable=False, default="563101")
+    district = Column(String(100), nullable=False, default="")
+    state = Column(String(100), nullable=False, default="")
+    pincode = Column(String(10), nullable=False, default="")
     mpin_hash = Column(String(128), nullable=False, default="39f92748003bb63bbc666ed4d03787b825d110c3d9092857f43c5a396f1510d4") # Default SHA-256 for '1234'
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
@@ -26,13 +26,13 @@ class HarvestLot(Base):
 
     lot_id = Column(String(50), primary_key=True) # e.g. FR-KLR-20261113-0001
     farmer_id = Column(String(50), ForeignKey("farmers.farmer_id"), nullable=False)
-    crop = Column(String(50), nullable=False, default="Tomato")
-    variety = Column(String(50), nullable=False, default="Hybrid Red")
+    crop = Column(String(50), nullable=False)
+    variety = Column(String(50), nullable=False, default="")
     quantity_kg = Column(Float, nullable=False)
     quality_grade = Column(String(20), nullable=False, default="Grade A") # Farmer-declared
     harvest_date = Column(String(20), nullable=False)
-    harvest_time = Column(String(50), nullable=True, default="07:00 AM")
-    expected_date_time = Column(String(50), nullable=True, default="2026-11-14 09:00 AM")
+    harvest_time = Column(String(50), nullable=True)
+    expected_date_time = Column(String(50), nullable=True)
     sell_immediately = Column(Boolean, nullable=False, default=True)
     status = Column(String(30), nullable=False, default="ready_for_sale") # ready_for_sale, pooled, weighed, delivered
     metadata_json = Column(Text, nullable=True, default="{}") # Extensible quality/harvest parameters
@@ -48,17 +48,17 @@ class BuyerRequirement(Base):
     id = Column(String(50), primary_key=True)
     buyer_name = Column(String(150), nullable=False)
     buyer_type = Column(String(50), nullable=False, default="Supermarket")
-    crop = Column(String(50), nullable=False, default="Tomato")
-    variety = Column(String(50), nullable=False, default="Hybrid Red")
+    crop = Column(String(50), nullable=False)
+    variety = Column(String(50), nullable=False, default="")
     required_grade = Column(String(20), nullable=False, default="Grade A")
     target_quantity_kg = Column(Float, nullable=False)
     min_acceptable_kg = Column(Float, nullable=True)
     max_price_per_kg = Column(Float, nullable=False)
     min_price_per_kg = Column(Float, nullable=False)
-    destination_location = Column(String(200), nullable=False, default="Bengaluru DC, Whitefield")
+    destination_location = Column(String(200), nullable=False, default="")
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    preferred_pickup_hub = Column(String(100), nullable=False, default="Kolar Central Hub")
+    preferred_pickup_hub = Column(String(100), nullable=False, default="")
     payment_terms = Column(String(100), nullable=False, default="T+1 direct bank transfer")
     metadata_json = Column(Text, nullable=True, default="{}") # Extensible buyer contract specs
     active = Column(Boolean, default=True)
@@ -91,13 +91,13 @@ class VirtualFpoPool(Base):
     __tablename__ = "virtual_fpo_pools"
 
     pool_id = Column(String(50), primary_key=True)
-    crop = Column(String(50), nullable=False, default="Tomato")
+    crop = Column(String(50), nullable=False)
     grade = Column(String(20), nullable=False, default="Grade A")
     buyer_requirement_id = Column(String(50), ForeignKey("buyer_requirements.id"), nullable=True)
-    target_quantity_kg = Column(Float, nullable=False, default=800.0)
+    target_quantity_kg = Column(Float, nullable=False)
     total_pooled_kg = Column(Float, nullable=False, default=0.0)
-    contract_price_per_kg = Column(Float, nullable=False, default=28.50)
-    total_freight_cost = Column(Float, nullable=False, default=3292.0)
+    contract_price_per_kg = Column(Float, nullable=False)
+    total_freight_cost = Column(Float, nullable=False, default=0.0)
     status = Column(String(30), nullable=False, default="pending") # pending, fulfilled, dispatched, settled
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -127,7 +127,7 @@ class OperatorWeighment(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lot_id = Column(String(50), ForeignKey("harvest_lots.lot_id"), nullable=False, unique=True)
-    operator_id = Column(String(50), nullable=False, default="OP-KLR-01")
+    operator_id = Column(String(50), nullable=False, default="OP-AGRI-01")
     declared_kg = Column(Float, nullable=False)
     actual_weighed_kg = Column(Float, nullable=False)
     grade_a_kg = Column(Float, nullable=False) # e.g. 88%
@@ -173,7 +173,7 @@ class ColdStorageFacility(Base):
 
     facility_id = Column(String(50), primary_key=True)
     name = Column(String(150), nullable=False)
-    district = Column(String(100), nullable=False, default="Kolar")
+    district = Column(String(100), nullable=False, default="")
     location = Column(String(200), nullable=False)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
@@ -181,7 +181,7 @@ class ColdStorageFacility(Base):
     available_capacity_tonnes = Column(Float, nullable=False, default=45.0)
     daily_rate_per_quintal = Column(Float, nullable=False, default=18.0)
     temperature_celsius = Column(Float, nullable=False, default=12.0)
-    contact_phone = Column(String(30), nullable=False, default="+91 98450 11223")
+    contact_phone = Column(String(30), nullable=False, default="")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class ColdStorageBooking(Base):
@@ -193,7 +193,7 @@ class ColdStorageBooking(Base):
     booking_id = Column(String(50), primary_key=True)
     facility_id = Column(String(50), ForeignKey("cold_storage_facilities.facility_id"), nullable=False)
     farmer_id = Column(String(50), nullable=False)
-    crop = Column(String(50), nullable=False, default="Tomato")
+    crop = Column(String(50), nullable=False, default="Produce")
     quantity_kg = Column(Float, nullable=False)
     duration_days = Column(Integer, nullable=False, default=7)
     status = Column(String(30), nullable=False, default="REQUESTED") # REQUESTED, CONFIRMED, CHECKED_IN, RELEASED

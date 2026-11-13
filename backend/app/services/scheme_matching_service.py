@@ -26,8 +26,6 @@ class SchemeMatchingService:
         # Read farmer harvest history to determine active crops
         lots = db.query(HarvestLot).filter(HarvestLot.farmer_id == farmer_id).all()
         farmer_crops = list({l.crop for l in lots if l.crop})
-        if not farmer_crops:
-            farmer_crops = ["Tomato"]
 
         # Parse extensible metadata
         meta = {}
@@ -40,11 +38,16 @@ class SchemeMatchingService:
         if voluntary_profile_override:
             meta.update(voluntary_profile_override)
 
+        if not farmer_crops and meta.get("crops"):
+            farmer_crops = meta.get("crops")
+        if not farmer_crops and voluntary_profile_override and voluntary_profile_override.get("crop"):
+            farmer_crops = [voluntary_profile_override.get("crop")]
+
         landholding_ha = meta.get("landholding_hectares")
         fruits_id = meta.get("fruits_id")
         is_fpo_member = meta.get("is_fpo_member", False)
         farmer_state = farmer.state or "Karnataka"
-        farmer_district = farmer.district or "Kolar"
+        farmer_district = farmer.district or ""
 
         schemes = db.query(Scheme).filter(Scheme.verification_status == "OFFICIALLY_VERIFIED").all()
         results = []
@@ -68,11 +71,14 @@ class SchemeMatchingService:
             # 2. Crop check
             crop_match = True
             if app_crops:
-                matching_crops = [c for c in farmer_crops if any(ac.lower() in c.lower() for ac in app_crops)]
-                if not matching_crops:
-                    crop_match = False
+                if farmer_crops:
+                    matching_crops = [c for c in farmer_crops if any(ac.lower() in c.lower() or c.lower() in ac.lower() for ac in app_crops)]
+                    if not matching_crops:
+                        crop_match = False
+                    else:
+                        matched_rules.append(f"Crop match confirmed: {', '.join(matching_crops)}")
                 else:
-                    matched_rules.append(f"Crop match confirmed: {', '.join(matching_crops)}")
+                    matched_rules.append("General agricultural eligibility evaluated (crops pending registration)")
 
             if not crop_match:
                 match_status = "POTENTIALLY_RELEVANT"
@@ -90,7 +96,8 @@ class SchemeMatchingService:
                     reason_kn = "ನೀವು FPO ಸದಸ್ಯರಾಗಿದ್ದೀರಿ. ನಿಮ್ಮ FPO ₹15 ಲಕ್ಷ ಈಕ್ವಿಟಿ ಅನುದಾನಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸಬಹುದು."
                 else:
                     match_status = "POTENTIALLY_RELEVANT"
-                    reason_en = "Institutional FPO grant (Paid to FPO company, not individual farmers). Join your local Kolar FPO cluster to benefit."
+                    fpo_region = f"{farmer_district} " if farmer_district else "local "
+                    reason_en = f"Institutional FPO grant (Paid to FPO company, not individual farmers). Join your {fpo_region}FPO cluster to benefit."
                     reason_kn = "ಸಾಂಸ್ಥಿಕ FPO ಅನುದಾನ (ವೈಯಕ್ತಿಕ ರೈತರಿಗಲ್ಲ, FPO ಸಂಸ್ಥೆಗೆ). ಸಮಗ್ರ ಲಾಭ ಪಡೆಯಲು ಸ್ಥಳೀಯ FPO ಗೆ ಸೇರಿ."
                 results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
                 continue
@@ -127,8 +134,12 @@ class SchemeMatchingService:
                 reason_kn = f"ಅರ್ಹತೆಯ ಸಾಧ್ಯತೆ ಇದೆ! ದೃಢೀಕರಿಸಲು ದಯವಿಟ್ಟು ನಿಮ್ಮ ವಿವರಗಳನ್ನು ದಾಖಲಿಸಿ."
             else:
                 match_status = "LIKELY_ELIGIBLE"
-                reason_en = f"Matches your location ({farmer_district}), crop ({', '.join(farmer_crops)}), and smallholder farmer profile."
-                reason_kn = f"ನಿಮ್ಮ ಸ್ಥಳ ({farmer_district}), ಬೆಳೆ ({', '.join(farmer_crops)}), ಮತ್ತು ರೈತ ಪ್ರೊಫೈಲ್‌ಗೆ ನಿಖರವಾಗಿ ಸರಿಹೊಂದುತ್ತದೆ."
+                loc_desc = f" ({farmer_district})" if farmer_district else ""
+                crop_desc = f", crop ({', '.join(farmer_crops)})" if farmer_crops else ""
+                loc_desc_kn = f" ({farmer_district})" if farmer_district else ""
+                crop_desc_kn = f", ಬೆಳೆ ({', '.join(farmer_crops)})" if farmer_crops else ""
+                reason_en = f"Matches your location{loc_desc}{crop_desc}, and smallholder farmer profile."
+                reason_kn = f"ನಿಮ್ಮ ಸ್ಥಳ{loc_desc_kn}{crop_desc_kn}, ಮತ್ತು ರೈತ ಪ್ರೊಫೈಲ್‌ಗೆ ನಿಖರವಾಗಿ ಸರಿಹೊಂದುತ್ತದೆ."
 
             results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
 
@@ -226,9 +237,11 @@ class SchemeMatchingService:
         opportunities = cls.evaluate_farmer_opportunities(farmer_id, db)
         created_notifications = []
 
+        current_month = datetime.now(timezone.utc).strftime("%Y%m")
+        current_year = datetime.now(timezone.utc).year
         for opp in opportunities:
             if opp["match_status"] in ["LIKELY_ELIGIBLE", "MORE_INFO_REQUIRED"]:
-                dedup_key = f"NOTIF-{farmer_id}-{opp['scheme_id']}-202611"
+                dedup_key = f"NOTIF-{farmer_id}-{opp['scheme_id']}-{current_month}"
                 existing = db.query(FarmerBenefitNotification).filter(
                     FarmerBenefitNotification.dedup_key == dedup_key
                 ).first()
@@ -240,8 +253,8 @@ class SchemeMatchingService:
                         dedup_key=dedup_key,
                         title_en=f"New Opportunity: {opp['title_en']}",
                         title_kn=f"ಹೊಸ ರೈತ ಅವಕಾಶ: {opp['title_kn']}",
-                        body_en=f"Benefit: {opp['benefit_amount_spec']}. Application window active for 2026.",
-                        body_kn=f"ಸೌಲಭ್ಯ: {opp['benefit_amount_spec']}. 2026 ರ ಅರ್ಜಿ ಸಲ್ಲಿಕೆ ಸಕ್ರಿಯವಾಗಿದೆ.",
+                        body_en=f"Benefit: {opp['benefit_amount_spec']}. Application window active for {current_year}.",
+                        body_kn=f"ಸೌಲಭ್ಯ: {opp['benefit_amount_spec']}. {current_year} ರ ಅರ್ಜಿ ಸಲ್ಲಿಕೆ ಸಕ್ರಿಯವಾಗಿದೆ.",
                         why_received_en=f"Why you received this: {opp['relevance_reason_en']}",
                         why_received_kn=f"ನಿಮಗೆ ಈ ಮಾಹಿತಿ ಏಕೆ: {opp['relevance_reason_kn']}",
                         source_url=opp["official_portal_url"],

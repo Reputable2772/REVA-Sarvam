@@ -12,11 +12,11 @@ router = APIRouter(prefix="/sync", tags=["Phase 15 — Offline Background Sync"]
 class OfflineLotItem(BaseModel):
     client_uuid: str
     farmer_id: str
-    crop: str = "Tomato"
-    variety: str = "Hybrid Red"
+    crop: str = "Produce"
+    variety: str = "Standard Variety"
     quantity_kg: float = Field(..., gt=0)
     quality_grade: str = "Grade A"
-    village: Optional[str] = "Mulbagal"
+    village: Optional[str] = None
     recorded_at: Optional[str] = None
 
 class BatchSyncRequest(BaseModel):
@@ -54,20 +54,25 @@ def sync_harvest_batch(
         # Ensure farmer exists
         farmer = db.query(Farmer).filter(Farmer.farmer_id == item.farmer_id).first()
         if not farmer:
+            # Generate deterministic unique phone based on farmer_id to respect unique constraint
+            phone_num = f"+91 {abs(hash(item.farmer_id)) % 9000000000 + 1000000000}"
             farmer = Farmer(
                 farmer_id=item.farmer_id,
                 name=f"Farmer {item.farmer_id}",
-                village=item.village or "Mulbagal",
-                district="Kolar",
-                phone="+91 98450 00000"
+                village=item.village or "",
+                district=item.village or "",
+                phone=phone_num
             )
             db.add(farmer)
             db.commit()
 
-        # Generate unique Lot ID
+        # Generate unique Lot ID with dynamic district prefix
+        dist_map = {"kolar": "KLR", "bangalore": "BLR", "bengaluru": "BLR", "mysore": "MYS", "mysuru": "MYS", "belgaum": "BEL", "belagavi": "BEL", "tumkur": "TUM", "mandya": "MDY", "hassan": "HAS"}
+        d_clean = (farmer.district or "").lower().strip()
+        dist_code = dist_map.get(d_clean, (farmer.district[:3] if farmer and farmer.district else "KLR").upper())
         date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         lot_count = db.query(HarvestLot).count() + 1
-        lot_id = f"FR-KLR-{date_str}-{lot_count:04d}"
+        lot_id = f"FR-{dist_code}-{date_str}-{lot_count:04d}"
 
         new_lot = HarvestLot(
             lot_id=lot_id,

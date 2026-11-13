@@ -60,13 +60,13 @@ def ensure_seeded_facilities(db: Session):
 class ColdStorageBookingRequest(BaseModel):
     farmer_id: str
     facility_id: str
-    crop: str = "Tomato"
+    crop: str = "Produce"
     quantity_kg: float = Field(..., gt=0)
     duration_days: int = Field(7, ge=1, le=90)
 
 @router.get("/facilities")
 def get_facilities(
-    district: Optional[str] = "Kolar",
+    district: Optional[str] = Query(None, description="Optional district filter"),
     db: Session = Depends(get_db)
 ):
     """

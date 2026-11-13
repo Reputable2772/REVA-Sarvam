@@ -135,61 +135,30 @@ class PanIndiaMandiService:
         origin_district: str,
         dest_state: str,
         dest_district: str,
-        dest_market: str
+        dest_market: str,
+        origin_village: Optional[str] = None,
+        origin_coords: Optional[Tuple[float, float]] = None
     ) -> float:
         """
-        Estimates realistic road distance in km between origin and destination mandi.
-        Accurate regional distances for Kolar/Karnataka hub, with state/district scaling for national mandis.
+        Estimates realistic road distance in km between origin and destination mandi using DistanceService.
         """
-        norm_orig_dist = origin_district.lower().strip()
-        norm_dest_dist = dest_district.lower().strip()
-        norm_dest_market = dest_market.lower().strip()
-
-        # Known regional distances from Mulbagal / Kolar core
-        if norm_orig_dist in ["kolar", "mulbagal"]:
-            if "mulbagal" in norm_dest_market:
-                return 4.5
-            if "kolar" in norm_dest_market:
-                return 18.0
-            if "bangarpet" in norm_dest_market:
-                return 28.0
-            if "srinivasapur" in norm_dest_market:
-                return 32.0
-            if "malur" in norm_dest_market:
-                return 42.0
-            if "chintamani" in norm_dest_market:
-                return 52.0
-            if "binny mill" in norm_dest_market or "bengaluru" in norm_dest_market:
-                return 85.0
-            if "ramanagara" in norm_dest_market:
-                return 125.0
-            if "chamarajanagar" in norm_dest_market:
-                return 220.0
-            if "nanjangud" in norm_dest_market or "mysuru" in norm_dest_market:
-                return 210.0
-            if "belgaum" in norm_dest_market:
-                return 540.0
-
-        if origin_state.lower() == dest_state.lower():
-            if norm_orig_dist == norm_dest_dist:
-                # Same district: 15 - 35 km
-                h = abs(hash(dest_market)) % 25
-                return 15.0 + float(h)
-            else:
-                # Same state, different district: 60 - 280 km
-                h = abs(hash(dest_district)) % 180
-                return 60.0 + float(h)
-        else:
-            # Interstate transport: 300 - 1200 km
-            h = abs(hash(dest_state + dest_district)) % 500
-            return 350.0 + float(h)
+        from backend.app.services.distance_service import DistanceService
+        origin_point = origin_coords or origin_village or origin_district or origin_state or "Karnataka"
+        return DistanceService.calculate_road_distance(
+            origin=origin_point,
+            destination=dest_market,
+            origin_district=origin_district,
+            origin_state=origin_state,
+            dest_district=dest_district,
+            dest_state=dest_state
+        )
 
     def evaluate_pan_india_mandi_netbacks(
         self,
         commodity: str = "Tomato",
         quantity_kg: float = 800.0,
         origin_state: str = "Karnataka",
-        origin_district: str = "Kolar",
+        origin_district: Optional[str] = None,
         candidate_limit: int = 10
     ) -> Dict[str, Any]:
         """
@@ -212,11 +181,14 @@ class PanIndiaMandiService:
         # 1. Same state & district
         # 2. Same state
         # 3. Other major states
+        orig_dist_clean = (origin_district or "").strip().lower()
+        orig_state_clean = (origin_state or "").strip().lower()
+
         def mandi_sort_key(m):
             score = 0
-            if m["state"].lower() == origin_state.lower():
+            if orig_state_clean and m["state"].lower() == orig_state_clean:
                 score += 100
-                if m["district"].lower() == origin_district.lower():
+                if orig_dist_clean and m["district"].lower() == orig_dist_clean:
                     score += 50
             return score
 
@@ -235,7 +207,7 @@ class PanIndiaMandiService:
                     break
 
         crates = max(1, math.ceil(quantity_kg / 25.0))
-        tonnes = quantity_kg / 1000.0
+        from backend.app.services.distance_service import DistanceService
 
         evaluated = []
         for m in candidates:
@@ -245,17 +217,18 @@ class PanIndiaMandiService:
             modal_kg = m["modal_price_kg"]
             gross_revenue = round(quantity_kg * modal_kg, 2)
 
-            # Transport cost: ₹3.0 per km base + ₹1.5 per ton-km
-            transport_cost = round(max(150.0, distance_km * (3.0 + (1.5 * tonnes))), 2)
+            # Accurate freight transport calculation via DistanceService
+            freight_info = DistanceService.calculate_freight(distance_km, quantity_kg, haul_type="solo")
+            transport_cost = freight_info["total_freight"]
 
             # APMC commission: standard 1.5% - 2.0%
-            comm_pct = 1.5 if "Karnataka" in m["state"] else 2.0
+            comm_pct = 1.5 if "karnataka" in m["state"].lower() else 2.0
             commission = round(gross_revenue * (comm_pct / 100.0), 2)
 
             # Unloading charge: ₹5 per crate (~₹0.20/kg)
             unloading = round(crates * 5.0, 2)
 
-            # Electronic weighment fee: ₹40 fixed lot fee
+            # Electronic weighment fee
             weighment = 40.0
 
             total_deductions = round(transport_cost + commission + unloading + weighment, 2)
@@ -269,6 +242,7 @@ class PanIndiaMandiService:
                 "commodity": m["commodity"],
                 "variety": m["variety"],
                 "distance_km": round(distance_km, 1),
+                "transport_vehicle": freight_info["vehicle_name"],
                 "modal_price_kg": modal_kg,
                 "gross_revenue": gross_revenue,
                 "deductions": {
@@ -290,14 +264,14 @@ class PanIndiaMandiService:
 
         if evaluated:
             best_net = evaluated[0]
-            # Flag price traps: higher gross/modal price than best net option, but lower final net take-home
+            # Flag price traps dynamically: higher gross/modal price than best net option, but lower final net take-home
             for item in evaluated:
                 if item["modal_price_kg"] > best_net["modal_price_kg"] and item["net_take_home"] < best_net["net_take_home"]:
-                    diff = best_net["net_take_home"] - item["net_take_home"]
+                    diff = round(best_net["net_take_home"] - item["net_take_home"], 2)
                     item["is_trap"] = True
                     item["trap_reason"] = (
                         f"Headline Price Trap! ₹{item['modal_price_kg']}/kg appears higher, "
-                        f"but high freight (₹{item['deductions']['transport']}) leaves you with ₹{diff:.0f} LESS net take-home "
+                        f"but high freight (₹{item['deductions']['transport']} over {item['distance_km']}km) leaves you with ₹{diff:.0f} LESS net take-home "
                         f"than {best_net['market']}."
                     )
 
@@ -318,11 +292,14 @@ class PanIndiaMandiService:
         quantity_kg: float = 200.0,
         farmer_district: str = "Kolar",
         farmer_state: str = "Karnataka",
-        target_mandi: Optional[str] = None
+        target_mandi: Optional[str] = None,
+        farmer_village: Optional[str] = None,
+        farmer_coords: Optional[Tuple[float, float]] = None
     ) -> List[Dict[str, Any]]:
         """
         Evaluates transparent costs, itemized deductions, and net take-home for all relevant
         mandis trading the given crop, formatted for the Farmer Mobile & Voice Experience.
+        Calculates exact road distance and transport freight from the farmer's location.
         """
         instance = cls.get_instance()
         records = instance._dataset_records
@@ -351,71 +328,43 @@ class PanIndiaMandiService:
         if len(candidates) < 3:
             candidates.extend(other_states[:3])
 
-        # Ensure we also include baseline Kolar and Bangarpet if in Karnataka / Kolar region
-        market_names = [c["market"].lower() for c in candidates]
-        if "bangarpet" not in " ".join(market_names) and farmer_state.lower() == "karnataka":
-            candidates.append({
-                "state": "Karnataka",
-                "district": "Kolar",
-                "market": "Bangarpet APMC",
-                "commodity": crop.capitalize(),
-                "variety": "Local / Hybrid",
-                "grade": "FAQ",
-                "modal_price_kg": 27.50,
-                "min_price_kg": 24.0,
-                "max_price_kg": 29.0
-            })
-        if "kolar" not in " ".join(market_names) and farmer_state.lower() == "karnataka":
-            candidates.append({
-                "state": "Karnataka",
-                "district": "Kolar",
-                "market": "Kolar APMC",
-                "commodity": crop.capitalize(),
-                "variety": "Local / Hybrid",
-                "grade": "FAQ",
-                "modal_price_kg": 24.00,
-                "min_price_kg": 21.0,
-                "max_price_kg": 26.0
-            })
-
         crates = max(1, round(quantity_kg / 25.0))
         results = []
+        from backend.app.services.distance_service import DistanceService
 
         for m in candidates:
             market_name = m["market"]
             distance_km = instance._estimate_distance(
-                farmer_state, farmer_district, m["state"], m["district"], market_name
+                farmer_state, farmer_district, m["state"], m["district"], market_name,
+                origin_village=farmer_village,
+                origin_coords=farmer_coords
             )
 
             modal_rate = m.get("modal_price_kg", 20.0)
             gross_revenue = round(quantity_kg * modal_rate, 2)
 
-            is_bangarpet = "bangarpet" in market_name.lower()
-            comm_pct = 8.0 if is_bangarpet else 6.5
+            # Accurate freight transport calculation via DistanceService
+            freight_info = DistanceService.calculate_freight(distance_km, quantity_kg, haul_type="solo")
+            transport_cost = freight_info["total_freight"]
+
+            # Standard APMC commission
+            comm_pct = 1.5 if "karnataka" in m["state"].lower() else 2.0
             commission_cost = round(gross_revenue * (comm_pct / 100.0), 2)
 
-            if distance_km <= 10:
-                transport_cost = 120.0
-            elif distance_km <= 35:
-                transport_cost = 350.0
-            elif is_bangarpet:
-                transport_cost = 620.0
-            else:
-                transport_cost = round(200.0 + (distance_km * 9.5), 2)
-
-            unloading_cost = round(crates * (8.0 if is_bangarpet else 5.0), 2)
-            weighing_fee = 50.0 if is_bangarpet else 30.0
+            unloading_cost = round(crates * 5.0, 2)
+            weighing_fee = 30.0
 
             total_deductions = round(commission_cost + transport_cost + unloading_cost + weighing_fee, 2)
             net_take_home = round(gross_revenue - total_deductions, 2)
-            effective_rate_per_kg = round(net_take_home / quantity_kg, 2)
+            effective_rate_per_kg = round(net_take_home / quantity_kg, 2) if quantity_kg > 0 else 0.0
 
             results.append({
                 "mandi_name": market_name,
                 "district": m["district"],
                 "state": m["state"],
                 "commodity": m["commodity"],
-                "distance_km": distance_km,
+                "distance_km": round(distance_km, 1),
+                "transport_vehicle": freight_info["vehicle_name"],
                 "modal_price_per_kg": modal_rate,
                 "min_price_per_kg": m.get("min_price_kg", modal_rate - 2),
                 "max_price_per_kg": m.get("max_price_kg", modal_rate + 2),
@@ -437,7 +386,8 @@ class PanIndiaMandiService:
         # Add Virtual FPO Direct Buyer Option as gold standard recommendation
         direct_rate = round(max([r["modal_price_per_kg"] for r in results] + [25.0]) + 0.50, 2)
         direct_gross = round(quantity_kg * direct_rate, 2)
-        shared_freight = round(150.0 + (quantity_kg * 0.30), 2)
+        direct_freight_info = DistanceService.calculate_freight(5.0, quantity_kg, haul_type="pooled")
+        shared_freight = direct_freight_info["total_freight"]
         direct_loading = round(crates * 2.0, 2)
         direct_deductions = round(shared_freight + direct_loading, 2)
         direct_net = round(direct_gross - direct_deductions, 2)
@@ -447,7 +397,8 @@ class PanIndiaMandiService:
             "district": farmer_district,
             "state": farmer_state,
             "commodity": crop.capitalize(),
-            "distance_km": 10.0,
+            "distance_km": 5.0,
+            "transport_vehicle": direct_freight_info["vehicle_name"],
             "modal_price_per_kg": direct_rate,
             "min_price_per_kg": direct_rate,
             "max_price_per_kg": direct_rate,

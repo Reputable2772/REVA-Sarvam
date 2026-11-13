@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from datetime import datetime
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.app.models.models import MandiPriceRecord, Farmer, HarvestLot, BuyerRequirement
@@ -18,11 +19,13 @@ class DatasetImporter:
         updated = 0
         for r in records:
             # Flexible field resolution supporting both AGMARKNET official column names and custom camelCase/snake_case
-            market = r.get("market_name") or r.get("Market") or r.get("market") or "Kolar"
-            commodity = r.get("commodity") or r.get("Commodity") or "Tomato"
-            variety = r.get("variety") or r.get("Variety") or "Hybrid"
+            market = r.get("market_name") or r.get("Market") or r.get("market")
+            if not market:
+                continue
+            commodity = r.get("commodity") or r.get("Commodity") or "Produce"
+            variety = r.get("variety") or r.get("Variety") or "Standard"
             grade = r.get("grade") or r.get("Grade") or "FAQ"
-            date = str(r.get("arrival_date") or r.get("Arrival_Date") or r.get("date") or "2026-11-13")
+            date = str(r.get("arrival_date") or r.get("Arrival_Date") or r.get("date") or datetime.now().strftime("%Y-%m-%d"))
             arrivals = float(r.get("arrivals_tonnes") or r.get("Arrivals") or 0.0)
 
             min_q = float(r.get("min_price_per_quintal") or r.get("Min_x0020_Price") or r.get("min_price") or 2000.0)
@@ -48,8 +51,8 @@ class DatasetImporter:
                 updated += 1
             else:
                 new_record = MandiPriceRecord(
-                    state=r.get("state") or "Karnataka",
-                    district=r.get("district") or "Kolar",
+                    state=r.get("state") or "India",
+                    district=r.get("district") or market,
                     market_name=market,
                     commodity=commodity,
                     variety=variety,
@@ -59,7 +62,7 @@ class DatasetImporter:
                     min_price_per_quintal=min_q,
                     max_price_per_quintal=max_q,
                     modal_price_per_quintal=modal_q,
-                    modal_price_per_kg=modal_kg,
+                    modal_price_kg=modal_kg,
                     source=r.get("source") or "AGMARKNET"
                 )
                 db.add(new_record)
@@ -98,9 +101,9 @@ class DatasetImporter:
                 new_farmer = Farmer(
                     farmer_id=f_id,
                     name=r["name"],
-                    village=r["village"],
-                    district=r.get("district", "Kolar"),
-                    phone=r.get("phone", "+91 98000 00000"),
+                    village=r.get("village", ""),
+                    district=r.get("district") or r.get("village") or "",
+                    phone=r.get("phone") or "+91 98000 00000",
                     latitude=r.get("latitude"),
                     longitude=r.get("longitude"),
                     metadata_json=meta_str
@@ -130,12 +133,12 @@ class DatasetImporter:
                 new_lot = HarvestLot(
                     lot_id=lot_id,
                     farmer_id=r["farmer_id"],
-                    crop=r.get("crop", "Tomato"),
-                    variety=r.get("variety", "Hybrid Red"),
+                    crop=r.get("crop") or "Produce",
+                    variety=r.get("variety") or "Standard Variety",
                     quantity_kg=float(r["quantity_kg"]),
-                    quality_grade=r.get("quality_grade", "Grade A"),
-                    harvest_date=r.get("harvest_date", "2026-11-13"),
-                    status=r.get("status", "ready_for_sale"),
+                    quality_grade=r.get("quality_grade") or "Grade A",
+                    harvest_date=r.get("harvest_date") or datetime.now().strftime("%Y-%m-%d"),
+                    status=r.get("status") or "ready_for_sale",
                     metadata_json=meta_str
                 )
                 db.add(new_lot)

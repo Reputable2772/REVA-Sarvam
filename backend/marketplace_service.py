@@ -88,7 +88,18 @@ class MarketplaceService:
                 qty_score = min(20.0, round((quantity_kg / target) * 20.0, 1))
             
             price_score = min(30.0, round((buyer.max_price_per_kg / 30.0) * 30.0, 1))
-            logistics_score = 30.0 if "kolar" in buyer.pickup_hub.lower() else 20.0
+            # Dynamic logistics scoring based on calculated road distance
+            from backend.app.services.distance_service import DistanceService
+            hub_dist = DistanceService.calculate_road_distance(
+                origin="Local Hub",
+                destination=buyer.pickup_hub or "Local APMC"
+            )
+            if hub_dist <= 25.0:
+                logistics_score = 30.0
+            elif hub_dist <= 50.0:
+                logistics_score = 25.0
+            else:
+                logistics_score = max(10.0, round(30.0 - (hub_dist / 10.0), 1))
             total = grade_score + qty_score + price_score + logistics_score
 
             recommendation = (

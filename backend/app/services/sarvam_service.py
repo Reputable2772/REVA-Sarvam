@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import re
+from datetime import datetime, timedelta
 import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional, List
@@ -259,14 +260,19 @@ class SarvamService:
         Robust agricultural NLP heuristic parser.
         Default entities and regular expression matchers for Kannada & English.
         """
+        now = datetime.now()
+        today_str = now.strftime("%Y-%m-%d")
+        yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+        tomorrow_str = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
         crop = "Tomato"
-        variety = "Hybrid Red"
+        variety = "Standard"
         quantity_kg = 200.0
         quality_grade = "Grade A"
-        village = "Mulbagal"
-        harvest_date = "2026-11-13"
+        village = None
+        harvest_date = today_str
         harvest_time = "07:00 AM"
-        expected_date_time = "2026-11-14 09:00 AM"
+        expected_date_time = f"{tomorrow_str} 09:00 AM"
         sell_immediately = True
         fields_detected = []
 
@@ -328,13 +334,13 @@ class SarvamService:
 
         # Harvest Date detection
         if re.search(r"today|ಇಂದು|ಈ ದಿನ", text, re.IGNORECASE):
-            harvest_date = "2026-11-13"
+            harvest_date = today_str
             fields_detected.append("harvest_date")
         elif re.search(r"yesterday|ನಿನ್ನೆ", text, re.IGNORECASE):
-            harvest_date = "2026-11-12"
+            harvest_date = yesterday_str
             fields_detected.append("harvest_date")
         elif re.search(r"tomorrow|ನಾಳೆ", text, re.IGNORECASE):
-            harvest_date = "2026-11-14"
+            harvest_date = tomorrow_str
             fields_detected.append("harvest_date")
 
         date_match = re.search(r"\b(202\d-\d{2}-\d{2})\b", text)
@@ -364,13 +370,13 @@ class SarvamService:
 
         # Expected Date/Time detection
         if re.search(r"tomorrow morning|ನಾಳೆ ಬೆಳಿಗ್ಗೆ", text, re.IGNORECASE):
-            expected_date_time = "2026-11-14 09:00 AM"
+            expected_date_time = f"{tomorrow_str} 09:00 AM"
             fields_detected.append("expected_date_time")
         elif re.search(r"tomorrow evening|ನಾಳೆ ಸಂಜೆ", text, re.IGNORECASE):
-            expected_date_time = "2026-11-14 05:00 PM"
+            expected_date_time = f"{tomorrow_str} 05:00 PM"
             fields_detected.append("expected_date_time")
         elif re.search(r"today evening|ಇಂದು ಸಂಜೆ", text, re.IGNORECASE):
-            expected_date_time = "2026-11-13 06:00 PM"
+            expected_date_time = f"{today_str} 06:00 PM"
             fields_detected.append("expected_date_time")
 
         # Sell immediately vs Cold storage
@@ -385,14 +391,36 @@ class SarvamService:
         if re.search(r"bangarpet|ಬಂಗಾರಪೇಟೆ", text, re.IGNORECASE):
             village = "Bangarpet"
             fields_detected.append("village")
+        elif re.search(r"mulbagal|ಮುಳಬಾಗಿಲು", text, re.IGNORECASE):
+            village = "Mulbagal"
+            fields_detected.append("village")
         elif re.search(r"malur|ಮಾಲೂರು", text, re.IGNORECASE):
             village = "Malur"
             fields_detected.append("village")
         elif re.search(r"kolar|ಕೋಲಾರ", text, re.IGNORECASE):
             village = "Kolar"
             fields_detected.append("village")
+        elif re.search(r"srinivaspur|ಶ್ರೀನಿವಾಸಪುರ", text, re.IGNORECASE):
+            village = "Srinivaspur"
+            fields_detected.append("village")
+        elif re.search(r"chintamani|ಚಿಂತಾಮಣಿ", text, re.IGNORECASE):
+            village = "Chintamani"
+            fields_detected.append("village")
+        elif re.search(r"chikkaballapur|ಚಿಕ್ಕಬಳ್ಳಾಪುರ", text, re.IGNORECASE):
+            village = "Chikkaballapur"
+            fields_detected.append("village")
         else:
-            village = "Mulbagal"
+            loc_match = re.search(r"\b(?:in|at|from|village)\s+([A-Za-z]+)", text, re.IGNORECASE)
+            if loc_match:
+                cand = loc_match.group(1).title()
+                if cand.lower() not in ["kg", "kgs", "farm", "grade", "hybrid", "today", "tomorrow"]:
+                    village = cand
+                    fields_detected.append("village")
+            else:
+                kn_loc_match = re.search(r"([A-Za-z\u0C80-\u0CFF]{3,20})(?:ನಲ್ಲಿ|ದಲ್ಲಿ|ಯಿಂದ|ದಿಂದ|ಹತ್ತಿರ)", text)
+                if kn_loc_match:
+                    village = kn_loc_match.group(1)
+                    fields_detected.append("village")
 
         return {
             "crop": crop,
@@ -596,7 +624,7 @@ class SarvamService:
             action = "UPDATE_HARVEST"
             crop = entities.get('crop', 'Tomato')
             qty = entities.get('quantity_kg', 200)
-            date = entities.get('harvest_date', '2026-11-13')
+            date = entities.get('harvest_date') or datetime.now().strftime("%Y-%m-%d")
             time = entities.get('harvest_time', '07:00 AM')
             msg_en = f"Updated: {qty}kg {crop}, Harvest: {date} at {time}."
             msg_kn = f"ನವೀಕರಿಸಲಾಗಿದೆ: {qty} ಕೆಜಿ {crop}, ಕೊಯ್ಲು: {date} {time}."
@@ -634,23 +662,38 @@ class SarvamService:
 
         rec_name = recommended.get("mandi_name") or recommended.get("market") or "Primary Mandi"
         rec_net = int(recommended.get("net_take_home", 0))
+        rec_dist = recommended.get("distance_km", 0)
+        rec_deductions = recommended.get("itemized_deductions") or recommended.get("deductions") or {}
+        rec_trans = int(rec_deductions.get("transport_cost") or rec_deductions.get("transport", 0))
 
         if is_kn:
-            text = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} ಮೂಲಕ ₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ಸಿಗುತ್ತದೆ. "
+            dist_phrase = f"{rec_dist} ಕಿಮೀ ದೂರದಲ್ಲಿದ್ದು, " if rec_dist > 0 else ""
+            trans_phrase = f"ಸಾರಿಗೆ ವೆಚ್ಚ ಕೇವಲ ₹{rec_trans}. " if rec_trans > 0 else ""
+            text = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} {dist_phrase}₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ನೀಡುತ್ತದೆ. {trans_phrase}"
             if trap:
                 trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
                 trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
+                trap_dist = trap.get("distance_km", 0)
+                trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
+                trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
                 diff = int(rec_net - trap.get("net_take_home", 0))
-                text += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಜಾಸ್ತಿ ಕಾಣಿಸಿದರೂ, ಸಾರಿಗೆ ವೆಚ್ಚ ಮತ್ತು ಕಮಿಷನ್ ಕಡಿತದಿಂದ ₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
+                dist_warn = f"{trap_dist} ಕಿಮೀ ದೂರದ ಪ್ರಯಾಣ ಮತ್ತು ₹{trap_trans} ವಾಹನ ಬಾಡಿಗೆಯಿಂದಾಗಿ " if trap_dist > 0 else "ಹೆಚ್ಚಿನ ಸಾರಿಗೆ ವೆಚ್ಚದಿಂದ "
+                text += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಕಾಣಿಸಿದರೂ, {dist_warn}₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
             else:
                 text += "ಕಡಿಮೆ ಸಾರಿಗೆ ಮತ್ತು ಕಮಿಷನ್ ವೆಚ್ಚ ಇರುವ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ."
         else:
-            text = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} gives the highest net return of ₹{rec_net}. "
+            dist_phrase = f"at {rec_dist} km " if rec_dist > 0 else ""
+            trans_phrase = f"Transport freight is ₹{rec_trans}. " if rec_trans > 0 else ""
+            text = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} {dist_phrase}gives the highest net return of ₹{rec_net}. {trans_phrase}"
             if trap:
                 trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
                 trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
+                trap_dist = trap.get("distance_km", 0)
+                trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
+                trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
                 loss = int(rec_net - trap.get("net_take_home", 0))
-                text += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but high freight and commission leaves you with ₹{loss} less cash in hand."
+                dist_warn = f"due to {trap_dist} km distance (₹{trap_trans} freight) " if trap_dist > 0 else "due to transport costs "
+                text += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but {dist_warn}you take home ₹{loss} less cash in hand."
             else:
                 text += "Choosing direct pooling saves middleman commission and transport loss."
 

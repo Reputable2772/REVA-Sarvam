@@ -15,11 +15,11 @@ class WeatherService:
     CACHE_TTL_SECONDS = 600 # 10 minutes
 
     @classmethod
-    def get_weather(cls, location: str = "Kolar") -> Dict[str, Any]:
+    def get_weather(cls, location: str = "") -> Dict[str, Any]:
         """
         Fetches live weather from wttr.in with in-memory caching and intelligent agricultural advisory generation.
         """
-        loc_key = location.strip().title()
+        loc_key = (location or "Bengaluru").strip().title()
         now = time.time()
 
         # Check Cache
@@ -80,8 +80,8 @@ class WeatherService:
                 return result
 
         except Exception as e:
-            # Fallback realistic weather data for Kolar corridor
-            advisory, risk_level = cls._generate_harvest_advisory(26, 58, "Partly Cloudy", 0.0)
+            # Fallback weather advisory dynamically incorporating the requested location
+            advisory, risk_level = cls._generate_harvest_advisory(26, 58, "Partly Cloudy", 0.0, location=loc_key)
             return {
                 "success": True,
                 "location": loc_key,
@@ -103,11 +103,12 @@ class WeatherService:
             }
 
     @staticmethod
-    def _generate_harvest_advisory(temp_c: int, humidity: int, condition: str, precip_mm: float):
+    def _generate_harvest_advisory(temp_c: int, humidity: int, condition: str, precip_mm: float, location: str = ""):
         cond_lower = condition.lower()
+        loc_str = f" in {location}" if location else ""
         if "rain" in cond_lower or "shower" in cond_lower or "thunder" in cond_lower or precip_mm > 2.0:
             return (
-                "⚠️ ಮಳೆ ಮುನ್ಸೂಚನೆ (Rain Alert): High risk of rain wash and skin cracking. Cover crates with plastic tarpaulins or route directly to Kolar Cold Chain facility.",
+                f"⚠️ ಮಳೆ ಮುನ್ಸೂಚನೆ (Rain Alert): High risk of rain wash and skin cracking. Cover crates with plastic tarpaulins or route directly to your nearest Cold Storage facility{loc_str}.",
                 "HIGH"
             )
         elif humidity > 75:

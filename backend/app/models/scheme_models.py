@@ -12,7 +12,7 @@ class SchemeSource(Base):
     authority_type = Column(String(50), nullable=False) # CENTRAL_GOVT, STATE_GOVT_KARNATAKA, INSTITUTIONAL_NABARD_SFAC, MARKET_INTELLIGENCE
     official_url = Column(String(255), nullable=False)
     helpdesk_contact = Column(String(100), nullable=True)
-    last_checked_date = Column(String(30), nullable=False, default="2026-11-13")
+    last_checked_date = Column(String(30), nullable=False, default=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     schemes = relationship("Scheme", back_populates="source")
@@ -43,7 +43,7 @@ class Scheme(Base):
     official_portal_url = Column(String(255), nullable=False)
     official_contact = Column(String(100), nullable=True)
     verification_status = Column(String(30), default="OFFICIALLY_VERIFIED") # OFFICIALLY_VERIFIED, PARTIALLY_VERIFIED, PENDING_VERIFICATION, EXPIRED
-    last_verified_date = Column(String(30), nullable=False, default="2026-11-13")
+    last_verified_date = Column(String(30), nullable=False, default=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))
     freshness_label = Column(String(50), default="Active 2026 Guidelines")
     applicable_crops_json = Column(Text, default="[]") # Empty means all crops
     applicable_states_json = Column(Text, default="[]") # Empty means all India

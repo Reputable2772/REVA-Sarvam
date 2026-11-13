@@ -12,12 +12,12 @@ class BuyerRequirement(BaseModel):
     buyer_name: str
     buyer_type: BuyerType
     crop: str
-    variety: str = "Hybrid Red"
+    variety: str = ""
     required_grade: QualityGrade = "Grade A"
     target_quantity_kg: float
     min_acceptable_kg: Optional[float] = None
     max_price_per_kg: float
-    pickup_hub: str = "Kolar Central Hub"
+    pickup_hub: str = ""
     payment_terms: str = "T+1 direct bank transfer"
     active: bool = True
 
@@ -26,7 +26,7 @@ class HarvestLot(BaseModel):
     farmer_id: str
     farmer_name: str
     village: str
-    district: str = "Kolar"
+    district: str = ""
     phone: Optional[str] = None
     crop: str
     variety: str

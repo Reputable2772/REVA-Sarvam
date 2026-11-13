@@ -49,7 +49,7 @@ def analyze_pan_india_mandi_netbacks(
     commodity: str = Query("Tomato", description="Crop commodity"),
     quantity_kg: float = Query(800.0, ge=1.0, description="Harvest quantity in kg"),
     origin_state: str = Query("Karnataka", description="Farmer origin state"),
-    origin_district: str = Query("Kolar", description="Farmer origin district"),
+    origin_district: Optional[str] = Query(None, description="Farmer origin district"),
     limit: int = Query(10, ge=1, le=30, description="Number of mandis to compare")
 ):
     """
