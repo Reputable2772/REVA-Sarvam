@@ -37,7 +37,7 @@ fun MandiComparisonScreen(
     harvestId: String,
     onBackClick: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(false) }
+    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
     var isLoading by remember { mutableStateOf(true) }
     var crop by remember { mutableStateOf("Tomato") }
     var quantityKg by remember { mutableStateOf(200.0) }
@@ -54,17 +54,32 @@ fun MandiComparisonScreen(
 
     val scope = rememberCoroutineScope()
 
-    // Initialize Android native TTS engine as fallback
+    // Initialize Android native TTS engine targeting Google TTS with generic fallback
     DisposableEffect(context) {
         var tts: TextToSpeech? = null
         try {
-            tts = TextToSpeech(context) { status ->
+            tts = TextToSpeech(context, { status ->
                 if (status == TextToSpeech.SUCCESS) {
-                    tts?.language = if (isKannada) Locale("kn", "IN") else Locale.ENGLISH
+                    val targetLocale = if (isKannada) Locale("kn", "IN") else Locale.ENGLISH
+                    val avail = tts?.isLanguageAvailable(targetLocale)
+                    if (avail != null && avail >= TextToSpeech.LANG_AVAILABLE) {
+                        tts?.language = targetLocale
+                    } else {
+                        tts?.language = Locale.ENGLISH
+                    }
                 }
-            }
+            }, "com.google.android.tts")
             ttsEngine = tts
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+            try {
+                tts = TextToSpeech(context) { status ->
+                    if (status == TextToSpeech.SUCCESS) {
+                        tts?.language = if (isKannada) Locale("kn", "IN") else Locale.ENGLISH
+                    }
+                }
+                ttsEngine = tts
+            } catch (_: Exception) {}
+        }
 
         onDispose {
             try {

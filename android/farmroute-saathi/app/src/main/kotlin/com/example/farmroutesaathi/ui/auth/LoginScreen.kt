@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.FarmerProfile
 import com.example.farmroutesaathi.data.UserSession
+import com.example.farmroutesaathi.ui.components.LanguageSelectionDialog
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -53,7 +54,8 @@ enum class AuthStep {
 fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(false) }
+    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var currentStep by remember { mutableStateOf(AuthStep.PHONE_ENTRY) }
     var phoneNumber by remember { mutableStateOf("") }
     var mpinInput by remember { mutableStateOf("") }
@@ -162,13 +164,13 @@ fun LoginScreen(
                         }
                     }
 
-                    // Section C: Language Selector
+                    // Section C: Dynamic Language Selector
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = SoilFieldPaper.copy(alpha = 0.95f),
                         border = BorderStroke(1.2.dp, SoilCropGreen),
                         shadowElevation = 3.dp,
-                        modifier = Modifier.clickable { isKannada = !isKannada }
+                        modifier = Modifier.clickable { showLanguageDialog = true }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
@@ -176,7 +178,7 @@ fun LoginScreen(
                         ) {
                             Text("🌐 ", fontSize = 12.sp)
                             Text(
-                                text = if (isKannada) "ಕನ್ನಡ (KN)" else "English (EN)",
+                                text = "${UserSession.selectedLanguage.nativeName} (${UserSession.selectedLanguage.code.uppercase()})",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SoilCropGreen
@@ -215,25 +217,25 @@ fun LoginScreen(
                         letterSpacing = 0.5.sp
                     )
 
-                    // Tagline: "From Soil to Market"
-                    Text(
-                        text = if (isKannada) "ಮಣ್ಣಿನಿಂದ ಮಾರುಕಟ್ಟೆಗೆ • FROM SOIL TO MARKET" else "FROM SOIL TO MARKET",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SoilCropGreen,
-                        letterSpacing = 1.2.sp
-                    )
-
+                    // Primary Slogan: "Your Land. Your Harvest. Your Better Tomorrow."
                     Text(
                         text = if (isKannada)
-                            "ಫಲವತ್ತಾದ ಮಣ್ಣಿನಿಂದ ಪಾರದರ್ಶಕ ಮಾರುಕಟ್ಟೆಗಳಿಗೆ ಭಾರತೀಯ ರೈತರ ಪ್ರಯಾಣ"
+                            "ನಿಮ್ಮ ಭೂಮಿ • ನಿಮ್ಮ ಬೆಳೆ • ನಿಮ್ಮ ಉತ್ತಮ ನಾಳೆ"
                         else
-                            "Connecting Indian farmers from fertile soil to transparent markets",
+                            "Your Land. Your Harvest. Your Better Tomorrow.",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SoilCropGreen,
+                        letterSpacing = 0.4.sp
+                    )
+
+                    // Secondary Tagline: "From Soil to Market"
+                    Text(
+                        text = if (isKannada) "ಮಣ್ಣಿನಿಂದ ಮಾರುಕಟ್ಟೆಗೆ • FROM SOIL TO MARKET" else "FROM SOIL TO MARKET",
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = SoilDeepEarth.copy(alpha = 0.75f),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 2.dp)
+                        fontWeight = FontWeight.ExtraBold,
+                        color = SoilHarvestGold,
+                        letterSpacing = 1.2.sp
                     )
                 }
             }
@@ -258,10 +260,6 @@ fun LoginScreen(
                             onPhoneChange = { if (it.length <= 10 && it.all { char -> char.isDigit() }) phoneNumber = it },
                             isLoading = isLoading,
                             errorMessage = errorMessage,
-                            onDemoSelect = { demoPhone ->
-                                phoneNumber = demoPhone
-                                errorMessage = null
-                            },
                             onContinue = {
                                 if (phoneNumber.length != 10) {
                                     errorMessage = if (isKannada)
@@ -361,9 +359,9 @@ fun LoginScreen(
                                         onLoginSuccess()
                                     } else {
                                         errorMessage = if (isKannada)
-                                            "ತಪ್ಪಾದ MPIN. (ಮಾದರಿ: 1234 ಬಳಸಿ)"
+                                            "ತಪ್ಪಾದ MPIN. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ"
                                         else
-                                            "Invalid MPIN. (Demo hint: Use 1234)"
+                                            "Incorrect MPIN. Please try again."
                                     }
                                 }
                             }
@@ -495,6 +493,18 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+
+        if (showLanguageDialog) {
+            LanguageSelectionDialog(
+                currentLanguage = UserSession.selectedLanguage,
+                onLanguageSelected = { lang ->
+                    UserSession.setLanguage(lang)
+                    isKannada = (lang.code == "kn")
+                    showLanguageDialog = false
+                },
+                onDismiss = { showLanguageDialog = false }
+            )
+        }
     }
 }
 
@@ -625,7 +635,6 @@ private fun SoilPhoneEntryCard(
     onPhoneChange: (String) -> Unit,
     isLoading: Boolean,
     errorMessage: String?,
-    onDemoSelect: (String) -> Unit,
     onContinue: () -> Unit
 ) {
     Card(
@@ -752,66 +761,8 @@ private fun SoilPhoneEntryCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
-
-            // Quick Demo Selectors
-            HorizontalDivider(color = SoilDeepEarth.copy(alpha = 0.1f))
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = if (isKannada) "ಪರಿಶೀಲನೆಗಾಗಿ ಡೆಮೊ ಸಂಖ್ಯೆಗಳು:" else "Quick Tap Demo Farmers:",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = SoilDeepEarth.copy(alpha = 0.65f)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                SoilDemoChip(
-                    label = "9845012345\n(Manjunatha)",
-                    onClick = { onDemoSelect("9845012345") },
-                    modifier = Modifier.weight(1f)
-                )
-                SoilDemoChip(
-                    label = "9845012346\n(Venkatamma)",
-                    onClick = { onDemoSelect("9845012346") },
-                    modifier = Modifier.weight(1f)
-                )
-                SoilDemoChip(
-                    label = "9900011222\n(New Farmer)",
-                    onClick = { onDemoSelect("9900011222") },
-                    modifier = Modifier.weight(1f)
-                )
-            }
+            Spacer(modifier = Modifier.height(10.dp))
         }
-    }
-}
-
-@Composable
-private fun SoilDemoChip(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = SoilFreshLeaf.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.35f)),
-        modifier = modifier.clickable { onClick() }
-    ) {
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            textAlign = TextAlign.Center,
-            fontWeight = FontWeight.SemiBold,
-            color = SoilDeepEarth,
-            lineHeight = 14.sp,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
-        )
     }
 }
 
@@ -1006,7 +957,7 @@ private fun SoilMpinEntryCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = if (isKannada) "ಡೆಮೊ ಸುಳಿವು: MPIN '1234' ಬಳಸಿ" else "Demo Hint: Use MPIN '1234'",
+                text = if (isKannada) "ರಕ್ಷಿತ ಲಾಗಿನ್ • ನಿಮ್ಮ 4-ಅಂಕಿಯ ರಹಸ್ಯ MPIN ನಮೂದಿಸಿ" else "Secure Login • Enter your 4-digit secret MPIN",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = SoilDeepEarth.copy(alpha = 0.6f)

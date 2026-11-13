@@ -20,3 +20,5 @@ scratch_page.html
 test.csv
 .direnv/
 .envrc
+.kotlin/
+*.hprof

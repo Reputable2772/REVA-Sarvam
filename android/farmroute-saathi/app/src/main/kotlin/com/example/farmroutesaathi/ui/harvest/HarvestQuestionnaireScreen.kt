@@ -1,6 +1,10 @@
 package com.example.farmroutesaathi.ui.harvest
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.widget.Toast
+import java.util.Calendar
+import java.util.Locale
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -63,6 +67,35 @@ fun HarvestQuestionnaireScreen(
     val context = LocalContext.current
     val voiceRecorder = remember { VoiceRecorder(context) }
     val farmer = UserSession.currentFarmer
+    val calendar = remember { Calendar.getInstance() }
+
+    fun showDatePicker(onDateSelected: (String) -> Unit) {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val formatted = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                onDateSelected(formatted)
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    fun showTimePicker(onTimeSelected: (String) -> Unit) {
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val amPm = if (hourOfDay < 12) "AM" else "PM"
+                val hour12 = if (hourOfDay == 0) 12 else if (hourOfDay > 12) hourOfDay - 12 else hourOfDay
+                val formatted = String.format(Locale.US, "%02d:%02d %s", hour12, minute, amPm)
+                onTimeSelected(formatted)
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            false
+        ).show()
+    }
 
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
@@ -344,21 +377,28 @@ fun HarvestQuestionnaireScreen(
                 ),
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(18.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("🎙️", fontSize = 20.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (isKannada) "ಸರ್ವಂ ಧ್ವನಿ ಸಹಾಯಕ (STT)" else "Sarvam Voice STT Assistant",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp,
-                                color = ForestGreenDeep
-                            )
+                            Text("🎙️", fontSize = 22.sp)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್ ಧ್ವನಿ ಸಹಾಯಕ" else "FarmRoute Voice Assistant",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    color = ForestGreenDeep
+                                )
+                                Text(
+                                    text = if (isKannada) "ನಿಮ್ಮ ಕೊಯ್ಲಿನ ವಿವರಗಳನ್ನು ಮಾತನಾಡಿ" else "Speak Your Harvest Details",
+                                    fontSize = 11.5.sp,
+                                    color = Color.Gray
+                                )
+                            }
                         }
 
                         Surface(
@@ -366,16 +406,16 @@ fun HarvestQuestionnaireScreen(
                             color = FreshLeafGreen.copy(alpha = 0.15f)
                         ) {
                             Text(
-                                text = "SARVAM SAARAS v4",
-                                fontSize = 9.sp,
+                                text = "SARVAM AI",
+                                fontSize = 9.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = ForestGreenDeep,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // Voice Recording Hardware Button (Records audio file and sends to Sarvam STT)
                     Surface(
@@ -400,24 +440,24 @@ fun HarvestQuestionnaireScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 12.dp, horizontal = 14.dp),
+                                .padding(vertical = 14.dp, horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
                                 if (isRecordingAudio) "🔴" else if (isUploadingAudio) "⏳" else "🎙️",
-                                fontSize = 20.sp
+                                fontSize = 22.sp
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = when {
                                     isRecordingAudio -> if (isKannada) "ರೆಕಾರ್ಡ್ ಆಗುತ್ತಿದೆ... ನಿಲ್ಲಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Recording Audio... Tap to Stop & Send"
-                                    isUploadingAudio -> if (isKannada) "ಸರ್ವಂ AI ವಿಶ್ಲೇಷಿಸುತ್ತಿದೆ..." else "Sarvam AI Analyzing Audio..."
-                                    else -> if (isKannada) "ಧ್ವನಿ ರೆಕಾರ್ಡ್ ಮಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap to Record & Send Audio to Sarvam"
+                                    isUploadingAudio -> if (isKannada) "ಧ್ವನಿ ವಿಶ್ಲೇಷಿಸಲಾಗುತ್ತಿದೆ..." else "Sarvam AI Analyzing Audio..."
+                                    else -> if (isKannada) "ಧ್ವನಿ ಮೂಲಕ ಮಾತನಾಡಲು ಟ್ಯಾಪ್ ಮಾಡಿ" else "Tap to Speak Harvest Details"
                                 },
                                 fontWeight = FontWeight.Bold,
                                 color = if (isRecordingAudio) Color(0xFFDC2626) else ForestGreenDeep,
-                                fontSize = 13.sp
+                                fontSize = 14.sp
                             )
                         }
                     }
@@ -434,7 +474,7 @@ fun HarvestQuestionnaireScreen(
 
                     // Spoken Feedback Banner
                     if (voiceFeedback != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = ForestGreenDeep.copy(alpha = 0.08f),
@@ -445,13 +485,13 @@ fun HarvestQuestionnaireScreen(
                                 color = ForestGreenDeep,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             )
                         }
                     }
 
-                    // Editable Spoken Transcript / Text input bar
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // Enlarged Editable Spoken Transcript / Text input bar
+                    Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = voiceTranscriptInput,
                         onValueChange = { input ->
@@ -465,77 +505,32 @@ fun HarvestQuestionnaireScreen(
                         },
                         label = {
                             Text(
-                                if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ (ಸಂಪಾದಿಸಿ ಅಥವಾ ಬರೆಯಿರಿ)" else "Voice Transcript / Custom Input",
-                                fontSize = 11.sp
+                                if (isKannada) "ಧ್ವನಿ ಪಠ್ಯ ಅಥವಾ ವಿವರಗಳು" else "Harvest Details Transcript",
+                                fontSize = 12.sp
                             )
                         },
                         placeholder = {
                             Text(
-                                if (isKannada) "ಉದಾ: ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ..."
-                                else "e.g. Harvested 250 kg tomato today at 7 AM...",
-                                fontSize = 11.sp
+                                if (isKannada) "ನಿಮ್ಮ ಕೊಯ್ಲು ವಿವರಗಳನ್ನು ಇಲ್ಲಿ ಮಾತನಾಡಿ ಅಥವಾ ಬರೆಯಿರಿ..."
+                                else "Speak or type your harvest details here...",
+                                fontSize = 12.sp
                             )
                         },
                         trailingIcon = {
                             IconButton(onClick = {
                                 if (voiceTranscriptInput.isNotBlank()) processSpeechInput(voiceTranscriptInput)
                             }) {
-                                Text("⚡", fontSize = 18.sp)
+                                Text("⚡", fontSize = 20.sp)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 80.dp),
                         shape = RoundedCornerShape(12.dp),
-                        singleLine = true
+                        maxLines = 3
                     )
-
-                    // Quick Voice Test Phrases
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = if (isKannada) "ಮಾದರಿ ಧ್ವನಿ ಆಜ್ಞೆಗಳು (ಪರೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ):" else "Sample Voice Commands (tap to test Sarvam STT):",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        AssistChip(
-                            onClick = {
-                                val phrase = if (isKannada)
-                                    "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
-                                else
-                                    "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
-                                processSpeechInput(phrase)
-                            },
-                            label = { Text(if (isKannada) "🍅 250 ಕೆಜಿ ಟೊಮೆಟೊ" else "🍅 250kg Tomato", fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        AssistChip(
-                            onClick = {
-                                val phrase = if (isKannada)
-                                    "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 6:30 ಕ್ಕೆ 300 ಕೆಜಿ ಈರುಳ್ಳಿ ಕೊಯ್ಲು ಮಾಡಿದೆ, ನಾಳೆ ಮಾರಾಟ"
-                                else
-                                    "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
-                                processSpeechInput(phrase)
-                            },
-                            label = { Text(if (isKannada) "🧅 300 ಕೆಜಿ ಈರುಳ್ಳಿ" else "🧅 300kg Onion", fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        AssistChip(
-                            onClick = {
-                                val phrase = if (isKannada)
-                                    "500 ಕೆಜಿ ಆಲೂಗಡ್ಡೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ, ಶೀತಲ ಶೇಖರಣೆ ಮಾಡಬೇಕು"
-                                else
-                                    "500 kg potato harvested, send to cold storage do not sell immediately"
-                                processSpeechInput(phrase)
-                            },
-                            label = { Text(if (isKannada) "❄️ ಶೀತಲ ಶೇಖರಣೆ" else "❄️ Cold Storage", fontSize = 10.sp) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
+            }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -604,10 +599,21 @@ fun HarvestQuestionnaireScreen(
                     OutlinedTextField(
                         value = harvestDate,
                         onValueChange = { harvestDate = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showDatePicker { harvestDate = it } },
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
-                        leadingIcon = { Text("📅") }
+                        leadingIcon = {
+                            IconButton(onClick = { showDatePicker { harvestDate = it } }) {
+                                Text("📅", fontSize = 18.sp)
+                            }
+                        },
+                        trailingIcon = {
+                            TextButton(onClick = { showDatePicker { harvestDate = it } }) {
+                                Text(if (isKannada) "ಕ್ಯಾಲೆಂಡರ್" else "Pick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -638,10 +644,21 @@ fun HarvestQuestionnaireScreen(
                     OutlinedTextField(
                         value = harvestTime,
                         onValueChange = { harvestTime = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTimePicker { harvestTime = it } },
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true,
-                        leadingIcon = { Text("⏰") }
+                        leadingIcon = {
+                            IconButton(onClick = { showTimePicker { harvestTime = it } }) {
+                                Text("⏰", fontSize = 18.sp)
+                            }
+                        },
+                        trailingIcon = {
+                            TextButton(onClick = { showTimePicker { harvestTime = it } }) {
+                                Text(if (isKannada) "ಗಡಿಯಾರ" else "Pick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -825,7 +842,7 @@ fun HarvestQuestionnaireScreen(
                                 Text("🏠", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (isKannada) "ಹೌದು, ಸಂಗ್ರಹವಿದೆ" else "Yes, I have storage",
+                                    text = if (isKannada) "ಹೌದು, ನನ್ನ ಬಳಿ ದಾಸ್ತಾನು ಇದೆ" else "Yes, I have storage",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (hasStorageAccess) Color.White else Color.Black
@@ -853,7 +870,7 @@ fun HarvestQuestionnaireScreen(
                                 Text("❄️", fontSize = 20.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (isKannada) "ಇಲ್ಲ, ಶೀತಲಾಗಾರ ಬೇಕು" else "No, need Storage",
+                                    text = if (isKannada) "ಇಲ್ಲ, ನನಗೆ ಶೀತಲಾಗಾರ ಬೇಕು" else "No, I need storage",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = if (!hasStorageAccess) Color.White else Color.Black

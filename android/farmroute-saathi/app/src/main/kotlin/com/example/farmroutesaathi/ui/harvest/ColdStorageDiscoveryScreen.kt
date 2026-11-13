@@ -86,7 +86,7 @@ fun ColdStorageDiscoveryScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var isKannada by remember { mutableStateOf(false) }
+    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
     var selectedRadiusKm by remember { mutableStateOf(50.0) }
     var isLoading by remember { mutableStateOf(true) }
     var facilities by remember { mutableStateOf<List<ColdStorageItem>>(emptyList()) }

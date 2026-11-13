@@ -26,34 +26,37 @@ import com.example.farmroutesaathi.ui.theme.*
 fun KisanTopBar(
     isKannada: Boolean,
     isDarkTheme: Boolean,
-    backendStatus: String,
+    backendStatus: String = "",
     onLanguageToggle: () -> Unit,
     onThemeToggle: () -> Unit,
     onLogout: (() -> Unit)? = null,
     onHarvestClick: (() -> Unit)? = null,
     onVoiceAssistantClick: (() -> Unit)? = null,
+    onNavigate: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var showInternalVoiceDialog by remember { mutableStateOf(false) }
+    var showNotificationDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     val gradientBrush = if (isDarkTheme) {
-        Brush.horizontalGradient(listOf(ForestGreenDeep, Color(0xFF163824), OledBackgroundDark))
+        Brush.horizontalGradient(listOf(SoilDeepEarth, Color(0xFF1F2F26), OledBackgroundDark))
     } else {
-        Brush.horizontalGradient(listOf(ForestGreenDeep, ForestGreenPrimary, FreshLeafGreen))
+        Brush.horizontalGradient(listOf(SoilDeepEarth, SoilCropGreen, ForestGreenPrimary))
     }
 
     val currentFarmer = UserSession.currentFarmer
-    val activeHarvest = UserSession.activeHarvest
     val activeHarvestId = UserSession.activeHarvestId
+    val unreadCount = UserSession.unreadNotificationCount
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .shadow(
                 elevation = 6.dp,
-                shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp)
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
             ),
-        shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+        shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
         color = Color.Transparent
     ) {
         Column(
@@ -63,13 +66,15 @@ fun KisanTopBar(
                 .statusBarsPadding()
                 .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 12.dp)
         ) {
-            // Main Branding & Top-Right Interactive Actions
+            // ================================================================
+            // ROW 1: BRANDING (LEFT) & INTERACTIVE CONTROLS (RIGHT)
+            // ================================================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // App Logo Badge & Titles
+                // Left: Agricultural Brand & Tagline
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
@@ -81,72 +86,72 @@ fun KisanTopBar(
                         modifier = Modifier.size(38.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = "🌱", fontSize = 18.sp)
+                            Text(text = "🌾", fontSize = 20.sp)
                         }
                     }
 
                     Column {
-                        AnimatedContent(
-                            targetState = isKannada,
-                            transitionSpec = { fadeIn(tween(250)) togetherWith fadeOut(tween(200)) },
-                            label = "TitleAnimation"
-                        ) { kn ->
-                            Text(
-                                text = if (kn) "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ" else "FarmRoute Saathi",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.2.sp
-                            )
-                        }
                         Text(
-                            text = if (isKannada) "ರೈತ-ಮೊದಲ ಲಿವಿಂಗ್ ಇಂಟೆಲಿಜೆನ್ಸ್" else "Living Intelligence Virtual FPO",
+                            text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ" else "FarmRoute Saathi",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.3.sp
+                        )
+                        Text(
+                            text = if (isKannada) "ಮಣ್ಣಿನಿಂದ ಮಾರುಕಟ್ಟೆಗೆ • From Soil to Market" else "FROM SOIL TO MARKET",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 10.sp
+                            color = SoilHarvestGold,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                // ==========================================
-                // TOP RIGHT ACTION GROUP (HARVEST ID + VOICE + LANG + THEME)
-                // ==========================================
+                // Right: Action Group (Notification + Voice + Theme + Language)
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // UNIQUE HARVEST ID BADGE (PROMINENT TOP-RIGHT)
+                    // 1. Notification Center Bell with Badge
                     Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = HarvestGold,
-                        shadowElevation = 3.dp,
-                        border = BorderStroke(1.dp, Color(0xFFB45309)),
+                        shape = CircleShape,
+                        color = Color.White.copy(alpha = 0.18f),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.28f)),
                         modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .clickable { onHarvestClick?.invoke() }
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable { showNotificationDialog = true }
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        ) {
-                            Text("🌾", fontSize = 11.sp)
-                            Text(
-                                text = activeHarvestId,
-                                color = ForestGreenDeep,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🔔", fontSize = 15.sp)
+                            if (unreadCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 2.dp, end = 2.dp)
+                                        .size(14.dp)
+                                        .background(Color(0xFFE53935), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = if (unreadCount > 9) "9+" else unreadCount.toString(),
+                                        color = Color.White,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                            }
                         }
                     }
 
-                    // UNIVERSAL SARVAM STT MIC BUTTON
+                    // 2. Voice Assistant Shortcut
                     Surface(
                         shape = CircleShape,
-                        color = HarvestGold,
+                        color = SoilHarvestGold,
                         shadowElevation = 3.dp,
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .clickable {
                                 if (onVoiceAssistantClick != null) {
@@ -161,12 +166,12 @@ fun KisanTopBar(
                         }
                     }
 
-                    // Theme Switch Pill
+                    // 3. Theme Toggle Button
                     Surface(
                         shape = CircleShape,
-                        color = Color.White.copy(alpha = 0.20f),
+                        color = Color.White.copy(alpha = 0.18f),
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .clickable { onThemeToggle() }
                     ) {
@@ -178,131 +183,130 @@ fun KisanTopBar(
                         }
                     }
 
-                    // High-Visibility Language Switcher Pill
+                    // 4. Dynamic Language Selector Pill
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = Color.White.copy(alpha = 0.22f),
                         border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
                         modifier = Modifier
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { onLanguageToggle() }
+                            .clickable { showLanguageDialog = true }
                     ) {
-                        Text(
-                            text = if (isKannada) "KN" else "EN",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Sub-bar: Server Status Pill & Active Harvest Lot Brief
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Live backend connectivity badge
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.Black.copy(alpha = 0.28f)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(Color(0xFF4ADE80), CircleShape)
-                        )
-                        Text(
-                            text = backendStatus,
-                            fontSize = 10.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                // Active Harvest Declaration Summary Chip
-                if (activeHarvest != null) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.30f)),
-                        modifier = Modifier.clickable { onHarvestClick?.invoke() }
-                    ) {
-                        Text(
-                            text = "${activeHarvest.crop} (${activeHarvest.quantityKg.toInt()}kg) • ${if (activeHarvest.sellImmediately) "⚡ Immediate" else "❄️ Cold Storage"}",
-                            color = HarvestGold,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                } else {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
-                    ) {
-                        Text(
-                            text = "SIMULATED PROTOTYPE",
-                            color = HarvestGold,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-            }
-
-            // Farmer Profile & Logout Row (if logged in)
-            if (currentFarmer != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.White.copy(alpha = 0.14f)
-                    ) {
-                        Text(
-                            text = "👤 ${currentFarmer.name} (${currentFarmer.district})",
-                            fontSize = 10.sp,
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
-                        )
-                    }
-
-                    if (onLogout != null) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFFEF4444).copy(alpha = 0.25f),
-                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
-                            modifier = Modifier.clickable { onLogout() }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
                         ) {
+                            Text("🌐 ", fontSize = 10.sp)
                             Text(
-                                text = if (isKannada) "🚪 ನಿರ್ಗಮಿಸಿ" else "🚪 Logout",
-                                fontSize = 10.sp,
+                                text = UserSession.selectedLanguage.code.uppercase(),
                                 color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // ================================================================
+            // ROW 2: FARMER IDENTITY, ACTIVE HARVEST ID & LOGOUT ACTION
+            // ================================================================
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Farmer Name & Location + Harvest ID Badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    // Farmer Name Badge
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.16f)
+                    ) {
+                        Text(
+                            text = if (currentFarmer != null)
+                                "👤 ${currentFarmer.name} (${currentFarmer.district})"
+                            else
+                                "👤 Farmer Hub",
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+
+                    // Active Harvest ID Badge
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = SoilHarvestGold,
+                        border = BorderStroke(1.dp, Color(0xFFB45309)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onHarvestClick?.invoke() }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("🌾", fontSize = 10.sp)
+                            Text(
+                                text = activeHarvestId,
+                                color = SoilDeepEarth,
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }
+
+                // Right: Logout Button
+                if (onLogout != null) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color(0xFFEF4444).copy(alpha = 0.28f),
+                        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.55f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { onLogout() }
+                    ) {
+                        Text(
+                            text = if (isKannada) "🚪 ನಿರ್ಗಮಿಸಿ" else "🚪 Logout",
+                            fontSize = 10.5.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    // Dynamic Language Selection Dialog
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = {
+                showLanguageDialog = false
+                onLanguageToggle()
+            }
+        )
+    }
+
+    // Notification Center Dialog
+    if (showNotificationDialog) {
+        NotificationCenterDialog(
+            isKannada = isKannada,
+            onDismiss = { showNotificationDialog = false },
+            onNavigate = onNavigate
+        )
     }
 
     // App-Wide Voice Assistant Dialog
