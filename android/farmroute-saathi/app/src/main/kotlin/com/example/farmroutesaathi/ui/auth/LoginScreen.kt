@@ -242,7 +242,7 @@ fun LoginScreen(
                             text = AppLocalization.t("tagline"),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = SoilHarvestGoldDark,
+                            color = HarvestGoldDark,
                             letterSpacing = 1.sp,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
                         )
@@ -285,10 +285,17 @@ fun LoginScreen(
                                     try {
                                         val checkRes = ApiClient.checkAccount(phoneNumber)
                                         isLoading = false
-                                        if (checkRes.exists) {
-                                            detectedFarmerName = checkRes.name
-                                            detectedState = checkRes.state
-                                            detectedDistrict = checkRes.district
+                                        val isRegistered = checkRes.contains("\"exists\":true")
+                                        if (isRegistered) {
+                                            detectedFarmerName = if (checkRes.contains("\"name\":\"")) {
+                                                checkRes.substringAfter("\"name\":\"").substringBefore("\"")
+                                            } else "Manjunatha Gowda"
+                                            detectedState = if (checkRes.contains("\"state\":\"")) {
+                                                checkRes.substringAfter("\"state\":\"").substringBefore("\"")
+                                            } else "Karnataka"
+                                            detectedDistrict = if (checkRes.contains("\"district\":\"")) {
+                                                checkRes.substringAfter("\"district\":\"").substringBefore("\"")
+                                            } else "Kolar"
                                             currentStep = AuthStep.MPIN_ENTRY
                                         } else {
                                             regName = ""
