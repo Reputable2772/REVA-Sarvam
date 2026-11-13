@@ -35,6 +35,7 @@ enum class RoleTab(val labelEn: String, val labelKn: String, val icon: String) {
 @Composable
 fun MainScreen(
     onItemClick: (NavKey) -> Unit = {},
+    onLogout: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var isKannada by remember { mutableStateOf(false) }
@@ -59,7 +60,8 @@ fun MainScreen(
                     isDarkTheme = isDarkTheme,
                     backendStatus = backendStatus,
                     onLanguageToggle = { isKannada = !isKannada },
-                    onThemeToggle = { isDarkTheme = !isDarkTheme }
+                    onThemeToggle = { isDarkTheme = !isDarkTheme },
+                    onLogout = onLogout
                 )
             },
             floatingActionButton = {

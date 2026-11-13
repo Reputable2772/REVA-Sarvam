@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
 
 @Composable
@@ -28,6 +29,7 @@ fun KisanTopBar(
     backendStatus: String,
     onLanguageToggle: () -> Unit,
     onThemeToggle: () -> Unit,
+    onLogout: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val gradientBrush = if (isDarkTheme) {
@@ -35,6 +37,8 @@ fun KisanTopBar(
     } else {
         Brush.horizontalGradient(listOf(ForestGreenDeep, ForestGreenPrimary, FreshLeafGreen))
     }
+
+    val currentFarmer = UserSession.currentFarmer
 
     Surface(
         modifier = modifier
@@ -148,7 +152,7 @@ fun KisanTopBar(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Sub-bar: Server Status Pill & Simulated Prototype Disclaimer
+            // Sub-bar: Server Status Pill & Farmer Session / Logout
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,6 +196,50 @@ fun KisanTopBar(
                         letterSpacing = 0.5.sp,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
+                }
+            }
+
+            // Farmer Profile & Logout Row (if logged in)
+            if (currentFarmer != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White.copy(alpha = 0.14f)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "👤 ${currentFarmer.name} (${currentFarmer.district})",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    if (onLogout != null) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = Color(0xFFEF4444).copy(alpha = 0.25f),
+                            border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f)),
+                            modifier = Modifier.clickable { onLogout() }
+                        ) {
+                            Text(
+                                text = if (isKannada) "🚪 ನಿರ್ಗಮಿಸಿ" else "🚪 Logout",
+                                fontSize = 11.sp,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
                 }
             }
         }

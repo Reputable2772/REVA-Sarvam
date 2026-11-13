@@ -1,26 +1,40 @@
 package com.example.farmroutesaathi
 
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
+import com.example.farmroutesaathi.data.UserSession
+import com.example.farmroutesaathi.ui.auth.LoginScreen
 import com.example.farmroutesaathi.ui.main.MainScreen
 
 @Composable
 fun MainNavigation() {
-  val backStack = rememberNavBackStack(Main)
+  val initialKey = if (UserSession.isLoggedIn) Main else Login
+  val backStack = rememberNavBackStack(initialKey)
 
   NavDisplay(
     backStack = backStack,
     onBack = { backStack.removeLastOrNull() },
     entryProvider =
       entryProvider {
+        entry<Login> {
+          LoginScreen(
+            onLoginSuccess = {
+              backStack.clear()
+              backStack.add(Main)
+            }
+          )
+        }
         entry<Main> {
-          MainScreen(onItemClick = { navKey -> backStack.add(navKey) })
+          MainScreen(
+            onItemClick = { navKey -> backStack.add(navKey) },
+            onLogout = {
+              UserSession.logout()
+              backStack.clear()
+              backStack.add(Login)
+            }
+          )
         }
       },
   )
