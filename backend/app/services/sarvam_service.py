@@ -572,6 +572,10 @@ class SarvamService:
             action = "NAVIGATE_COLD_STORAGE"
             msg_en = "Opening Cold Storage Facility Discovery."
             msg_kn = "ಶೀತಲ ಶೇಖರಣಾ ಸೌಲಭ್ಯಗಳ ವಿಭಾಗವನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
+        elif re.search(r"scheme|benefit|subsidy|grant|insurance|ಯೋಜನೆ|ಸಬ್ಸಿಡಿ|ಅನುದಾನ|ಸೌಲಭ್ಯ|ವಿಮೆ|fruits|pm kisan|raitha siri|enam", text, re.IGNORECASE):
+            action = "NAVIGATE_SCHEMES"
+            msg_en = "Opening AI Government Schemes & Opportunities Intelligence."
+            msg_kn = "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು ಮತ್ತು ಸೌಲಭ್ಯಗಳ ವಿಭಾಗವನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
         elif re.search(r"reset|ಮರುಹೊಂದಿಸಿ", text, re.IGNORECASE):
             action = "DEMO_RESET"
             msg_en = "Resetting demo scenario to baseline."
@@ -653,4 +657,142 @@ class SarvamService:
             "language_code": language_code,
             "recommended_mandi": rec_name,
             "trap_mandi": (trap.get("mandi_name") or trap.get("market")) if trap else None
+        }
+
+    @classmethod
+    def answer_scheme_query(
+        cls,
+        query_text: str,
+        farmer_id: Optional[str] = None,
+        language_code: str = "kn-IN",
+        db: Optional[Any] = None
+    ) -> Dict[str, Any]:
+        """
+        Factual, grounded AI Assistant answering farmer questions about Government Schemes,
+        Subsidies, FPO opportunities, and e-NAM.
+        Never guarantees approval; references official government portals.
+        """
+        is_kn = "kn" in language_code.lower() or any("\u0C80" <= c <= "\u0CFF" for c in query_text)
+        query_lower = query_text.lower()
+
+        # Load verified schemes
+        from backend.app.models.scheme_models import Scheme
+        from backend.app.services.scheme_matching_service import SchemeMatchingService
+
+        schemes = []
+        matches = []
+        if db:
+            schemes = db.query(Scheme).all()
+            if farmer_id:
+                matches = SchemeMatchingService.evaluate_farmer_opportunities(farmer_id, db)
+
+        # Factual grounded response matching
+        if re.search(r"fpo|producer company|ಸಂಸ್ಥೆ|ಎಫ್‌ಪಿಒ|ಗುಂಪು", query_lower):
+            if is_kn:
+                ans = (
+                    "FPO (ರೈತ ಉತ್ಪಾದಕ ಸಂಸ್ಥೆ) ರೈತರ ಒಕ್ಕೂಟವಾಗಿದೆ. SFAC ಮತ್ತು ನಬಾರ್ಡ್ ಯೋಜನೆ ಅಡಿಯಲ್ಲಿ, "
+                    "ಕನಿಷ್ಠ 300 ರೈತರು ಸೇರಿ FPO ರಚಿಸಿದರೆ ₹15 ಲಕ್ಷದವರೆಗೆ ಈಕ್ವಿಟಿ ಅನುದಾನ ಮತ್ತು ₹2 ಕೋಟಿ ಸಾಲ ಖಾತರಿ ಸಿಗುತ್ತದೆ. "
+                    "ನೆನಪಿಡಿ: ಈ ಅನುದಾನವು FPO ಸಂಸ್ಥೆಗೆ ಮಾತ್ರ ಸಿಗುತ್ತದೆ, ವೈಯಕ್ತಿಕ ರೈತರ ಖಾತೆಗೆ ನೇರವಾಗಿ ಜಮೆಯಾಗುವುದಿಲ್ಲ. "
+                    "ಅಧಿಕೃತ ವೆಬ್‌ಸೈಟ್: sfacindia.com, ಸಹಾಯವಾಣಿ: 1800 270 0224."
+                )
+            else:
+                ans = (
+                    "Under the Central Sector Scheme for 10,000 FPOs (SFAC / NABARD), an FPO with at least 300 farmer "
+                    "members can receive up to ₹15 Lakhs matching Equity Grant and ₹2 Crore Credit Guarantee. "
+                    "IMPORTANT NOTE: This grant is paid to the registered FPO company for collective infrastructure, "
+                    "NOT directly to individual farmers. Official portal: sfacindia.com (Helpline: 1800 270 0224)."
+                )
+            scheme_id = "SCHEME-SFAC-10K-FPO"
+
+        elif re.search(r"raitha siri|millet|ಸಿರಿ|ರೈತ ಸಿರಿ|ತೋಟಗಾರಿಕೆ|fruits", query_lower):
+            if is_kn:
+                ans = (
+                    "ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ ಯೋಜನೆಯಡಿ, ಸಿರಿಧಾನ್ಯ ಮತ್ತು ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಾರರಿಗೆ ಹೆಕ್ಟೇರ್‌ಗೆ ₹10,000 (ಗರಿಷ್ಠ 2 ಹೆಕ್ಟೇರ್‌ಗೆ ₹20,000) "
+                    "ಪ್ರೋತ್ಸಾಹಧನ ಸಿಗುತ್ತದೆ. ಇದಕ್ಕೆ ನಿಮ್ಮ ಭೂಮಿಯನ್ನು ಫ್ರೂಟ್ಸ್ (FRUITS) ಪೋರ್ಟಲ್‌ನಲ್ಲಿ ನೋಂದಾಯಿಸಿ FID ಸಂಖ್ಯೆ ಹೊಂದಿರಬೇಕು. "
+                    "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಪಹಣಿ/RTC, ಆಧಾರ್, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್. ನಿಮ್ಮ ಸಮೀಪದ ರೈತ ಸಂಪರ್ಕ ಕೇಂದ್ರಕ್ಕೆ (RSK) ಭೇಟಿ ನೀಡಿ. "
+                    "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: fruits.karnataka.gov.in."
+                )
+            else:
+                ans = (
+                    "Under Karnataka Raitha Siri Scheme, horticulture & millet growers receive ₹10,000 per hectare "
+                    "(up to 2 hectares = ₹20,000) directly via DBT. You must be registered on the Karnataka FRUITS portal "
+                    "with a valid FID. Required documents: RTC/Pahani, Aadhaar, and bank passbook. "
+                    "Apply or update at your nearest Raitha Samparka Kendra (RSK) or visit fruits.karnataka.gov.in."
+                )
+            scheme_id = "SCHEME-KA-RAITHA-SIRI"
+
+        elif re.search(r"pm kisan|kisan|ಸಮ್ಮಾನ್|ಆದಾಯ|6000", query_lower):
+            if is_kn:
+                ans = (
+                    "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ (PM-KISAN) ಯೋಜನೆಯಡಿ, ಸಾಗುವಳಿ ಭೂಮಿ ಹೊಂದಿರುವ ಅರ್ಹ ರೈತ ಕುಟುಂಬಗಳಿಗೆ "
+                    "ವರ್ಷಕ್ಕೆ ₹6,000 ಆದಾಯ ಬೆಂಬಲ ಸಿಗುತ್ತದೆ (ತಲಾ ₹2,000 ರ 3 ಕಂತುಗಳಲ್ಲಿ). "
+                    "ನಿಮ್ಮ ಆಧಾರ್ ಸಂಖ್ಯೆಗೆ e-KYC ಪೂರ್ಣಗೊಂಡಿರಬೇಕು ಮತ್ತು ಬ್ಯಾಂಕ್ ಖಾತೆ ಆಧಾರ್‌ಗೆ ಲಿಂಕ್ ಆಗಿರಬೇಕು. "
+                    "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: pmkisan.gov.in, ಸಹಾಯವಾಣಿ: 155261."
+                )
+            else:
+                ans = (
+                    "PM-KISAN provides ₹6,000 per year in three installments of ₹2,000 each directly to cultivable "
+                    "landholding farmer families. Requires completed biometric/facial e-KYC and Aadhaar-seeded bank account. "
+                    "Official portal: pmkisan.gov.in (Helpline: 155261)."
+                )
+            scheme_id = "SCHEME-PM-KISAN"
+
+        elif re.search(r"insurance|fasal bima|samrakshane|ವಿಮೆ|ಫಸಲ್ ಬಿಮಾ|ಸಂರಕ್ಷಣೆ|ನಷ್ಟ", query_lower):
+            if is_kn:
+                ans = (
+                    "ಪ್ರಧಾನ ಮಂತ್ರಿ ಫಸಲ್ ಬಿಮಾ (ಸಂರಕ್ಷಣೆ ಕರ್ನಾಟಕ) ಯೋಜನೆಯಡಿ ಬೆಳೆ ಹಾನಿಗೆ ಸಮಗ್ರ ವಿಮಾ ರಕ್ಷಣೆ ಸಿಗುತ್ತದೆ. "
+                    "ಟೊಮೆಟೊ, ಈರುಳ್ಳಿ ಮುಂತಾದ ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಳಿಗೆ ರೈತರು ಕೇವಲ 5% ಪ್ರೀಮಿಯಂ ಪಾವತಿಸಬೇಕು. "
+                    "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಜಮೀನಿನ ಪಹಣಿ (RTC), ಬಿತ್ತನೆ ದೃಢೀಕರಣ ಪತ್ರ, ಆಧಾರ್. "
+                    "ನಿಮ್ಮ ತಾಲೂಕಿನ ಬೆಳೆ ಕಟ್-ಆಫ್ ದಿನಾಂಕವನ್ನು samrakshane.karnataka.gov.in ನಲ್ಲಿ ಪರಿಶೀಲಿಸಿ."
+                )
+            else:
+                ans = (
+                    "PM Fasal Bima Yojana / Samrakshane Karnataka covers natural crop losses from pre-sowing to post-harvest. "
+                    "For commercial and horticulture crops like Tomato and Onion, farmers pay only 5% nominal premium. "
+                    "Check cut-off dates and submit RTC and sowing certificate at your nearest CSC or bank branch. "
+                    "Portal: samrakshane.karnataka.gov.in (Helpline: 080-22180800)."
+                )
+            scheme_id = "SCHEME-PMFBY-SAMRAKSHANE"
+
+        elif re.search(r"enam|e-nam|ಮಾರುಕಟ್ಟೆ|ಆನ್‌ಲೈನ್ ಮಾರಾಟ|trading|bidding", query_lower):
+            if is_kn:
+                ans = (
+                    "e-NAM (ರಾಷ್ಟ್ರೀಯ ಕೃಷಿ ಮಾರುಕಟ್ಟೆ) ಮೂಲಕ ನೀವು ಕೋಲಾರ ಅಥವಾ ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿಗೆ ತರುವ ಬೆಳೆಯನ್ನು "
+                    "ದೇಶಾದ್ಯಂತದ ವ್ಯಾಪಾರಿಗಳು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸ್ಪರ್ಧಾತ್ಮಕ ದರಕ್ಕೆ ಬಿಡ್ ಮಾಡುತ್ತಾರೆ. "
+                    "ಯಾವುದೇ ಅನಧಿಕೃತ ಕಮಿಷನ್ ಕಡಿತವಿಲ್ಲ, ಸರಿಯಾದ ಎಲೆಕ್ಟ್ರಾನಿಕ್ ತೂಕ, ಮತ್ತು 24 ಗಂಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ನೇರ ಹಣ ಬರುತ್ತದೆ. "
+                    "ನೋಂದಣಿಗೆ ಆಧಾರ್ ಮತ್ತು ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್ ಸಾಕು. ಅಧಿಕೃತ ಪೋರ್ಟಲ್: enam.gov.in."
+                )
+            else:
+                ans = (
+                    "e-NAM provides pan-India electronic price discovery at integrated APMCs (like Kolar and Bangarpet). "
+                    "Produce is assayed for quality, and verified buyers bid electronically with zero unauthorized commission "
+                    "and direct online payment to your bank within 24 hours. "
+                    "Register free with Aadhaar and bank details at the APMC gate or on enam.gov.in."
+                )
+            scheme_id = "SCHEME-ENAM-DIRECT"
+
+        else:
+            if is_kn:
+                ans = (
+                    "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ ವಿವರ: 1. ಪಿಎಂ-ಕಿಸಾನ್ (₹6,000/ವರ್ಷ), 2. ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ (₹10,000/ಹೆಕ್ಟೇರ್ ತೋಟಗಾರಿಕೆ), "
+                    "3. ಸಂರಕ್ಷಣೆ ಬೆಳೆ ವಿಮೆ (5% ಪ್ರೀಮಿಯಂ), 4. ನಬಾರ್ಡ್ FPO ಅನುದಾನ (₹15 ಲಕ್ಷ ಸಂಸ್ಥೆಗೆ), "
+                    "5. e-NAM ನೇರ ಮಾರುಕಟ್ಟೆ. ನಿರ್ದಿಷ್ಟ ಯೋಜನೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಹೆಸರನ್ನು ಹೇಳಿ."
+                )
+            else:
+                ans = (
+                    "Available verified agricultural opportunities: 1. PM-KISAN (₹6,000/yr), "
+                    "2. Karnataka Raitha Siri (₹10,000/ha for horticulture), 3. Samrakshane Crop Insurance, "
+                    "4. SFAC/NABARD 10,000 FPO Scheme (₹15 Lakhs institutional equity grant), and 5. e-NAM Direct Trading. "
+                    "Ask about any specific scheme for step-by-step guidance."
+                )
+            scheme_id = None
+
+        tts_res = cls.synthesize_speech(ans, language_code)
+        return {
+            "query": query_text,
+            "answer": ans,
+            "language_code": language_code,
+            "scheme_id": scheme_id,
+            "audio_base64": tts_res.get("audio_base64", ""),
+            "disclaimer": "Factual guidance based strictly on verified government publications. Not a government approval or financial guarantee."
         }

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation3.runtime.NavKey
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.UserSession
+import com.example.farmroutesaathi.ui.benefits.FarmerBenefitsScreen
 import com.example.farmroutesaathi.ui.components.*
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.delay
@@ -89,6 +90,7 @@ fun MainScreen(
                             "MARKETPLACE" -> selectedTab = RoleTab.BUYER
                             "WEATHER" -> selectedTab = RoleTab.FARMER
                             "COLD_STORAGE" -> selectedTab = RoleTab.FARMER
+                            "NAVIGATE_SCHEMES", "SCHEMES", "BENEFITS" -> selectedTab = RoleTab.BENEFITS
                             "DEMO_RESET" -> {
                                 scope.launch {
                                     ApiClient.postDemoReset()
@@ -148,11 +150,12 @@ fun MainScreen(
                             RoleTab.FARMER -> FarmerDashboardView(
                                 isKannada = isKannada,
                                 onDeclareHarvestClick = onDeclareHarvestClick,
-                                onMandiComparisonClick = onMandiComparisonClick
+                                onMandiComparisonClick = onMandiComparisonClick,
+                                onViewBenefitsClick = { selectedTab = RoleTab.BENEFITS }
                             )
                             RoleTab.BUYER -> BuyerDashboardView(isKannada = isKannada)
                             RoleTab.OPERATOR -> OperatorCollectionCenterView(isKannada = isKannada)
-                            RoleTab.BENEFITS -> GovernmentBenefitsOpportunityView(isKannada = isKannada)
+                            RoleTab.BENEFITS -> FarmerBenefitsScreen(isKannada = isKannada)
                             RoleTab.DEMO -> DemoWorkflowInteractiveView(
                                 isKannada = isKannada,
                                 isLoading = isLoading,
@@ -191,7 +194,8 @@ fun MainScreen(
 fun FarmerDashboardView(
     isKannada: Boolean,
     onDeclareHarvestClick: (() -> Unit)? = null,
-    onMandiComparisonClick: ((String) -> Unit)? = null
+    onMandiComparisonClick: ((String) -> Unit)? = null,
+    onViewBenefitsClick: (() -> Unit)? = null
 ) {
     val currentLot = UserSession.activeHarvestId
     val farmerName = UserSession.currentFarmer?.name ?: "Manjunath Gowda"
@@ -312,6 +316,40 @@ fun FarmerDashboardView(
                                 fontWeight = FontWeight.Bold,
                                 color = ForestGreenDeep
                             )
+                        }
+                    }
+
+                    // Discover Govt Schemes Quick CTA
+                    Surface(
+                        color = HarvestGold.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onViewBenefitsClick?.invoke() }
+                            .padding(top = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("🏛️", fontSize = 14.sp)
+                                Column {
+                                    Text(
+                                        text = if (isKannada) "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು & ಸಬ್ಸಿಡಿಗಳು" else "Government Schemes & Subsidies",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        color = HarvestGoldDark
+                                    )
+                                    Text(
+                                        text = if (isKannada) "ಪಿಎಂ-ಕಿಸಾನ್, ರೈತ ಸಿರಿ (₹20,000), ಸಂರಕ್ಷಣೆ ವಿಮೆ ಲಭ್ಯ" else "PM-KISAN, Raitha Siri (₹20,000), PMFBY Crop Insurance",
+                                        fontSize = 9.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text("➔", color = HarvestGoldDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 }

@@ -274,3 +274,21 @@ def get_mandi_voice_explanation(
         "recommended_mandi": spoken_res.get("recommended_mandi"),
         "trap_mandi": spoken_res.get("trap_mandi")
     }
+
+class SchemeGuidanceRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    farmer_id: Optional[str] = "FARMER-01"
+    language_code: Optional[str] = "kn-IN"
+
+@router.post("/scheme-guidance")
+def get_scheme_guidance(req: SchemeGuidanceRequest, db: Session = Depends(get_db)):
+    """
+    Factual AI Saathi voice & text guidance for government schemes, subsidies,
+    FPO formation, and e-NAM trading.
+    """
+    return SarvamService.answer_scheme_query(
+        query_text=req.query,
+        farmer_id=req.farmer_id,
+        language_code=req.language_code or "kn-IN",
+        db=db
+    )

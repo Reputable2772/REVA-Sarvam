@@ -226,3 +226,12 @@ class NotificationRecord(Base):
     read = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+# Scheme & Opportunity Intelligence Models
+from backend.app.models.scheme_models import (
+    SchemeSource,
+    Scheme,
+    FarmerOpportunityMatch,
+    FarmerSavedOpportunity,
+    FarmerBenefitNotification
+)
+

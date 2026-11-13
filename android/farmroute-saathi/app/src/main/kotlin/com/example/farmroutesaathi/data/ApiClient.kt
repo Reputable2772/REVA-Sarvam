@@ -255,6 +255,50 @@ object ApiClient {
         postJson("$BASE_URL/api/voice/mandi-explanation", jsonBody)
     }
 
+    suspend fun getSchemeRecommendations(identifier: String): String = withContext(Dispatchers.IO) {
+        getJson("$BASE_URL/api/schemes/recommendations/$identifier")
+    }
+
+    suspend fun getSchemeNotifications(identifier: String): String = withContext(Dispatchers.IO) {
+        getJson("$BASE_URL/api/schemes/notifications/$identifier")
+    }
+
+    suspend fun updateVoluntaryProfile(
+        farmerId: String?,
+        phone: String?,
+        landholdingHa: Double?,
+        fruitsId: String?,
+        isFpoMember: Boolean?
+    ): String = withContext(Dispatchers.IO) {
+        val parts = mutableListOf<String>()
+        farmerId?.let { parts.add("\"farmer_id\":\"$it\"") }
+        phone?.let { parts.add("\"phone\":\"$it\"") }
+        landholdingHa?.let { parts.add("\"landholding_hectares\":$it") }
+        fruitsId?.let { parts.add("\"fruits_id\":\"$it\"") }
+        isFpoMember?.let { parts.add("\"is_fpo_member\":$it") }
+        val body = "{${parts.joinToString(",")}}"
+        postJson("$BASE_URL/api/schemes/update-profile", body)
+    }
+
+    suspend fun getSchemeVoiceGuidance(
+        query: String,
+        farmerId: String? = "FARMER-01",
+        languageCode: String = "kn-IN"
+    ): String = withContext(Dispatchers.IO) {
+        val escaped = query.replace("\"", "\\\"").replace("\n", " ")
+        val jsonBody = "{\"query\":\"$escaped\",\"farmer_id\":\"${farmerId ?: "FARMER-01"}\",\"language_code\":\"$languageCode\"}"
+        postJson("$BASE_URL/api/voice/scheme-guidance", jsonBody)
+    }
+
+    suspend fun toggleSchemeBookmark(
+        farmerId: String,
+        schemeId: String,
+        saved: Boolean
+    ): String = withContext(Dispatchers.IO) {
+        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"scheme_id\":\"$schemeId\",\"saved\":$saved}"
+        postJson("$BASE_URL/api/schemes/bookmark", jsonBody)
+    }
+
     private fun getJson(urlString: String): String {
         return try {
             val url = URL(urlString)
