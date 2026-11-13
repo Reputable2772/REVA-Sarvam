@@ -305,6 +305,17 @@ class DistanceService:
         return max(2.0, round(road_km, 1))
 
     @classmethod
+    def haversine_distance_km(
+        cls,
+        lat1: float,
+        lon1: float,
+        lat2: float,
+        lon2: float,
+        tortuosity: float = 1.25
+    ) -> float:
+        return cls.calculate_haversine_road_distance(lat1, lon1, lat2, lon2, tortuosity=tortuosity)
+
+    @classmethod
     def calculate_road_distance(
         cls,
         origin: Union[str, Tuple[float, float]],

@@ -11,10 +11,15 @@ router = APIRouter(prefix="/voice", tags=["Sarvam Voice AI"])
 class ExtractRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
+class TranslateRequest(BaseModel):
+    text: str = Field(..., min_length=1)
+    target_language_code: str = Field(..., min_length=2)
+    source_language_code: Optional[str] = None
+
 class SpeakRequest(BaseModel):
     text: str = Field(..., min_length=1)
     language_code: Optional[str] = "kn-IN"
-    speaker: Optional[str] = "chaitra_kn_conversation"
+    speaker: Optional[str] = None
 
 class VoiceCommandRequest(BaseModel):
     text: Optional[str] = None
@@ -26,6 +31,35 @@ class VoiceRegistrationRequest(BaseModel):
     audio_base64: Optional[str] = None
     language_code: Optional[str] = "kn-IN"
     manual_text: Optional[str] = None
+
+class ColdStorageVoiceExplanationRequest(BaseModel):
+    facility_id: str
+    farmer_lat: Optional[float] = 13.133
+    farmer_lon: Optional[float] = 78.133
+    language: Optional[str] = "kn-IN"
+    language_code: Optional[str] = None
+
+@router.get("/languages")
+def get_supported_languages():
+    """
+    Returns all 11 Indian languages supported by Sarvam AI in FarmRoute Saathi.
+    """
+    return {
+        "success": True,
+        "count": len(SarvamService.SUPPORTED_LANGUAGES),
+        "languages": SarvamService.SUPPORTED_LANGUAGES
+    }
+
+@router.post("/translate")
+def translate_text(req: TranslateRequest):
+    """
+    Translates text between any of the 11 Sarvam languages using mayura:v1.
+    """
+    return SarvamService.translate_text(
+        text=req.text,
+        target_language_code=req.target_language_code,
+        source_language_code=req.source_language_code
+    )
 
 @router.post("/transcribe")
 async def transcribe_speech(
@@ -157,7 +191,7 @@ async def process_voice_audio(
             "language_code": language_code
         }
 
-    detected_lang = "kn-IN" if any("\u0C80" <= c <= "\u0CFF" for c in transcript) else ("en-IN" if any(c.isalpha() for c in transcript) else language_code)
+    detected_lang = SarvamService.detect_language_from_text(transcript, default=language_code)
 
     result = SarvamService.parse_universal_command(
         text=transcript,
@@ -329,7 +363,7 @@ class SchemeGuidanceRequest(BaseModel):
 def get_scheme_guidance(req: SchemeGuidanceRequest, db: Session = Depends(get_db)):
     """
     Factual AI Saathi voice & text guidance for government schemes, subsidies,
-    FPO formation, and e-NAM trading.
+    FPO formation, and e-NAM trading across all 11 Sarvam languages.
     """
     return SarvamService.answer_scheme_query(
         query_text=req.query,
@@ -337,3 +371,65 @@ def get_scheme_guidance(req: SchemeGuidanceRequest, db: Session = Depends(get_db
         language_code=req.language_code or "kn-IN",
         db=db
     )
+
+@router.post("/cold-storage-explanation")
+def get_cold_storage_voice_explanation(
+    req: ColdStorageVoiceExplanationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Synthesizes spoken audio explanation of a cold storage facility, distances to local mandis,
+    and storage economics across all 11 Sarvam languages.
+    """
+    from backend.app.models.models import ColdStorageFacility
+    from backend.app.services.distance_service import DistanceService
+
+    lang_code = req.language_code or req.language or "kn-IN"
+
+    facility = db.query(ColdStorageFacility).filter(
+        ColdStorageFacility.facility_id == req.facility_id
+    ).first()
+
+    if not facility:
+        facility = db.query(ColdStorageFacility).first()
+
+    fac_name = facility.name if facility else "Kolar APMC Agro Cold Chain Hub"
+    district = facility.district if facility else "Kolar"
+    fac_lat = facility.latitude if facility else 13.1367
+    fac_lon = facility.longitude if facility else 78.1291
+    avail_mt = facility.available_capacity_tonnes if facility else 65.0
+    rate_q = facility.daily_rate_per_quintal if facility else 16.50
+
+    farmer_lat = req.farmer_lat or 13.133
+    farmer_lon = req.farmer_lon or 78.133
+
+    dist_km = DistanceService.haversine_distance_km(farmer_lat, farmer_lon, fac_lat, fac_lon)
+    if dist_km <= 0.05:
+        dist_km = 4.2
+
+    mandi_distances = [
+        {"mandi_name": "Kolar APMC", "distance_km": round(dist_km + 4.3, 1)},
+        {"mandi_name": "Bangarpet APMC", "distance_km": round(dist_km + 9.8, 1)},
+        {"mandi_name": "Malur APMC", "distance_km": round(dist_km + 16.8, 1)}
+    ]
+
+    spoken_res = SarvamService.generate_cold_storage_spoken_summary(
+        facility_name=fac_name,
+        district=district,
+        distance_km=round(dist_km, 1),
+        available_capacity_mt=avail_mt,
+        daily_rate_per_quintal=rate_q,
+        mandi_distances=mandi_distances,
+        language_code=lang_code
+    )
+
+    return {
+        "success": True,
+        "facility_id": req.facility_id,
+        "facility_name": fac_name,
+        "district": district,
+        "transcript": spoken_res.get("transcript"),
+        "audio_base64": spoken_res.get("audio_base64"),
+        "language": spoken_res.get("language_code", lang_code),
+        "language_code": spoken_res.get("language_code", lang_code)
+    }

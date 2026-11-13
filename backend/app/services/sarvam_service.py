@@ -23,8 +23,247 @@ class SarvamService:
     STT_URL = "https://api.sarvam.ai/speech-to-text"
     TTS_URL = "https://api.sarvam.ai/text-to-speech"
     COMPLETIONS_URL = "https://api.sarvam.ai/v1/chat/completions"
+    TRANSLATE_URL = "https://api.sarvam.ai/translate"
 
     _key_index: int = 0
+    _translate_cache: Dict[str, str] = {}
+
+    SUPPORTED_LANGUAGES: Dict[str, Dict[str, Any]] = {
+        "hi-IN": {
+            "name": "Hindi",
+            "native_name": "हिन्दी",
+            "script": "Devanagari",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "aditya_hi_conversational",
+            "unicode_range": (0x0900, 0x097F),
+            "sample_phrase": "मेरे पास 800 किलो ए ग्रेड टमाटर है।"
+        },
+        "bn-IN": {
+            "name": "Bengali",
+            "native_name": "বাংলা",
+            "script": "Bengali",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "arnab_bn_conversation",
+            "unicode_range": (0x0980, 0x09FF),
+            "sample_phrase": "আমার কাছে ৮০০ কেজি গ্রেড এ টমেটো আছে।"
+        },
+        "kn-IN": {
+            "name": "Kannada",
+            "native_name": "ಕನ್ನಡ",
+            "script": "Kannada",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "chaitra_kn_conversation",
+            "unicode_range": (0x0C80, 0x0CFF),
+            "sample_phrase": "ನನ್ನ ಬಳಿ 800 ಕೆಜಿ ಗ್ರೇಡ್ ಎ ಟೊಮೆಟೊ ಇದೆ."
+        },
+        "ml-IN": {
+            "name": "Malayalam",
+            "native_name": "മലയാളം",
+            "script": "Malayalam",
+            "tts_model": "bulbul:v3",
+            "default_speaker": "aditya",
+            "unicode_range": (0x0D00, 0x0D7F),
+            "sample_phrase": "എന്റെ പക്കൽ 800 കിലോഗ്രാം ഗ്രേഡ് എ തക്കാളി ഉണ്ട്."
+        },
+        "mr-IN": {
+            "name": "Marathi",
+            "native_name": "मराठी",
+            "script": "Devanagari",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "nilesh_mr_conversation",
+            "unicode_range": (0x0900, 0x097F),
+            "sample_phrase": "माझ्याकडे 800 किलो ग्रेड ए टोमॅटो आहेत."
+        },
+        "od-IN": {
+            "name": "Odia",
+            "native_name": "ଓଡ଼ିଆ",
+            "script": "Odia",
+            "tts_model": "bulbul:v3",
+            "default_speaker": "aditya",
+            "unicode_range": (0x0B00, 0x0B7F),
+            "sample_phrase": "ମୋ ପାଖରେ 800 କିଲୋଗ୍ରାମ ଗ୍ରେଡ୍ ଏ ଟମାଟୋ ଅଛି।"
+        },
+        "pa-IN": {
+            "name": "Punjabi",
+            "native_name": "ਪੰਜਾਬੀ",
+            "script": "Gurmukhi",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "anand_pa_conversation",
+            "unicode_range": (0x0A00, 0x0A7F),
+            "sample_phrase": "ਮੇਰੇ ਕੋਲ 800 ਕਿਲੋ ਗ੍ਰੇਡ ਏ ਟਮਾਟਰ ਹਨ।"
+        },
+        "ta-IN": {
+            "name": "Tamil",
+            "native_name": "தமிழ்",
+            "script": "Tamil",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "gokul_ta_narration",
+            "unicode_range": (0x0B80, 0x0BFF),
+            "sample_phrase": "என்னிடம் 800 கிலோ தரம் ஏ தக்காளி உள்ளது."
+        },
+        "te-IN": {
+            "name": "Telugu",
+            "native_name": "తెలుగు",
+            "script": "Telugu",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "kavitha_te_conversation",
+            "unicode_range": (0x0C00, 0x0C7F),
+            "sample_phrase": "నా వద్ద 800 కిలోల గ్రేడ్ ఎ టమాటా ఉంది."
+        },
+        "gu-IN": {
+            "name": "Gujarati",
+            "native_name": "ગુજરાતી",
+            "script": "Gujarati",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "bhavik_gu_conversation",
+            "unicode_range": (0x0A80, 0x0AFF),
+            "sample_phrase": "મારી પાસે 800 કિલો ગ્રેડ એ ટામેટાં છે."
+        },
+        "en-IN": {
+            "name": "English (India)",
+            "native_name": "English",
+            "script": "Latin",
+            "tts_model": "bulbul:v4-flash",
+            "default_speaker": "aparna_en_companion",
+            "unicode_range": (0x0041, 0x007A),
+            "sample_phrase": "I have 800 kg Grade A tomato ready for sale."
+        }
+    }
+
+    @classmethod
+    def normalize_language_code(cls, lang: Optional[str]) -> str:
+        """
+        Normalizes any 2-letter, case-varying, or hyphen/underscore formatted language code
+        to the standard Sarvam 11-language format (e.g. 'kn', 'kn_in' -> 'kn-IN').
+        """
+        if not lang:
+            return "kn-IN"
+        cleaned = str(lang).strip().replace("_", "-")
+        for code in cls.SUPPORTED_LANGUAGES:
+            if code.lower() == cleaned.lower():
+                return code
+        prefix = cleaned.split("-")[0].lower()
+        for code in cls.SUPPORTED_LANGUAGES:
+            if code.split("-")[0].lower() == prefix:
+                return code
+        return "kn-IN"
+
+    @classmethod
+    def detect_language_from_text(cls, text: str, default: str = "kn-IN") -> str:
+        """
+        Determines the Sarvam language code from Unicode script code points.
+        """
+        if not text:
+            return cls.normalize_language_code(default)
+        counts = {lang: 0 for lang in cls.SUPPORTED_LANGUAGES}
+        for char in text:
+            code = ord(char)
+            for lang, meta in cls.SUPPORTED_LANGUAGES.items():
+                start, end = meta["unicode_range"]
+                if start <= code <= end:
+                    counts[lang] += 1
+        best_lang = max(counts, key=counts.get)
+        if counts[best_lang] > 0:
+            return best_lang
+        return cls.normalize_language_code(default)
+
+    @classmethod
+    def translate_text(
+        cls,
+        text: str,
+        target_language_code: str = "en-IN",
+        source_language_code: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Translates text across any of the 11 Sarvam languages using mayura:v1.
+        Includes multi-key cycling and in-memory caching.
+        """
+        target_lang = cls.normalize_language_code(target_language_code)
+        if not text or not text.strip():
+            return {
+                "success": True,
+                "translated_text": "",
+                "source_language": source_language_code or target_lang,
+                "target_language": target_lang,
+                "is_live_api": False
+            }
+
+        # If source is explicitly identical to target, return immediately
+        if source_language_code and cls.normalize_language_code(source_language_code) == target_lang:
+            return {
+                "success": True,
+                "translated_text": text,
+                "source_language": target_lang,
+                "target_language": target_lang,
+                "is_live_api": False
+            }
+
+        cache_key = f"{text[:120]}::{source_language_code}::{target_lang}"
+        if cache_key in cls._translate_cache:
+            return {
+                "success": True,
+                "translated_text": cls._translate_cache[cache_key],
+                "source_language": source_language_code or "auto",
+                "target_language": target_lang,
+                "is_live_api": True
+            }
+
+        keys = cls.get_api_keys()
+        if keys:
+            src = cls.normalize_language_code(source_language_code) if source_language_code else None
+            if src == target_lang:
+                return {
+                    "success": True,
+                    "translated_text": text,
+                    "source_language": target_lang,
+                    "target_language": target_lang,
+                    "is_live_api": False
+                }
+            payload = {
+                "input": text,
+                "target_language_code": target_lang,
+                "model": "mayura:v1"
+            }
+            if src:
+                payload["source_language_code"] = src
+            data_bytes = json.dumps(payload).encode()
+
+            for _ in range(len(keys)):
+                current_key = cls.get_api_key()
+                try:
+                    req = urllib.request.Request(
+                        cls.TRANSLATE_URL,
+                        data=data_bytes,
+                        headers={
+                            "api-subscription-key": current_key,
+                            "Content-Type": "application/json"
+                        },
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        res = json.loads(resp.read().decode())
+                        translated = res.get("translated_text", text)
+                        cls._translate_cache[cache_key] = translated
+                        return {
+                            "success": True,
+                            "translated_text": translated,
+                            "source_language": res.get("source_language_code", source_language_code or "auto"),
+                            "target_language": target_lang,
+                            "model": "mayura:v1",
+                            "is_live_api": True
+                        }
+                except (urllib.error.HTTPError, urllib.error.URLError, Exception):
+                    cls.rotate_api_key()
+
+        # Fallback if no API key or network fails: return original text
+        return {
+            "success": True,
+            "translated_text": text,
+            "source_language": source_language_code or "auto",
+            "target_language": target_lang,
+            "model": "mayura:v1 (passthrough)",
+            "is_live_api": False
+        }
 
     @classmethod
     def get_api_keys(cls) -> list:
@@ -80,8 +319,10 @@ class SarvamService:
     ) -> Dict[str, Any]:
         """
         Transcribes speech using Sarvam Saaras v4 model with multi-key cycling.
+        Supports all 11 Sarvam languages (hi-IN, bn-IN, kn-IN, ml-IN, mr-IN, od-IN, pa-IN, ta-IN, te-IN, gu-IN, en-IN).
         Falls back to OpenAI-compatible Whisper if configured, or realistic simulated speech if both fail.
         """
+        target_lang = cls.normalize_language_code(language_code)
         keys = cls.get_api_keys()
         if keys:
             boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
@@ -96,7 +337,7 @@ class SarvamService:
             body.extend(b"saaras:v4\r\n")
             body.extend(f"--{boundary}\r\n".encode())
             body.extend(b'Content-Disposition: form-data; name="language_code"\r\n\r\n')
-            body.extend(language_code.encode() + b"\r\n")
+            body.extend(target_lang.encode() + b"\r\n")
             body.extend(f"--{boundary}--\r\n".encode())
             data_bytes = bytes(body)
 
@@ -117,7 +358,7 @@ class SarvamService:
                         return {
                             "success": True,
                             "transcript": res_data.get("transcript", ""),
-                            "language_code": res_data.get("language_code", language_code),
+                            "language_code": res_data.get("language_code", target_lang),
                             "model": "saaras:v4",
                             "is_live_api": True
                         }
@@ -155,23 +396,20 @@ class SarvamService:
                     return {
                         "success": True,
                         "transcript": w_res.get("text", ""),
-                        "language_code": language_code,
+                        "language_code": target_lang,
                         "model": "whisper-1 (openai-fallback)",
                         "is_live_api": True
                     }
             except Exception:
                 pass
 
-        # Intelligent Fallback Simulation (Kannada / English)
-        sample_transcript = (
-            "ನನ್ನ ಬಳಿ 800 ಕೆಜಿ ಗ್ರೇಡ್ ಎ ಟೊಮೆಟೊ ಇದೆ, ಮುಳುಬಾಗಿಲು ಗ್ರಾಮದಿಂದ ಮಾರಾಟ ಮಾಡಬೇಕು."
-            if "kn" in language_code
-            else "I have 800 kg Grade A tomato ready for sale from Mulbagal."
-        )
+        # Intelligent Fallback Simulation per language
+        lang_meta = cls.SUPPORTED_LANGUAGES.get(target_lang, cls.SUPPORTED_LANGUAGES["kn-IN"])
+        sample_transcript = lang_meta.get("sample_phrase", "I have 800 kg Grade A tomato ready for sale.")
         return {
             "success": True,
             "transcript": sample_transcript,
-            "language_code": language_code,
+            "language_code": target_lang,
             "model": "saaras:v4 (simulated)",
             "is_live_api": False
         }
@@ -184,20 +422,32 @@ class SarvamService:
         speaker: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Synthesizes text to speech using Sarvam Bulbul v4-flash model with multi-key cycling.
+        Synthesizes text to speech using Sarvam Bulbul models (bulbul:v4-flash or bulbul:v3) with multi-key cycling.
+        Automatically maps to verified native conversational speakers across all 11 supported languages.
         Returns base64 encoded audio.
         """
-        if not speaker or speaker in ("pavithra", "arvind"):
-            is_kn = "kn" in (language_code or "").lower()
-            speaker = "chaitra_kn_conversation" if is_kn else "aparna_en_companion"
+        target_lang = cls.normalize_language_code(language_code)
+        lang_meta = cls.SUPPORTED_LANGUAGES.get(target_lang, cls.SUPPORTED_LANGUAGES["kn-IN"])
+        tts_model = lang_meta.get("tts_model", "bulbul:v4-flash")
+
+        # Select speaker
+        if not speaker or speaker in ("pavithra", "arvind", "chaitra_kn_conversation", "aparna_en_companion"):
+            if speaker == "chaitra_kn_conversation" and target_lang == "kn-IN":
+                actual_speaker = "chaitra_kn_conversation"
+            elif speaker == "aparna_en_companion" and target_lang == "en-IN":
+                actual_speaker = "aparna_en_companion"
+            else:
+                actual_speaker = lang_meta["default_speaker"]
+        else:
+            actual_speaker = speaker
 
         keys = cls.get_api_keys()
         if keys:
             payload = {
                 "inputs": [text],
-                "target_language_code": language_code,
-                "speaker": speaker,
-                "model": "bulbul:v4-flash"
+                "target_language_code": target_lang,
+                "speaker": actual_speaker,
+                "model": tts_model
             }
             data_payload = json.dumps(payload).encode()
             for _ in range(len(keys)):
@@ -219,9 +469,9 @@ class SarvamService:
                         return {
                             "success": True,
                             "audio_base64": audio_b64,
-                            "language_code": language_code,
-                            "speaker": speaker,
-                            "model": "bulbul:v4-flash",
+                            "language_code": target_lang,
+                            "speaker": actual_speaker,
+                            "model": tts_model,
                             "is_live_api": True
                         }
                 except (urllib.error.HTTPError, urllib.error.URLError, Exception):
@@ -248,17 +498,17 @@ class SarvamService:
         return {
             "success": True,
             "audio_base64": fallback_b64,
-            "language_code": language_code,
-            "speaker": speaker,
-            "model": "bulbul:v4-flash (simulated)",
+            "language_code": target_lang,
+            "speaker": actual_speaker,
+            "model": f"{tts_model} (simulated)",
             "is_live_api": False
         }
 
     @classmethod
     def _extract_heuristic(cls, text: str) -> Dict[str, Any]:
         """
-        Robust agricultural NLP heuristic parser.
-        Default entities and regular expression matchers for Kannada & English.
+        Robust pan-Indian agricultural NLP heuristic parser.
+        Extracts entities across all 11 Sarvam languages and scripts.
         """
         now = datetime.now()
         today_str = now.strftime("%Y-%m-%d")
@@ -276,70 +526,73 @@ class SarvamService:
         sell_immediately = True
         fields_detected = []
 
-        # Regex for quantity: prioritize explicit weight unit
-        qty_unit_match = re.search(r"(\d+(?:\.\d+)?)\s*(kg|kgs|ಕೆಜಿ|quintal|ton|ಕ್ವಿಂಟಾಲ್|ಟನ್)", text, re.IGNORECASE)
+        # Regex for quantity across 11 Indian scripts (kg, quintal, ton)
+        qty_unit_match = re.search(
+            r"(\d+(?:\.\d+)?)\s*(kg|kgs|ಕೆಜಿ|किलो|किलोग्राम|केजी|कैटल|കിലോ|கிலோ|కిలో|કિલો|ਕਿਲੋ|କିଲୋ|quintal|ക്വിന്റൽ|क्विंटल|ಕ್ವಿಂಟಾಲ್|কুইন্টাল|குவிண்டால்|క్వింటాల్|ક્વિન્ટલ|ਕਵਿੰਟਲ|କ୍ୱିଣ୍ଟାଲ|ton|टन|ಟನ್|টন|ടൺ|டன்|టన్ను|ટન|ਟਨ|ଟନ୍)",
+            text,
+            re.IGNORECASE
+        )
         if qty_unit_match:
             val = float(qty_unit_match.group(1))
             unit = qty_unit_match.group(2).lower()
-            if "quintal" in unit or "ಕ್ವಿಂಟಾಲ್" in unit:
+            if any(q in unit for q in ["quintal", "क्विंटल", "ಕ್ವಿಂಟಾಲ್", "কুইন্টাল", "ക്വിന്റൽ", "குவிண்டால்", "క్వింటాల్", "ક્વિન્ટલ", "ਕਵਿੰਟਲ", "କ୍ୱିଣ୍ଟାଲ"]):
                 quantity_kg = val * 100.0
-            elif "ton" in unit or "ಟನ್" in unit:
+            elif any(t in unit for t in ["ton", "टन", "ಟನ್", "টন", "ടൺ", "டன்", "టన్ను", "ટન", "ਟਨ", "ଟନ୍"]):
                 quantity_kg = val * 1000.0
             else:
                 quantity_kg = val
             fields_detected.append("quantity_kg")
         else:
-            # Standalone number not followed by time units
-            qty_fallback = re.search(r"\b(\d{2,5}(?:\.\d+)?)\b(?!\s*(?:am|pm|ಗಂಟೆ|days|hours))", text, re.IGNORECASE)
+            qty_fallback = re.search(r"\b(\d{2,5}(?:\.\d+)?)\b(?!\s*(?:am|pm|ಗಂಟೆ|days|hours|घंटे|घण्टे))", text, re.IGNORECASE)
             if qty_fallback:
                 quantity_kg = float(qty_fallback.group(1))
                 fields_detected.append("quantity_kg")
 
-        # Grade detection
-        if re.search(r"grade\s*b|ಗ್ರೇಡ್\s*ಬಿ", text, re.IGNORECASE):
+        # Grade detection across all 11 scripts
+        if re.search(r"grade\s*b|ಗ್ರೇಡ್\s*ಬಿ|ग्रेड\s*बी|గ్రేడ్\s*బి|கிரேடு\s*பி|গ্রেড\s*বি|ગ્રેડ\s*બી|ਗ੍ਰੇਡ\s*ਬੀ|ഗ്രേഡ്\s*ബി|ଗ୍ରେଡ୍\s*ବି|ग्रेड\s*ब", text, re.IGNORECASE):
             quality_grade = "Grade B"
             fields_detected.append("quality_grade")
-        elif re.search(r"grade\s*c|ಗ್ರೇಡ್\s*ಸಿ", text, re.IGNORECASE):
+        elif re.search(r"grade\s*c|ಗ್ರೇಡ್\s*ಸಿ|ग्रेड\s*सी|గ్రేడ్\s*సి|கிரேடு\s*சி|গ্রেড\s*সি|ગ્રેડ\s*સી|ਗ੍ਰੇਡ\s*ਸੀ|ഗ്രേഡ്\s*സി|ଗ୍ରେଡ୍\s*ସି|ग्रेड\s*क", text, re.IGNORECASE):
             quality_grade = "Grade C"
             fields_detected.append("quality_grade")
-        elif re.search(r"grade\s*a|ಗ್ರೇಡ್\s*ಎ", text, re.IGNORECASE):
+        elif re.search(r"grade\s*a|ಗ್ರೇಡ್\s*ಎ|ग्रेड\s*ए|గ్రేడ్\s*ఎ|கிரேடு\s*ஏ|গ্রেড\s*এ|ગ્રેડ\s*એ|ਗ੍ਰੇਡ\s*ਏ|ഗ്രേഡ്\s*എ|ଗ୍ରେଡ୍\s*ଏ|ग्रेड\s*अ", text, re.IGNORECASE):
             quality_grade = "Grade A"
             fields_detected.append("quality_grade")
 
-        # Crop detection
-        if re.search(r"onion|ಈರುಳ್ಳಿ", text, re.IGNORECASE):
+        # Crop detection across all 11 scripts
+        if re.search(r"onion|ಈರುಳ್ಳಿ|प्याज|कांदा|उल्ली|ఉల్లిపాయ|வெங்காயம்|পেঁয়াজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ", text, re.IGNORECASE):
             crop = "Onion"
             variety = "Nasik Red"
             fields_detected.append("crop")
-        elif re.search(r"potato|ಆಲೂಗಡ್ಡೆ", text, re.IGNORECASE):
+        elif re.search(r"potato|ಆಲೂಗಡ್ಡೆ|ಆಲೂ|आलू|बटाटा|உருளைக்கிழங்கு|బంగాళాదుంప|আলু|બટાકા|ഉരുളക്കിഴങ്ങ്|ਆਲੂ|ଆଳୁ", text, re.IGNORECASE):
             crop = "Potato"
             variety = "Jyoti"
             fields_detected.append("crop")
-        elif re.search(r"cabbage|ಎಲೆಕೋಸು", text, re.IGNORECASE):
+        elif re.search(r"cabbage|ಎಲೆಕೋಸು|ಕೋಸು|पत्तागोभी|कोबी|முட்டைகோஸ்|క్యాబేజీ|বাঁধাকপি|કોબીજ|ਪੱਤਾਗੋਭੀ|ବନ୍ଧାକୋବି", text, re.IGNORECASE):
             crop = "Cabbage"
             variety = "Green Express"
             fields_detected.append("crop")
-        elif re.search(r"carrot|ಕ್ಯಾರೆಟ್", text, re.IGNORECASE):
+        elif re.search(r"carrot|ಕ್ಯಾರೆಟ್|गाजर|கேரட்|క్యారెట్|গাজর|ગાજર|ਗਾਜਰ|ଗାଜର", text, re.IGNORECASE):
             crop = "Carrot"
             variety = "Pusa Rudhira"
             fields_detected.append("crop")
-        elif re.search(r"chilli|ಮೆಣಸಿನಕಾಯಿ", text, re.IGNORECASE):
+        elif re.search(r"chilli|chili|ಮೆಣಸಿನಕಾಯಿ|ಮೆಣಸಿನ|मिर्च|मिरची|பச்சை\s*மிளகாய்|మిరపకాయ|লঙ্কা|મરચાં|ਮਿਰਚ|ଲଙ୍କା", text, re.IGNORECASE):
             crop = "Chilli"
             variety = "Guntur Hot"
             fields_detected.append("crop")
-        elif re.search(r"tomato|ಟೊಮೆಟೊ", text, re.IGNORECASE):
+        elif re.search(r"tomato|ಟೊಮೆಟೊ|ಟೊಮ್ಯಾಟೊ|टमाटर|टोमॅटो|தக்காளி|టమాటా|టమోటా|টমেটো|ટામેટા|തക്കാളി|ਟਮਾਟਰ|ଟମାଟୋ", text, re.IGNORECASE):
             crop = "Tomato"
             variety = "Hybrid Red"
             fields_detected.append("crop")
 
-        # Harvest Date detection
-        if re.search(r"today|ಇಂದು|ಈ ದಿನ", text, re.IGNORECASE):
+        # Harvest Date detection across 11 scripts
+        if re.search(r"today|ಇಂದು|ಈ ದಿನ|आज|आजचा|இன்று|ఈరోజు|আজ|આજે|ਅੱਜ|ଆଜି|ഇന്ന്", text, re.IGNORECASE):
             harvest_date = today_str
             fields_detected.append("harvest_date")
-        elif re.search(r"yesterday|ನಿನ್ನೆ", text, re.IGNORECASE):
+        elif re.search(r"yesterday|ನಿನ್ನೆ|कल|बीता हुआ कल|काल|நேற்று|నిన్న|গতকাল|ગઈકાલે|ਕੱਲ੍ਹ|ଗତକାଲି|ഇന്നലെ", text, re.IGNORECASE):
             harvest_date = yesterday_str
             fields_detected.append("harvest_date")
-        elif re.search(r"tomorrow|ನಾಳೆ", text, re.IGNORECASE):
+        elif re.search(r"tomorrow|ನಾಳೆ|कल|आने वाला कल|उद्या|நாளை|రేపు|কাল|કાલે|ਕੱਲ੍ਹ|କାଲି|നാളെ", text, re.IGNORECASE):
             harvest_date = tomorrow_str
             fields_detected.append("harvest_date")
 
@@ -349,68 +602,68 @@ class SarvamService:
             fields_detected.append("harvest_date")
 
         # Harvest Time detection
-        time_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|ಗಂಟೆ)", text, re.IGNORECASE)
+        time_match = re.search(r"(\d{1,2})(?::(\d{2}))?\s*(am|pm|ಗಂಟೆ|बजे|மணி|గంటలు)", text, re.IGNORECASE)
         if time_match:
             hour = int(time_match.group(1))
             minute = time_match.group(2) or "00"
             ampm = (time_match.group(3) or "").upper()
-            if "ಗಂಟೆ" in ampm:
-                ampm = "AM" if ("ಬೆಳಿಗ್ಗೆ" in text or hour < 12) else "PM"
+            if any(w in ampm for w in ["ಗಂಟೆ", "बजे", "மணி", "గంటలు"]):
+                ampm = "AM" if (any(m in text for m in ["ಬೆಳಿಗ್ಗೆ", "सुबह", "காலை", "ఉదయం"]) or hour < 12) else "PM"
             harvest_time = f"{hour:02d}:{minute} {ampm}"
             fields_detected.append("harvest_time")
-        elif re.search(r"morning|ಬೆಳಿಗ್ಗೆ", text, re.IGNORECASE):
+        elif re.search(r"morning|ಬೆಳಿಗ್ಗೆ|सुबह|காலை|ఉదయం|সকাল|સવાર|ਸਵੇਰ|ସକାଳ|രാവിലെ", text, re.IGNORECASE):
             harvest_time = "07:00 AM"
             fields_detected.append("harvest_time")
-        elif re.search(r"afternoon|ಮಧ್ಯಾಹ್ನ", text, re.IGNORECASE):
+        elif re.search(r"afternoon|ಮಧ್ಯಾಹ್ನ|दोपहर|மதியம்|మధ్యాహ్నం|দুপুর|બપોર|ਦੁਪਹਿਰ|ଅପରାହ୍ନ|ഉച്ചതിരിഞ്ഞ്", text, re.IGNORECASE):
             harvest_time = "01:30 PM"
             fields_detected.append("harvest_time")
-        elif re.search(r"evening|ಸಂಜೆ", text, re.IGNORECASE):
+        elif re.search(r"evening|ಸಂಜೆ|शाम|மாலை|సాయంత్రం|সন্ধ্যা|સાંજ|ਸ਼ਾਮ|ସନ୍ଧ୍ୟା|വൈകുന്നേരം", text, re.IGNORECASE):
             harvest_time = "05:30 PM"
             fields_detected.append("harvest_time")
 
         # Expected Date/Time detection
-        if re.search(r"tomorrow morning|ನಾಳೆ ಬೆಳಿಗ್ಗೆ", text, re.IGNORECASE):
+        if re.search(r"tomorrow morning|ನಾಳೆ ಬೆಳಿಗ್ಗೆ|कल सुबह|நாளை காலை|రేపు ఉదయం", text, re.IGNORECASE):
             expected_date_time = f"{tomorrow_str} 09:00 AM"
             fields_detected.append("expected_date_time")
-        elif re.search(r"tomorrow evening|ನಾಳೆ ಸಂಜೆ", text, re.IGNORECASE):
+        elif re.search(r"tomorrow evening|ನಾಳೆ ಸಂಜೆ|कल शाम|நாளை மாலை|రేపు సాయంత్రం", text, re.IGNORECASE):
             expected_date_time = f"{tomorrow_str} 05:00 PM"
             fields_detected.append("expected_date_time")
-        elif re.search(r"today evening|ಇಂದು ಸಂಜೆ", text, re.IGNORECASE):
+        elif re.search(r"today evening|ಇಂದು ಸಂಜೆ|आज शाम|இன்று மாலை|ఈరోజు సాయంత్రం", text, re.IGNORECASE):
             expected_date_time = f"{today_str} 06:00 PM"
             fields_detected.append("expected_date_time")
 
         # Sell immediately vs Cold storage
-        if re.search(r"cold storage|store|ಶೀತಲ|ಇಲ್ಲ|hold|later", text, re.IGNORECASE):
+        if re.search(r"cold storage|store|warehouse|ಶೀತಲ|ಇಲ್ಲ|hold|later|कोल्ड स्टोरेज|भंडारण|శీతల|குளிர்பதன|হিমাগার|ਕੋਲਡ ਸਟੋਰੇਜ|ଶୀତଳ|ശീതീകരണ", text, re.IGNORECASE):
             sell_immediately = False
             fields_detected.append("sell_immediately")
-        elif re.search(r"immediately|now|direct|ಮಾರಾಟ|ಈಗಲೇ|ಹೌದು|yes|today", text, re.IGNORECASE):
+        elif re.search(r"immediately|now|direct|ಮಾರಾಟ|ಈಗಲೇ|ಹೌದು|yes|today|तुरंत|अभी|इरवे|తక్షణమే|உடனடியாக|এখনই|તરત|ਤੁਰନ୍ତ|ଶୀଘ୍ର|ഉടൻ", text, re.IGNORECASE):
             sell_immediately = True
             fields_detected.append("sell_immediately")
 
         # Village detection
-        if re.search(r"bangarpet|ಬಂಗಾರಪೇಟೆ", text, re.IGNORECASE):
+        if re.search(r"bangarpet|ಬಂಗಾರಪೇಟೆ|बांगरपेट", text, re.IGNORECASE):
             village = "Bangarpet"
             fields_detected.append("village")
-        elif re.search(r"mulbagal|ಮುಳಬಾಗಿಲು", text, re.IGNORECASE):
+        elif re.search(r"mulbagal|ಮುಳಬಾಗಿಲು|मुलबागल", text, re.IGNORECASE):
             village = "Mulbagal"
             fields_detected.append("village")
-        elif re.search(r"malur|ಮಾಲೂರು", text, re.IGNORECASE):
+        elif re.search(r"malur|ಮಾಲೂರು|मालूर", text, re.IGNORECASE):
             village = "Malur"
             fields_detected.append("village")
-        elif re.search(r"kolar|ಕೋಲಾರ", text, re.IGNORECASE):
+        elif re.search(r"kolar|ಕೋಲಾರ|कोलार", text, re.IGNORECASE):
             village = "Kolar"
             fields_detected.append("village")
-        elif re.search(r"srinivaspur|ಶ್ರೀನಿವಾಸಪುರ", text, re.IGNORECASE):
+        elif re.search(r"srinivaspur|ಶ್ರೀನಿವಾಸಪುರ|श्रीनिवासपुर", text, re.IGNORECASE):
             village = "Srinivaspur"
             fields_detected.append("village")
-        elif re.search(r"chintamani|ಚಿಂತಾಮಣಿ", text, re.IGNORECASE):
+        elif re.search(r"chintamani|ಚಿಂತಾಮಣಿ|चिंतामणि", text, re.IGNORECASE):
             village = "Chintamani"
             fields_detected.append("village")
-        elif re.search(r"chikkaballapur|ಚಿಕ್ಕಬಳ್ಳಾಪುರ", text, re.IGNORECASE):
+        elif re.search(r"chikkaballapur|ಚಿಕ್ಕಬಳ್ಳಾಪುರ|चिक्काबल्लापुर", text, re.IGNORECASE):
             village = "Chikkaballapur"
             fields_detected.append("village")
         else:
-            loc_match = re.search(r"\b(?:in|at|from|village)\s+([A-Za-z]+)", text, re.IGNORECASE)
+            loc_match = re.search(r"\b(?:in|at|from|village|गांव|గ్రామం|கிராமம்)\s+([A-Za-z\u0900-\u0D7F]+)", text, re.IGNORECASE)
             if loc_match:
                 cand = loc_match.group(1).title()
                 if cand.lower() not in ["kg", "kgs", "farm", "grade", "hybrid", "today", "tomorrow"]:
@@ -421,6 +674,19 @@ class SarvamService:
                 if kn_loc_match:
                     village = kn_loc_match.group(1)
                     fields_detected.append("village")
+
+        return {
+            "crop": crop,
+            "variety": variety,
+            "quantity_kg": quantity_kg,
+            "quality_grade": quality_grade,
+            "harvest_date": harvest_date,
+            "harvest_time": harvest_time,
+            "expected_date_time": expected_date_time,
+            "sell_immediately": sell_immediately,
+            "village": village,
+            "fields_detected": fields_detected
+        }
 
         return {
             "crop": crop,
@@ -514,43 +780,54 @@ class SarvamService:
         heuristic = cls._extract_heuristic(text)
 
         if parsed:
-            # Map Kannada keys if LLM translated them
+            # Multilingual key mappings (Kannada, Hindi, Telugu, Tamil, Marathi, Bengali, Gujarati, Malayalam, Punjabi, Odia)
             key_mappings = {
-                "ಬೆಳೆ": "crop",
-                "ಪ್ರಕಾರ": "variety",
-                "ತಳಿ": "variety",
-                "ಪ್ರಮಾಣ": "quantity_kg",
-                "ತೂಕ": "quantity_kg",
-                "ಗುಣಮಟ್ಟ": "quality_grade",
-                "ಗ್ರೇಡ್": "quality_grade",
-                "ಗ್ರಾಮ": "village",
-                "ಊರು": "village",
-                "ಸ್ಥಳ": "village",
-                "ಕೊಯ್ಲು_ದಿನಾಂಕ": "harvest_date",
-                "ಕೊಯ್ಲು_ಸಮಯ": "harvest_time",
-                "ಮಾರಾಟ_ಸಮಯ": "expected_date_time",
-                "ತಕ್ಷಣ_ಮಾರಾಟ": "sell_immediately"
+                # Kannada
+                "ಬೆಳೆ": "crop", "ಪ್ರಕಾರ": "variety", "ತಳಿ": "variety", "ಪ್ರಮಾಣ": "quantity_kg", "ತೂಕ": "quantity_kg",
+                "ಗುಣಮಟ್ಟ": "quality_grade", "ಗ್ರೇಡ್": "quality_grade", "ಗ್ರಾಮ": "village", "ಊರು": "village", "ಸ್ಥಳ": "village",
+                "ಕೊಯ್ಲು_ದಿನಾಂಕ": "harvest_date", "ಕೊಯ್ಲು_ಸಮಯ": "harvest_time", "ಮಾರಾಟ_ಸಮಯ": "expected_date_time", "ತಕ್ಷಣ_ಮಾರಾಟ": "sell_immediately",
+                # Hindi & Marathi
+                "फसल": "crop", "किस्म": "variety", "मात्रा": "quantity_kg", "तोल": "quantity_kg", "वजन": "quantity_kg",
+                "श्रेणी": "quality_grade", "ग्रेड": "quality_grade", "गांव": "village", "गाँव": "village", "तारीख": "harvest_date",
+                "समय": "harvest_time", "तुरंत_बिक्री": "sell_immediately", "पीक": "crop", "गाव": "village", "वेळ": "harvest_time",
+                # Telugu
+                "పంట": "crop", "రకం": "variety", "పరిమాణం": "quantity_kg", "గ్రేడ్": "quality_grade", "గ్రామం": "village",
+                "తేదీ": "harvest_date", "సమయం": "harvest_time",
+                # Tamil
+                "பயிர்": "crop", "வகை": "variety", "அளவு": "quantity_kg", "தரம்": "quality_grade", "கிராமம்": "village",
+                "தேதி": "harvest_date", "நேரம்": "harvest_time",
+                # Bengali
+                "ফসল": "crop", "জাত": "variety", "পরিমাণ": "quantity_kg", "গ্রেড": "quality_grade", "গ্রাম": "village",
+                "তারিখ": "harvest_date", "সময়": "harvest_time",
+                # Gujarati
+                "પાક": "crop", "જાત": "variety", "જથ્થો": "quantity_kg", "ગ્રેડ": "quality_grade", "ગામ": "village",
+                # Malayalam
+                "വിള": "crop", "ഇനം": "variety", "അളവ്": "quantity_kg", "ഗ്രേഡ്": "quality_grade", "ഗ്രാമം": "village",
+                # Punjabi
+                "ਫ਼ਸਲ": "crop", "ਕਿਸਮ": "variety", "ਮਾਤਰਾ": "quantity_kg", "ਗ੍ਰੇਡ": "quality_grade", "ਪਿੰਡ": "village",
+                # Odia
+                "ଫସଲ": "crop", "କିସମ": "variety", "ପରିମାଣ": "quantity_kg", "ଗ୍ରେଡ୍": "quality_grade", "ଗାଁ": "village"
             }
             normalized = {}
             for k, v in parsed.items():
                 target_k = key_mappings.get(k, k)
                 normalized[target_k] = v
 
-            # Normalize crop name
+            # Normalize crop name across 11 languages
             crop_val = normalized.get("crop")
             if crop_val:
                 crop_lower = str(crop_val).strip().lower()
-                if "tomat" in crop_lower or "ಟೊಮೆಟೊ" in crop_lower:
+                if any(c in crop_lower for c in ["tomat", "ಟೊಮೆಟೊ", "ಟೊಮ್ಯಾಟೊ", "टमाटर", "टोमॅटो", "தக்காளி", "టమాటా", "టమోటా", "টমেটো", "ટામેટા", "തക്കാളി", "ਟਮਾਟਰ", "ଟମାଟୋ"]):
                     normalized["crop"] = "Tomato"
-                elif "onion" in crop_lower or "ಈರುಳ್ಳಿ" in crop_lower:
+                elif any(c in crop_lower for c in ["onion", "ಈರುಳ್ಳಿ", "प्याज", "कांदा", "ఉల్లిపాయ", "வெங்காயம்", "পেঁয়াজ", "ડુંગળી", "ഉള്ളി", "ਪਿਆਜ਼", "ପିଆଜ"]):
                     normalized["crop"] = "Onion"
-                elif "potato" in crop_lower or "ಆಲೂ" in crop_lower:
+                elif any(c in crop_lower for c in ["potato", "ಆಲೂ", "आलू", "बटाटा", "உருளைக்கிழங்கு", "బంగాళాదుంప", "আলু", "બટાકા", "ഉരുളക്കിഴങ്ങ്", "ਆਲੂ", "ଆଳୁ"]):
                     normalized["crop"] = "Potato"
-                elif "cabbage" in crop_lower or "ಕೋಸು" in crop_lower:
+                elif any(c in crop_lower for c in ["cabbage", "ಕೋಸು", "पत्तागोभी", "कोबी", "முட்டைகோஸ்", "క్యాబేజీ", "বাঁধাকপি", "કોબીજ", "ਪੱਤਾਗੋਭੀ", "ବନ୍ଧାକୋବି"]):
                     normalized["crop"] = "Cabbage"
-                elif "carrot" in crop_lower or "ಕ್ಯಾರೆಟ್" in crop_lower:
+                elif any(c in crop_lower for c in ["carrot", "ಕ್ಯಾರೆಟ್", "गाजर", "கேரட்", "క్యారెట్", "গাজর", "ગાજર", "ਗਾਜਰ", "ଗାଜର"]):
                     normalized["crop"] = "Carrot"
-                elif "chilli" in crop_lower or "ಮೆಣಸಿನ" in crop_lower:
+                elif any(c in crop_lower for c in ["chilli", "chili", "ಮೆಣಸಿನ", "मिर्च", "मिरची", "மிளகாய்", "మిరపకాయ", "লঙ্কা", "મરચાં", "ਮਿਰਚ", "ଲଙ୍କା"]):
                     normalized["crop"] = "Chilli"
                 else:
                     normalized["crop"] = str(crop_val).title()
@@ -562,14 +839,14 @@ class SarvamService:
                 except (ValueError, TypeError):
                     pass
 
-            # Normalize quality grade to standard Grade A / Grade B / Grade C
+            # Normalize quality grade to standard Grade A / Grade B / Grade C across all 11 languages
             if "quality_grade" in normalized and normalized["quality_grade"]:
                 qg = str(normalized["quality_grade"]).strip().upper()
-                if qg in ["A", "GRADE A", "GRADE-A", "ಗ್ರೇಡ್ ಎ", "ಗ್ರೇಡ್ A"]:
+                if any(a in qg for a in ["A", "GRADE A", "GRADE-A", "ಗ್ರೇಡ್ ಎ", "ಗ್ರೇಡ್ A", "ग्रेड ए", "గ్రేడ్ ఎ", "கிரேடு ஏ", "গ্রেড এ", "ગ્રેડ એ", "ਗ੍ਰੇਡ ਏ", "ഗ്രേഡ് എ", "ଗ୍ରେଡ୍ ଏ"]):
                     normalized["quality_grade"] = "Grade A"
-                elif qg in ["B", "GRADE B", "GRADE-B", "ಗ್ರೇಡ್ ಬಿ", "ಗ್ರೇಡ್ B"]:
+                elif any(b in qg for b in ["B", "GRADE B", "GRADE-B", "ಗ್ರೇಡ್ ಬಿ", "ಗ್ರೇಡ್ B", "ग्रेड बी", "గ్రేడ్ బి", "கிரேடு பி", "গ্রেড বি", "ગ્રેડ બી", "ਗ੍ਰੇਡ ਬੀ", "ഗ്രേഡ് ബി", "ଗ୍ରେଡ୍ ବି"]):
                     normalized["quality_grade"] = "Grade B"
-                elif qg in ["C", "GRADE C", "GRADE-C", "ಗ್ರೇಡ್ ಸಿ", "ಗ್ರೇಡ್ C"]:
+                elif any(c in qg for c in ["C", "GRADE C", "GRADE-C", "ಗ್ರೇಡ್ ಸಿ", "ಗ್ರೇಡ್ C", "ग्रेड सी", "గ్రేಡ್ సి", "கிரேடு சி", "গ্রেড সি", "ગ્રેડ સી", "ਗ੍ਰੇਡ ਸੀ", "ഗ്രേഡ് സി", "ଗ୍ରେଡ୍ ସି"]):
                     normalized["quality_grade"] = "Grade C"
 
             # Fill in any missing or null fields from heuristic
@@ -595,38 +872,41 @@ class SarvamService:
     def parse_universal_command(cls, text: str, language_code: str = "kn-IN") -> Dict[str, Any]:
         """
         Universal app-wide voice command interpreter.
-        Enables speech understanding throughout the entire application.
+        Enables speech understanding throughout the entire application across all 11 Sarvam languages.
         """
-        is_kn = "kn" in language_code.lower() or any("\u0C80" <= c <= "\u0CFF" for c in text)
+        target_lang = cls.normalize_language_code(language_code or cls.detect_language_from_text(text))
+        is_kn = target_lang == "kn-IN"
+        is_en = target_lang == "en-IN"
+
         entities_result = cls.extract_harvest_entities(text)
         entities = entities_result.get("extracted", {})
 
         action = "UPDATE_HARVEST"
-        if re.search(r"rate|price|mandi|ದರ|ಬೆಲೆ|ಮಾರುಕಟ್ಟೆ", text, re.IGNORECASE):
+        if re.search(r"rate|price|mandi|market|ದರ|ಬೆಲೆ|ಮಾರುಕಟ್ಟೆ|भाव|दाम|मंडी|बाजार|ధర|మండీ|விலை|சந்தை|দাম|দর|બાજાર|ਭਾਅ|ଦର|വില", text, re.IGNORECASE):
             action = "NAVIGATE_MARKETPLACE"
             msg_en = "Navigating to Live APMC & Marketplace Rates."
             msg_kn = "ಲೈವ್ ಮಾರುಕಟ್ಟೆ ಮತ್ತು ಎಪಿಎಂಸಿ ದರಗಳಿಗೆ ನ್ಯಾವಿಗೇಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"weather|rain|forecast|ಮಳೆ|ಹವಾಮಾನ", text, re.IGNORECASE):
+        elif re.search(r"weather|rain|forecast|climate|ಮಳೆ|ಹವಾಮಾನ|मौसम|बारिश|वर्षा|వర్షం|వాతావరణం|வானிலை|மழை|আবহাওয়া|વરસાદ|ਮੀਂਹ|ପାଣିପାଗ|മഴ", text, re.IGNORECASE):
             action = "NAVIGATE_WEATHER"
             msg_en = "Opening 3-Day Micro-Climate Weather Advisory."
             msg_kn = "3-ದಿನಗಳ ಹವಾಮಾನ ಮುನ್ಸೂಚನೆಯನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"cold storage|warehouse|ಶೀತಲ", text, re.IGNORECASE):
+        elif re.search(r"cold storage|warehouse|store|ಶೀತಲ|कोल्ड स्टोरेज|भंडारण|శీతల|குளிர்பதன|হিমাগার|ਕੋਲਡ ਸਟੋਰੇਜ|ଶୀତଳ|ശീതീകരണ", text, re.IGNORECASE):
             action = "NAVIGATE_COLD_STORAGE"
             msg_en = "Opening Cold Storage Facility Discovery."
             msg_kn = "ಶೀತಲ ಶೇಖರಣಾ ಸೌಲಭ್ಯಗಳ ವಿಭಾಗವನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"scheme|benefit|subsidy|grant|insurance|ಯೋಜನೆ|ಸಬ್ಸಿಡಿ|ಅನುದಾನ|ಸೌಲಭ್ಯ|ವಿಮೆ|fruits|pm kisan|raitha siri|enam", text, re.IGNORECASE):
+        elif re.search(r"scheme|benefit|subsidy|grant|insurance|fruits|pm kisan|raitha siri|enam|fasal bima|ಯೋಜನೆ|ಸಬ್ಸಿಡಿ|ಅನುದಾನ|ಸೌಲಭ್ಯ|ವಿಮೆ|योजना|सब्सिडी|अनुदान|बीमा|పథకం|సబ్సిడీ|திட்டம்|மானியம்|যোজনা|ਸਕੀਮ|ଯୋଜନା|പദ്ധതി", text, re.IGNORECASE):
             action = "NAVIGATE_SCHEMES"
             msg_en = "Opening AI Government Schemes & Opportunities Intelligence."
             msg_kn = "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು ಮತ್ತು ಸೌಲಭ್ಯಗಳ ವಿಭಾಗವನ್ನು ತೆರೆಯಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"reset|ಮರುಹೊಂದಿಸಿ", text, re.IGNORECASE):
+        elif re.search(r"reset|ಮರುಹೊಂದಿಸಿ|रीसेट|రీసెట్|மீட்டமை|পুনরায় সেট", text, re.IGNORECASE):
             action = "DEMO_RESET"
             msg_en = "Resetting demo scenario to baseline."
             msg_kn = "ಡೆಮೊ ಸನ್ನಿವೇಶವನ್ನು ಮರುಹೊಂದಿಸಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"logout|ನಿರ್ಗಮಿಸಿ", text, re.IGNORECASE):
+        elif re.search(r"logout|sign out|ನಿರ್ಗಮಿಸಿ|लॉगआउट|బయటకు|வெளியேறு|লগআউট", text, re.IGNORECASE):
             action = "LOGOUT"
             msg_en = "Logging out of Kisan account."
             msg_kn = "ಖಾತೆಯಿಂದ ನಿರ್ಗಮಿಸಲಾಗುತ್ತಿದೆ."
-        elif re.search(r"confirm|submit|declare|ದೃಢೀಕರಿಸಿ|ಘೋಷಿಸಿ", text, re.IGNORECASE):
+        elif re.search(r"confirm|submit|declare|ದೃಢೀಕರಿಸಿ|ಘೋಷಿಸಿ|पुष्टि|दर्ज|ఖరారు|உறுதி|নিশ্চিত", text, re.IGNORECASE):
             action = "SUBMIT_HARVEST"
             msg_en = f"Confirming harvest declaration for {entities.get('quantity_kg', 200)}kg {entities.get('crop', 'Tomato')}."
             msg_kn = f"{entities.get('quantity_kg', 200)} ಕೆಜಿ {entities.get('crop', 'ಟೊಮೆಟೊ')} ಕೊಯ್ಲು ದೃಢೀಕರಿಸಲಾಗುತ್ತಿದೆ."
@@ -639,6 +919,14 @@ class SarvamService:
             msg_en = f"Updated: {qty}kg {crop}, Harvest: {date} at {time}."
             msg_kn = f"ನವೀಕರಿಸಲಾಗಿದೆ: {qty} ಕೆಜಿ {crop}, ಕೊಯ್ಲು: {date} {time}."
 
+        if is_kn:
+            spoken_feedback = msg_kn
+        elif is_en:
+            spoken_feedback = msg_en
+        else:
+            tr = cls.translate_text(msg_en, target_language_code=target_lang, source_language_code="en-IN")
+            spoken_feedback = tr.get("translated_text") or msg_en
+
         return {
             "success": True,
             "transcript": text,
@@ -647,7 +935,8 @@ class SarvamService:
             "fields_updated": entities.get("fields_detected", []),
             "message_en": msg_en,
             "message_kn": msg_kn,
-            "spoken_feedback": msg_kn if is_kn else msg_en
+            "spoken_feedback": spoken_feedback,
+            "language_code": target_lang
         }
 
     @classmethod
@@ -659,13 +948,25 @@ class SarvamService:
         language_code: str = "kn-IN"
     ) -> Dict[str, Any]:
         """
-        Synthesizes spoken audio explanation comparing Mandi options and highlighting headline traps.
+        Synthesizes spoken audio explanation comparing Mandi options and highlighting headline traps
+        across all 11 Sarvam languages.
         """
-        is_kn = "kn" in language_code.lower()
+        target_lang = cls.normalize_language_code(language_code)
+        is_kn = target_lang == "kn-IN"
+        is_en = target_lang == "en-IN"
+
         if not mandi_results:
-            msg = "ಯಾವುದೇ ಮಾರುಕಟ್ಟೆ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ." if is_kn else "No mandi data available for comparison."
-            tts_res = cls.synthesize_speech(msg, language_code)
-            return {"summary_text": msg, "audio_base64": tts_res.get("audio_base64", "")}
+            msg_kn = "ಯಾವುದೇ ಮಾರುಕಟ್ಟೆ ಮಾಹಿತಿ ಲಭ್ಯವಿಲ್ಲ."
+            msg_en = "No mandi data available for comparison."
+            if is_kn:
+                msg = msg_kn
+            elif is_en:
+                msg = msg_en
+            else:
+                tr = cls.translate_text(msg_en, target_language_code=target_lang, source_language_code="en-IN")
+                msg = tr.get("translated_text") or msg_en
+            tts_res = cls.synthesize_speech(msg, target_lang)
+            return {"summary_text": msg, "audio_base64": tts_res.get("audio_base64", ""), "language_code": target_lang}
 
         recommended = next((m for m in mandi_results if m.get("is_recommended")), mandi_results[0])
         trap = next((m for m in mandi_results if m.get("is_trap")), None)
@@ -676,42 +977,43 @@ class SarvamService:
         rec_deductions = recommended.get("itemized_deductions") or recommended.get("deductions") or {}
         rec_trans = int(rec_deductions.get("transport_cost") or rec_deductions.get("transport", 0))
 
-        if is_kn:
-            dist_phrase = f"{rec_dist} ಕಿಮೀ ದೂರದಲ್ಲಿದ್ದು, " if rec_dist > 0 else ""
-            trans_phrase = f"ಸಾರಿಗೆ ವೆಚ್ಚ ಕೇವಲ ₹{rec_trans}. " if rec_trans > 0 else ""
-            text = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} {dist_phrase}₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ನೀಡುತ್ತದೆ. {trans_phrase}"
-            if trap:
-                trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
-                trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
-                trap_dist = trap.get("distance_km", 0)
-                trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
-                trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
-                diff = int(rec_net - trap.get("net_take_home", 0))
-                dist_warn = f"{trap_dist} ಕಿಮೀ ದೂರದ ಪ್ರಯಾಣ ಮತ್ತು ₹{trap_trans} ವಾಹನ ಬಾಡಿಗೆಯಿಂದಾಗಿ " if trap_dist > 0 else "ಹೆಚ್ಚಿನ ಸಾರಿಗೆ ವೆಚ್ಚದಿಂದ "
-                text += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಕಾಣಿಸಿದರೂ, {dist_warn}₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
-            else:
-                text += "ಕಡಿಮೆ ಸಾರಿಗೆ ಮತ್ತು ಕಮಿಷನ್ ವೆಚ್ಚ ಇರುವ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ."
-        else:
-            dist_phrase = f"at {rec_dist} km " if rec_dist > 0 else ""
-            trans_phrase = f"Transport freight is ₹{rec_trans}. " if rec_trans > 0 else ""
-            text = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} {dist_phrase}gives the highest net return of ₹{rec_net}. {trans_phrase}"
-            if trap:
-                trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
-                trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
-                trap_dist = trap.get("distance_km", 0)
-                trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
-                trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
-                loss = int(rec_net - trap.get("net_take_home", 0))
-                dist_warn = f"due to {trap_dist} km distance (₹{trap_trans} freight) " if trap_dist > 0 else "due to transport costs "
-                text += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but {dist_warn}you take home ₹{loss} less cash in hand."
-            else:
-                text += "Choosing direct pooling saves middleman commission and transport loss."
+        dist_phrase_kn = f"{rec_dist} ಕಿಮೀ ದೂರದಲ್ಲಿದ್ದು, " if rec_dist > 0 else ""
+        trans_phrase_kn = f"ಸಾರಿಗೆ ವೆಚ್ಚ ಕೇವಲ ₹{rec_trans}. " if rec_trans > 0 else ""
+        text_kn = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} {dist_phrase_kn}₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ನೀಡುತ್ತದೆ. {trans_phrase_kn}"
 
-        tts_res = cls.synthesize_speech(text, language_code)
+        dist_phrase_en = f"at {rec_dist} km " if rec_dist > 0 else ""
+        trans_phrase_en = f"Transport freight is ₹{rec_trans}. " if rec_trans > 0 else ""
+        text_en = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} {dist_phrase_en}gives the highest net return of ₹{rec_net}. {trans_phrase_en}"
+
+        if trap:
+            trap_name = trap.get("mandi_name") or trap.get("market") or "Distant Mandi"
+            trap_modal = trap.get("modal_price_per_kg") or trap.get("modal_price_kg", 0)
+            trap_dist = trap.get("distance_km", 0)
+            trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
+            trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
+            diff = int(rec_net - trap.get("net_take_home", 0))
+            dist_warn_kn = f"{trap_dist} ಕಿಮೀ ದೂರದ ಪ್ರಯಾಣ ಮತ್ತು ₹{trap_trans} ವಾಹನ ಬಾಡಿಗೆಯಿಂದಾಗಿ " if trap_dist > 0 else "ಹೆಚ್ಚಿನ ಸಾರಿಗೆ ವೆಚ್ಚದಿಂದ "
+            text_kn += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಕಾಣಿಸಿದರೂ, {dist_warn_kn}₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
+
+            dist_warn_en = f"due to {trap_dist} km distance (₹{trap_trans} freight) " if trap_dist > 0 else "due to transport costs "
+            text_en += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but {dist_warn_en}you take home ₹{diff} less cash in hand."
+        else:
+            text_kn += "ಕಡಿಮೆ ಸಾರಿಗೆ ಮತ್ತು ಕಮಿಷನ್ ವೆಚ್ಚ ಇರುವ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ."
+            text_en += "Choosing direct pooling saves middleman commission and transport loss."
+
+        if is_kn:
+            summary_text = text_kn
+        elif is_en:
+            summary_text = text_en
+        else:
+            tr = cls.translate_text(text_en, target_language_code=target_lang, source_language_code="en-IN")
+            summary_text = tr.get("translated_text") or text_en
+
+        tts_res = cls.synthesize_speech(summary_text, target_lang)
         return {
-            "summary_text": text,
+            "summary_text": summary_text,
             "audio_base64": tts_res.get("audio_base64", ""),
-            "language_code": language_code,
+            "language_code": target_lang,
             "recommended_mandi": rec_name,
             "trap_mandi": (trap.get("mandi_name") or trap.get("market")) if trap else None
         }
@@ -726,10 +1028,12 @@ class SarvamService:
     ) -> Dict[str, Any]:
         """
         Factual, grounded AI Assistant answering farmer questions about Government Schemes,
-        Subsidies, FPO opportunities, and e-NAM.
+        Subsidies, FPO opportunities, and e-NAM across all 11 Sarvam languages.
         Never guarantees approval; references official government portals.
         """
-        is_kn = "kn" in language_code.lower() or any("\u0C80" <= c <= "\u0CFF" for c in query_text)
+        target_lang = cls.normalize_language_code(language_code or cls.detect_language_from_text(query_text))
+        is_kn = target_lang == "kn-IN"
+        is_en = target_lang == "en-IN"
         query_lower = query_text.lower()
 
         # Load verified schemes
@@ -744,112 +1048,170 @@ class SarvamService:
                 matches = SchemeMatchingService.evaluate_farmer_opportunities(farmer_id, db)
 
         # Factual grounded response matching
-        if re.search(r"fpo|producer company|ಸಂಸ್ಥೆ|ಎಫ್‌ಪಿಒ|ಗುಂಪು", query_lower):
-            if is_kn:
-                ans = (
-                    "FPO (ರೈತ ಉತ್ಪಾದಕ ಸಂಸ್ಥೆ) ರೈತರ ಒಕ್ಕೂಟವಾಗಿದೆ. SFAC ಮತ್ತು ನಬಾರ್ಡ್ ಯೋಜನೆ ಅಡಿಯಲ್ಲಿ, "
-                    "ಕನಿಷ್ಠ 300 ರೈತರು ಸೇರಿ FPO ರಚಿಸಿದರೆ ₹15 ಲಕ್ಷದವರೆಗೆ ಈಕ್ವಿಟಿ ಅನುದಾನ ಮತ್ತು ₹2 ಕೋಟಿ ಸಾಲ ಖಾತರಿ ಸಿಗುತ್ತದೆ. "
-                    "ನೆನಪಿಡಿ: ಈ ಅನುದಾನವು FPO ಸಂಸ್ಥೆಗೆ ಮಾತ್ರ ಸಿಗುತ್ತದೆ, ವೈಯಕ್ತಿಕ ರೈತರ ಖಾತೆಗೆ ನೇರವಾಗಿ ಜಮೆಯಾಗುವುದಿಲ್ಲ. "
-                    "ಅಧಿಕೃತ ವೆಬ್‌ಸೈಟ್: sfacindia.com, ಸಹಾಯವಾಣಿ: 1800 270 0224."
-                )
-            else:
-                ans = (
-                    "Under the Central Sector Scheme for 10,000 FPOs (SFAC / NABARD), an FPO with at least 300 farmer "
-                    "members can receive up to ₹15 Lakhs matching Equity Grant and ₹2 Crore Credit Guarantee. "
-                    "IMPORTANT NOTE: This grant is paid to the registered FPO company for collective infrastructure, "
-                    "NOT directly to individual farmers. Official portal: sfacindia.com (Helpline: 1800 270 0224)."
-                )
+        if re.search(r"fpo|producer company|ಸಂಸ್ಥೆ|ಎಫ್‌ಪಿಒ|ಗುಂಪು|संस्था|एफपीओ", query_lower):
+            ans_kn = (
+                "FPO (ರೈತ ಉತ್ಪಾದಕ ಸಂಸ್ಥೆ) ರೈತರ ಒಕ್ಕೂಟವಾಗಿದೆ. SFAC ಮತ್ತು ನಬಾರ್ಡ್ ಯೋಜನೆ ಅಡಿಯಲ್ಲಿ, "
+                "ಕನಿಷ್ಠ 300 ರೈತರು ಸೇರಿ FPO ರಚಿಸಿದರೆ ₹15 ಲಕ್ಷದವರೆಗೆ ಈಕ್ವಿಟಿ ಅನುದಾನ ಮತ್ತು ₹2 ಕೋಟಿ ಸಾಲ ಖಾತರಿ ಸಿಗುತ್ತದೆ. "
+                "ನೆನಪಿಡಿ: ಈ ಅನುದಾನವು FPO ಸಂಸ್ಥೆಗೆ ಮಾತ್ರ ಸಿಗುತ್ತದೆ, ವೈಯಕ್ತಿಕ ರೈತರ ಖಾತೆಗೆ ನೇರವಾಗಿ ಜಮೆಯಾಗುವುದಿಲ್ಲ. "
+                "ಅಧಿಕೃತ ವೆಬ್‌ಸೈಟ್: sfacindia.com, ಸಹಾಯವಾಣಿ: 1800 270 0224."
+            )
+            ans_en = (
+                "Under the Central Sector Scheme for 10,000 FPOs (SFAC / NABARD), an FPO with at least 300 farmer "
+                "members can receive up to ₹15 Lakhs matching Equity Grant and ₹2 Crore Credit Guarantee. "
+                "IMPORTANT NOTE: This grant is paid to the registered FPO company for collective infrastructure, "
+                "NOT directly to individual farmers. Official portal: sfacindia.com (Helpline: 1800 270 0224)."
+            )
             scheme_id = "SCHEME-SFAC-10K-FPO"
 
-        elif re.search(r"raitha siri|millet|ಸಿರಿ|ರೈತ ಸಿರಿ|ತೋಟಗಾರಿಕೆ|fruits", query_lower):
-            if is_kn:
-                ans = (
-                    "ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ ಯೋಜನೆಯಡಿ, ಸಿರಿಧಾನ್ಯ ಮತ್ತು ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಾರರಿಗೆ ಹೆಕ್ಟೇರ್‌ಗೆ ₹10,000 (ಗರಿಷ್ಠ 2 ಹೆಕ್ಟೇರ್‌ಗೆ ₹20,000) "
-                    "ಪ್ರೋತ್ಸಾಹಧನ ಸಿಗುತ್ತದೆ. ಇದಕ್ಕೆ ನಿಮ್ಮ ಭೂಮಿಯನ್ನು ಫ್ರೂಟ್ಸ್ (FRUITS) ಪೋರ್ಟಲ್‌ನಲ್ಲಿ ನೋಂದಾಯಿಸಿ FID ಸಂಖ್ಯೆ ಹೊಂದಿರಬೇಕು. "
-                    "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಪಹಣಿ/RTC, ಆಧಾರ್, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್. ನಿಮ್ಮ ಸಮೀಪದ ರೈತ ಸಂಪರ್ಕ ಕೇಂದ್ರಕ್ಕೆ (RSK) ಭೇಟಿ ನೀಡಿ. "
-                    "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: fruits.karnataka.gov.in."
-                )
-            else:
-                ans = (
-                    "Under Karnataka Raitha Siri Scheme, horticulture & millet growers receive ₹10,000 per hectare "
-                    "(up to 2 hectares = ₹20,000) directly via DBT. You must be registered on the Karnataka FRUITS portal "
-                    "with a valid FID. Required documents: RTC/Pahani, Aadhaar, and bank passbook. "
-                    "Apply or update at your nearest Raitha Samparka Kendra (RSK) or visit fruits.karnataka.gov.in."
-                )
+        elif re.search(r"raitha siri|millet|ಸಿರಿ|ರೈತ ಸಿರಿ|ತೋಟಗಾರಿಕೆ|fruits|ರೈತಸಿರಿ", query_lower):
+            ans_kn = (
+                "ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ ಯೋಜನೆಯಡಿ, ಸಿರಿಧಾನ್ಯ ಮತ್ತು ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಾರರಿಗೆ ಹೆಕ್ಟೇರ್‌ಗೆ ₹10,000 (ಗರಿಷ್ಠ 2 ಹೆಕ್ಟೇರ್‌ಗೆ ₹20,000) "
+                "ಪ್ರೋತ್ಸಾಹಧನ ಸಿಗುತ್ತದೆ. ಇದಕ್ಕೆ ನಿಮ್ಮ ಭೂಮಿಯನ್ನು ಫ್ರೂಟ್ಸ್ (FRUITS) ಪೋರ್ಟಲ್‌ನಲ್ಲಿ ನೋಂದಾಯಿಸಿ FID ಸಂಖ್ಯೆ ಹೊಂದಿರಬೇಕು. "
+                "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಪಹಣಿ/RTC, ಆಧಾರ್, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್. ನಿಮ್ಮ ಸಮೀಪದ ರೈತ ಸಂಪರ್ಕ ಕೇಂದ್ರಕ್ಕೆ (RSK) ಭೇಟಿ ನೀಡಿ. "
+                "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: fruits.karnataka.gov.in."
+            )
+            ans_en = (
+                "Under Karnataka Raitha Siri Scheme, horticulture & millet growers receive ₹10,000 per hectare "
+                "(up to 2 hectares = ₹20,000) directly via DBT. You must be registered on the Karnataka FRUITS portal "
+                "with a valid FID. Required documents: RTC/Pahani, Aadhaar, and bank passbook. "
+                "Apply or update at your nearest Raitha Samparka Kendra (RSK) or visit fruits.karnataka.gov.in."
+            )
             scheme_id = "SCHEME-KA-RAITHA-SIRI"
 
-        elif re.search(r"pm kisan|kisan|ಸಮ್ಮಾನ್|ಆದಾಯ|6000", query_lower):
-            if is_kn:
-                ans = (
-                    "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ (PM-KISAN) ಯೋಜನೆಯಡಿ, ಸಾಗುವಳಿ ಭೂಮಿ ಹೊಂದಿರುವ ಅರ್ಹ ರೈತ ಕುಟುಂಬಗಳಿಗೆ "
-                    "ವರ್ಷಕ್ಕೆ ₹6,000 ಆದಾಯ ಬೆಂಬಲ ಸಿಗುತ್ತದೆ (ತಲಾ ₹2,000 ರ 3 ಕಂತುಗಳಲ್ಲಿ). "
-                    "ನಿಮ್ಮ ಆಧಾರ್ ಸಂಖ್ಯೆಗೆ e-KYC ಪೂರ್ಣಗೊಂಡಿರಬೇಕು ಮತ್ತು ಬ್ಯಾಂಕ್ ಖಾತೆ ಆಧಾರ್‌ಗೆ ಲಿಂಕ್ ಆಗಿರಬೇಕು. "
-                    "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: pmkisan.gov.in, ಸಹಾಯವಾಣಿ: 155261."
-                )
-            else:
-                ans = (
-                    "PM-KISAN provides ₹6,000 per year in three installments of ₹2,000 each directly to cultivable "
-                    "landholding farmer families. Requires completed biometric/facial e-KYC and Aadhaar-seeded bank account. "
-                    "Official portal: pmkisan.gov.in (Helpline: 155261)."
-                )
+        elif re.search(r"pm kisan|kisan|ಸಮ್ಮಾನ್|ಆದಾಯ|6000|सम्मान|किसान", query_lower):
+            ans_kn = (
+                "ಪ್ರಧಾನ ಮಂತ್ರಿ ಕಿಸಾನ್ ಸಮ್ಮಾನ್ ನಿಧಿ (PM-KISAN) ಯೋಜನೆಯಡಿ, ಸಾಗುವಳಿ ಭೂಮಿ ಹೊಂದಿರುವ ಅರ್ಹ ರೈತ ಕುಟುಂಬಗಳಿಗೆ "
+                "ವರ್ಷಕ್ಕೆ ₹6,000 ಆದಾಯ ಬೆಂಬಲ ಸಿಗುತ್ತದೆ (ತಲಾ ₹2,000 ರ 3 ಕಂತುಗಳಲ್ಲಿ). "
+                "ನಿಮ್ಮ ಆಧಾರ್ ಸಂಖ್ಯೆಗೆ e-KYC ಪೂರ್ಣಗೊಂಡಿರಬೇಕು ಮತ್ತು ಬ್ಯಾಂಕ್ ಖಾತೆ ಆಧಾರ್‌ಗೆ ಲಿಂಕ್ ಆಗಿರಬೇಕು. "
+                "ಅಧಿಕೃತ ಪೋರ್ಟಲ್: pmkisan.gov.in, ಸಹಾಯವಾಣಿ: 155261."
+            )
+            ans_en = (
+                "PM-KISAN provides ₹6,000 per year in three installments of ₹2,000 each directly to cultivable "
+                "landholding farmer families. Requires completed biometric/facial e-KYC and Aadhaar-seeded bank account. "
+                "Official portal: pmkisan.gov.in (Helpline: 155261)."
+            )
             scheme_id = "SCHEME-PM-KISAN"
 
-        elif re.search(r"insurance|fasal bima|samrakshane|ವಿಮೆ|ಫಸಲ್ ಬಿಮಾ|ಸಂರಕ್ಷಣೆ|ನಷ್ಟ", query_lower):
-            if is_kn:
-                ans = (
-                    "ಪ್ರಧಾನ ಮಂತ್ರಿ ಫಸಲ್ ಬಿಮಾ (ಸಂರಕ್ಷಣೆ ಕರ್ನಾಟಕ) ಯೋಜನೆಯಡಿ ಬೆಳೆ ಹಾನಿಗೆ ಸಮಗ್ರ ವಿಮಾ ರಕ್ಷಣೆ ಸಿಗುತ್ತದೆ. "
-                    "ಟೊಮೆಟೊ, ಈರುಳ್ಳಿ ಮುಂತಾದ ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಳಿಗೆ ರೈತರು ಕೇವಲ 5% ಪ್ರೀಮಿಯಂ ಪಾವತಿಸಬೇಕು. "
-                    "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಜಮೀನಿನ ಪಹಣಿ (RTC), ಬಿತ್ತನೆ ದೃಢೀಕರಣ ಪತ್ರ, ಆಧಾರ್. "
-                    "ನಿಮ್ಮ ತಾಲೂಕಿನ ಬೆಳೆ ಕಟ್-ಆಫ್ ದಿನಾಂಕವನ್ನು samrakshane.karnataka.gov.in ನಲ್ಲಿ ಪರಿಶೀಲಿಸಿ."
-                )
-            else:
-                ans = (
-                    "PM Fasal Bima Yojana / Samrakshane Karnataka covers natural crop losses from pre-sowing to post-harvest. "
-                    "For commercial and horticulture crops like Tomato and Onion, farmers pay only 5% nominal premium. "
-                    "Check cut-off dates and submit RTC and sowing certificate at your nearest CSC or bank branch. "
-                    "Portal: samrakshane.karnataka.gov.in (Helpline: 080-22180800)."
-                )
+        elif re.search(r"insurance|fasal bima|samrakshane|ವಿಮೆ|ಫಸಲ್ ಬಿಮಾ|ಸಂರಕ್ಷಣೆ|ನಷ್ಟ|बीमा|फसल बीमा", query_lower):
+            ans_kn = (
+                "ಪ್ರಧಾನ ಮಂತ್ರಿ ಫಸಲ್ ಬಿಮಾ (ಸಂರಕ್ಷಣೆ ಕರ್ನಾಟಕ) ಯೋಜನೆಯಡಿ ಬೆಳೆ ಹಾನಿಗೆ ಸಮಗ್ರ ವಿಮಾ ರಕ್ಷಣೆ ಸಿಗುತ್ತದೆ. "
+                "ಟೊಮೆಟೊ, ಈರುಳ್ಳಿ ಮುಂತಾದ ತೋಟಗಾರಿಕೆ ಬೆಳೆಗಳಿಗೆ ರೈತರು ಕೇವಲ 5% ಪ್ರೀಮಿಯಂ ಪಾವತಿಸಬೇಕು. "
+                "ಅಗತ್ಯ ದಾಖಲೆಗಳು: ಜಮೀನಿನ ಪಹಣಿ (RTC), ಬಿತ್ತನೆ ದೃಢೀಕರಣ ಪತ್ರ, ಆಧಾರ್. "
+                "ನಿಮ್ಮ ತಾಲೂಕಿನ ಬೆಳೆ ಕಟ್-ಆಫ್ ದಿನಾಂಕವನ್ನು samrakshane.karnataka.gov.in ನಲ್ಲಿ ಪರಿಶೀಲಿಸಿ."
+            )
+            ans_en = (
+                "PM Fasal Bima Yojana / Samrakshane Karnataka covers natural crop losses from pre-sowing to post-harvest. "
+                "For commercial and horticulture crops like Tomato and Onion, farmers pay only 5% nominal premium. "
+                "Check cut-off dates and submit RTC and sowing certificate at your nearest CSC or bank branch. "
+                "Portal: samrakshane.karnataka.gov.in (Helpline: 080-22180800)."
+            )
             scheme_id = "SCHEME-PMFBY-SAMRAKSHANE"
 
-        elif re.search(r"enam|e-nam|ಮಾರುಕಟ್ಟೆ|ಆನ್‌ಲೈನ್ ಮಾರಾಟ|trading|bidding", query_lower):
-            if is_kn:
-                ans = (
-                    "e-NAM (ರಾಷ್ಟ್ರೀಯ ಕೃಷಿ ಮಾರುಕಟ್ಟೆ) ಮೂಲಕ ನೀವು ಕೋಲಾರ ಅಥವಾ ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿಗೆ ತರುವ ಬೆಳೆಯನ್ನು "
-                    "ದೇಶಾದ್ಯಂತದ ವ್ಯಾಪಾರಿಗಳು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸ್ಪರ್ಧಾತ್ಮಕ ದರಕ್ಕೆ ಬಿಡ್ ಮಾಡುತ್ತಾರೆ. "
-                    "ಯಾವುದೇ ಅನಧಿಕೃತ ಕಮಿಷನ್ ಕಡಿತವಿಲ್ಲ, ಸರಿಯಾದ ಎಲೆಕ್ಟ್ರಾನಿಕ್ ತೂಕ, ಮತ್ತು 24 ಗಂಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ನೇರ ಹಣ ಬರುತ್ತದೆ. "
-                    "ನೋಂದಣಿಗೆ ಆಧಾರ್ ಮತ್ತು ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್ ಸಾಕು. ಅಧಿಕೃತ ಪೋರ್ಟಲ್: enam.gov.in."
-                )
-            else:
-                ans = (
-                    "e-NAM provides pan-India electronic price discovery at integrated APMCs (like Kolar and Bangarpet). "
-                    "Produce is assayed for quality, and verified buyers bid electronically with zero unauthorized commission "
-                    "and direct online payment to your bank within 24 hours. "
-                    "Register free with Aadhaar and bank details at the APMC gate or on enam.gov.in."
-                )
+        elif re.search(r"enam|e-nam|ಮಾರುಕಟ್ಟೆ|ಆನ್‌ಲೈನ್ ಮಾರಾಟ|trading|bidding|ई-नाम|मंडी ट्रेडिंग", query_lower):
+            ans_kn = (
+                "e-NAM (ರಾಷ್ಟ್ರೀಯ ಕೃಷಿ ಮಾರುಕಟ್ಟೆ) ಮೂಲಕ ನೀವು ಕೋಲಾರ ಅಥವಾ ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿಗೆ ತರುವ ಬೆಳೆಯನ್ನು "
+                "ದೇಶಾದ್ಯಂತದ ವ್ಯಾಪಾರಿಗಳು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸ್ಪರ್ಧಾತ್ಮಕ ದರಕ್ಕೆ ಬಿಡ್ ಮಾಡುತ್ತಾರೆ. "
+                "ಯಾವುದೇ ಅನಧಿಕೃತ ಕಮಿಷನ್ ಕಡಿತವಿಲ್ಲ, ಸರಿಯಾದ ಎಲೆಕ್ಟ್ರಾನಿಕ್ ತೂಕ, ಮತ್ತು 24 ಗಂಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ನೇರ ಹಣ ಬರುತ್ತದೆ. "
+                "ನೋಂದಣಿಗೆ ಆಧಾರ್ ಮತ್ತು ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್ ಸಾಕು. ಅಧಿಕೃತ ಪೋರ್ಟಲ್: enam.gov.in."
+            )
+            ans_en = (
+                "e-NAM provides pan-India electronic price discovery at integrated APMCs (like Kolar and Bangarpet). "
+                "Produce is assayed for quality, and verified buyers bid electronically with zero unauthorized commission "
+                "and direct online payment to your bank within 24 hours. "
+                "Register free with Aadhaar and bank details at the APMC gate or on enam.gov.in."
+            )
             scheme_id = "SCHEME-ENAM-DIRECT"
 
         else:
-            if is_kn:
-                ans = (
-                    "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ ವಿವರ: 1. ಪಿಎಂ-ಕಿಸಾನ್ (₹6,000/ವರ್ಷ), 2. ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ (₹10,000/ಹೆಕ್ಟೇರ್ ತೋಟಗಾರಿಕೆ), "
-                    "3. ಸಂರಕ್ಷಣೆ ಬೆಳೆ ವಿಮೆ (5% ಪ್ರೀಮಿಯಂ), 4. ನಬಾರ್ಡ್ FPO ಅನುದಾನ (₹15 ಲಕ್ಷ ಸಂಸ್ಥೆಗೆ), "
-                    "5. e-NAM ನೇರ ಮಾರುಕಟ್ಟೆ. ನಿರ್ದಿಷ್ಟ ಯೋಜನೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಹೆಸರನ್ನು ಹೇಳಿ."
-                )
-            else:
-                ans = (
-                    "Available verified agricultural opportunities: 1. PM-KISAN (₹6,000/yr), "
-                    "2. Karnataka Raitha Siri (₹10,000/ha for horticulture), 3. Samrakshane Crop Insurance, "
-                    "4. SFAC/NABARD 10,000 FPO Scheme (₹15 Lakhs institutional equity grant), and 5. e-NAM Direct Trading. "
-                    "Ask about any specific scheme for step-by-step guidance."
-                )
+            ans_kn = (
+                "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳ ವಿವರ: 1. ಪಿಎಂ-ಕಿಸಾನ್ (₹6,000/ವರ್ಷ), 2. ಕರ್ನಾಟಕ ರೈತ ಸಿರಿ (₹10,000/ಹೆಕ್ಟೇರ್ ತೋಟಗಾರಿಕೆ), "
+                "3. ಸಂರಕ್ಷಣೆ ಬೆಳೆ ವಿಮೆ (5% ಪ್ರೀಮಿಯಂ), 4. ನಬಾರ್ಡ್ FPO ಅನುದಾನ (₹15 ಲಕ್ಷ ಸಂಸ್ಥೆಗೆ), "
+                "5. e-NAM ನೇರ ಮಾರುಕಟ್ಟೆ. ನಿರ್ದಿಷ್ಟ ಯೋಜನೆಯ ಬಗ್ಗೆ ಕೇಳಲು ಹೆಸರನ್ನು ಹೇಳಿ."
+            )
+            ans_en = (
+                "Available verified agricultural opportunities: 1. PM-KISAN (₹6,000/yr), "
+                "2. Karnataka Raitha Siri (₹10,000/ha for horticulture), 3. Samrakshane Crop Insurance, "
+                "4. SFAC/NABARD 10,000 FPO Scheme (₹15 Lakhs institutional equity grant), and 5. e-NAM Direct Trading. "
+                "Ask about any specific scheme for step-by-step guidance."
+            )
             scheme_id = None
 
-        tts_res = cls.synthesize_speech(ans, language_code)
+        if is_kn:
+            ans = ans_kn
+        elif is_en:
+            ans = ans_en
+        else:
+            tr = cls.translate_text(ans_en, target_language_code=target_lang, source_language_code="en-IN")
+            ans = tr.get("translated_text") or ans_en
+
+        tts_res = cls.synthesize_speech(ans, target_lang)
         return {
             "query": query_text,
             "answer": ans,
-            "language_code": language_code,
+            "language_code": target_lang,
             "scheme_id": scheme_id,
             "audio_base64": tts_res.get("audio_base64", ""),
             "disclaimer": "Factual guidance based strictly on verified government publications. Not a government approval or financial guarantee."
+        }
+
+    @classmethod
+    def generate_cold_storage_spoken_summary(
+        cls,
+        facility_name: str,
+        district: str,
+        distance_km: float,
+        available_capacity_mt: float,
+        daily_rate_per_quintal: float,
+        mandi_distances: Optional[List[Dict[str, Any]]] = None,
+        language_code: str = "kn-IN"
+    ) -> Dict[str, Any]:
+        """
+        Synthesizes spoken audio explanation of a discovered cold storage facility,
+        travel distances to local mandis, bay capacity, and rental rates across all 11 Sarvam languages.
+        """
+        target_lang = cls.normalize_language_code(language_code)
+        is_kn = target_lang == "kn-IN"
+        is_en = target_lang == "en-IN"
+
+        mandi_phrase_kn = ""
+        mandi_phrase_en = ""
+        if mandi_distances:
+            first = mandi_distances[0]
+            m_name = first.get("mandi_name") or first.get("market") or "ಸಮೀಪದ ಮಂಡಿ"
+            m_dist = first.get("distance_km", 0)
+            mandi_phrase_kn = f"ಇದು {m_name} ಮಾರುಕಟ್ಟೆಯಿಂದ {m_dist} ಕಿಮೀ ದೂರದಲ್ಲಿದೆ. "
+            mandi_phrase_en = f"It is {m_dist} km from {m_name}. "
+
+        text_kn = (
+            f"ಸೂಕ್ತವಾದ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಸೌಲಭ್ಯ '{facility_name}' ನಿಮ್ಮ ಸ್ಥಳದಿಂದ {distance_km:.1f} ಕಿಲೋಮೀಟರ್ ದೂರದಲ್ಲಿದೆ. "
+            f"{mandi_phrase_kn}"
+            f"ಲಭ್ಯವಿರುವ ಸಾಮರ್ಥ್ಯ {available_capacity_mt:.1f} ಟನ್ ದೃಢೀಕರಿಸಲಾಗಿದೆ. ದಿನದ ದರ ಕ್ವಿಂಟಾಲ್‌ಗೆ ₹{daily_rate_per_quintal:.2f}. "
+            f"ದಯವಿಟ್ಟು ಸೌಲಭ್ಯವನ್ನು ಸಂಪರ್ಕಿಸಿ ಬುಕಿಂಗ್ ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ."
+        )
+
+        text_en = (
+            f"Cold-storage facility '{facility_name}' is {distance_km:.1f} kilometres from your location in {district}. "
+            f"{mandi_phrase_en}"
+            f"Verified available space is {available_capacity_mt:.1f} tonnes at ₹{daily_rate_per_quintal:.2f} per quintal per day. "
+            f"Please contact the facility to confirm crate reservation."
+        )
+
+        if is_kn:
+            spoken_text = text_kn
+        elif is_en:
+            spoken_text = text_en
+        else:
+            tr = cls.translate_text(text_en, target_language_code=target_lang, source_language_code="en-IN")
+            spoken_text = tr.get("translated_text") or text_en
+
+        tts_res = cls.synthesize_speech(spoken_text, target_lang)
+        return {
+            "facility_name": facility_name,
+            "district": district,
+            "distance_km": distance_km,
+            "available_capacity_mt": available_capacity_mt,
+            "daily_rate_per_quintal": daily_rate_per_quintal,
+            "transcript": spoken_text,
+            "language_code": target_lang,
+            "audio_base64": tts_res.get("audio_base64", "")
         }
