@@ -270,6 +270,15 @@ object ApiClient {
         getJson("$BASE_URL/api/schemes/notifications/$identifier")
     }
 
+    suspend fun registerPushToken(
+        deviceId: String,
+        userId: String,
+        fcmToken: String
+    ): String = withContext(Dispatchers.IO) {
+        val payload = """{"device_id":"$deviceId","user_id":"$userId","fcm_token":"$fcmToken","platform":"android"}"""
+        postJson("$BASE_URL/api/notifications/register-token", payload)
+    }
+
     suspend fun updateVoluntaryProfile(
         farmerId: String?,
         phone: String?,

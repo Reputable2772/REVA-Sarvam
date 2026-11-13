@@ -80,6 +80,12 @@ object UserSession {
 
     var selectedLanguageCode by mutableStateOf("kn")
 
+    var isDarkTheme by mutableStateOf(false)
+
+    fun toggleTheme() {
+        isDarkTheme = !isDarkTheme
+    }
+
     val selectedLanguage: SupportedLanguage
         get() = supportedLanguages.find { it.code == selectedLanguageCode } ?: supportedLanguages.first()
 

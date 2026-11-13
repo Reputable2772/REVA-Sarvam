@@ -698,15 +698,20 @@ private fun SoilPhoneEntryCard(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = Color(0xFF1B2A1E),
                     unfocusedTextColor = Color(0xFF1B2A1E),
+                    disabledTextColor = Color(0xFF1B2A1E),
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
+                    disabledContainerColor = Color.White,
                     focusedBorderColor = SoilCropGreen,
                     unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
+                    disabledBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
                     focusedLabelColor = SoilCropGreen,
                     unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
+                    disabledLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
                     cursorColor = SoilCropGreen,
                     focusedPrefixColor = SoilDeepEarth,
-                    unfocusedPrefixColor = SoilDeepEarth
+                    unfocusedPrefixColor = SoilDeepEarth,
+                    disabledPrefixColor = SoilDeepEarth
                 )
             )
 
@@ -1002,15 +1007,19 @@ private fun SoilOnboardingCard(
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color(0xFF1B2A1E),
         unfocusedTextColor = Color(0xFF1B2A1E),
+        disabledTextColor = Color(0xFF1B2A1E),
         focusedContainerColor = Color.White,
         unfocusedContainerColor = Color.White,
+        disabledContainerColor = Color.White,
         focusedBorderColor = SoilCropGreen,
         unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
+        disabledBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
         focusedLabelColor = SoilCropGreen,
         unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
+        disabledLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
         cursorColor = SoilCropGreen
     )
-    val fieldTextStyle = LocalTextStyle.current.copy(
+    val fieldTextStyle = androidx.compose.ui.text.TextStyle(
         color = Color(0xFF1B2A1E),
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp

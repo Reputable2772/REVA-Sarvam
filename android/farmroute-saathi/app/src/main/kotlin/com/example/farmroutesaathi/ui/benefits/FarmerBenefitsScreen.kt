@@ -97,7 +97,7 @@ fun FarmerBenefitsScreen(
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
     val scope = rememberCoroutineScope()
-    val isDark = isSystemInDarkTheme()
+    val isDark = UserSession.isDarkTheme
 
     fun loadData() {
         isLoading = true
@@ -242,8 +242,10 @@ fun FarmerBenefitsScreen(
     ) {
         // Top Summary & Intelligence Header
         Card(
-            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else ForestGreenDeep),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
             shape = RoundedCornerShape(16.dp),
+            border = androidx.compose.foundation.BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -258,13 +260,13 @@ fun FarmerBenefitsScreen(
                     Column {
                         Text(
                             text = if (isKannada) "🏛️ AI ರೈತ ಯೋಜನೆಗಳು & ಸೌಲಭ್ಯಗಳು" else "🏛️ AI Farmer Benefits & Schemes",
-                            color = Color.White,
+                            color = if (isDark) Color.White else SoilDeepEarth,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp
                         )
                         Text(
                             text = "📍 Kolar, Karnataka • Verified Government Intelligence",
-                            color = FreshLimeAccent,
+                            color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -274,7 +276,7 @@ fun FarmerBenefitsScreen(
                     Box(
                         modifier = Modifier
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f))
+                            .background(if (isDark) Color.White.copy(alpha = 0.15f) else SoilCropGreen.copy(alpha = 0.12f))
                             .clickable { showNotificationsSheet = true }
                             .padding(8.dp)
                     ) {
@@ -305,7 +307,7 @@ fun FarmerBenefitsScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
-                        color = FreshLeafGreen.copy(alpha = 0.25f),
+                        color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -313,19 +315,19 @@ fun FarmerBenefitsScreen(
                             Text(
                                 text = if (isKannada) "ಅರ್ಹತೆಯಿದೆ" else "Likely Eligible",
                                 fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.9f)
+                                color = if (isDark) Color.White.copy(alpha = 0.9f) else TextSecondaryLight
                             )
                             Text(
                                 text = "$likelyEligibleCount Schemes",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = FreshLimeAccent
+                                color = if (isDark) SoilFreshLeaf else SoilCropGreen
                             )
                         }
                     }
 
                     Surface(
-                        color = HarvestGoldDark.copy(alpha = 0.25f),
+                        color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -333,13 +335,13 @@ fun FarmerBenefitsScreen(
                             Text(
                                 text = if (isKannada) "ಮಾಹಿತಿ ಬೇಕು" else "More Info",
                                 fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.9f)
+                                color = if (isDark) Color.White.copy(alpha = 0.9f) else TextSecondaryLight
                             )
                             Text(
                                 text = "$moreInfoNeededCount Schemes",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = HarvestGold
+                                color = if (isDark) HarvestGold else HarvestGoldDark
                             )
                         }
                     }
@@ -352,14 +354,14 @@ fun FarmerBenefitsScreen(
                         playVoiceGuidance(prompt)
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isPlayingAudio) SemanticWarningAmber else FreshLimeAccent
+                        containerColor = if (isPlayingAudio) SemanticWarningAmber else SoilCropGreen
                     ),
                     shape = RoundedCornerShape(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = if (isPlayingAudio) "⏹ Stop Audio / ನಿಲ್ಲಿಸಿ" else if (isKannada) "▶ ಧ್ವನಿ ಸಾರಾಂಶ ಕೇಳಿ (Bulbul TTS)" else "▶ Listen AI Scheme Summary 🔊",
-                        color = Color.Black,
+                        color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -368,7 +370,8 @@ fun FarmerBenefitsScreen(
                 // Spoken Text Banner
                 if (activeSpokenText != null) {
                     Surface(
-                        color = Color.Black.copy(alpha = 0.35f),
+                        color = if (isDark) Color.Black.copy(alpha = 0.35f) else SoilFieldPaper,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.35f)),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -377,12 +380,12 @@ fun FarmerBenefitsScreen(
                                 text = "🗣️ AI Saathi Guidance:",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = FreshLimeAccent
+                                color = SoilCropGreen
                             )
                             Text(
                                 text = activeSpokenText ?: "",
                                 fontSize = 11.sp,
-                                color = Color.White,
+                                color = if (isDark) Color.White else TextPrimaryLight,
                                 lineHeight = 16.sp
                             )
                         }
@@ -422,7 +425,7 @@ fun FarmerBenefitsScreen(
 
                     Button(
                         onClick = { showMissingInfoDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = HarvestGoldDark),
+                        colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                     ) {
@@ -451,7 +454,7 @@ fun FarmerBenefitsScreen(
                     onClick = { selectedCategory = catKey },
                     label = { Text(label, fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = FreshLeafGreen,
+                        selectedContainerColor = SoilCropGreen,
                         selectedLabelColor = Color.White
                     )
                 )
@@ -461,7 +464,7 @@ fun FarmerBenefitsScreen(
         // Schemes List
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = FreshLeafGreen)
+                CircularProgressIndicator(color = SoilCropGreen)
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -486,8 +489,9 @@ fun FarmerBenefitsScreen(
 
         // FPO Institutional Distinction Banner
         Card(
-            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else SurfaceParchmentWarm),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
             shape = RoundedCornerShape(12.dp),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -495,7 +499,7 @@ fun FarmerBenefitsScreen(
                     text = if (isKannada) "ℹ️ FPO ಸಂಸ್ಥೆ ಮತ್ತು ವೈಯಕ್ತಿಕ ರೈತರ ಸೌಲಭ್ಯಗಳ ವ್ಯತ್ಯಾಸ" else "ℹ️ Individual vs FPO Institutional Grants Policy",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    color = if (isDark) FreshLimeAccent else ForestGreenDeep
+                    color = if (isDark) SoilFreshLeaf else SoilCropGreen
                 )
                 Text(
                     text = if (isKannada)
@@ -662,12 +666,13 @@ fun SchemeCardView(
     }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else SurfaceParchment),
+        colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
         shape = RoundedCornerShape(14.dp),
         border = androidx.compose.foundation.BorderStroke(
             width = if (scheme.matchStatus == "LIKELY_ELIGIBLE") 1.5.dp else 1.dp,
-            color = if (scheme.matchStatus == "LIKELY_ELIGIBLE") FreshLeafGreen else BorderParchment
+            color = if (scheme.matchStatus == "LIKELY_ELIGIBLE") SoilCropGreen else (if (isDark) BorderDarkSubtle else BorderPaperLight)
         ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { isExpanded = !isExpanded }
@@ -701,7 +706,7 @@ fun SchemeCardView(
                     Text(
                         text = "🟢 Verified",
                         fontSize = 10.sp,
-                        color = FreshLeafGreen,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                         fontWeight = FontWeight.SemiBold
                     )
                     IconButton(
@@ -719,7 +724,7 @@ fun SchemeCardView(
                     text = if (isKannada) scheme.titleKn else scheme.titleEn,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDark) TextPrimaryDark else TextPrimaryLight
+                    color = if (isDark) TextPrimaryDark else SoilDeepEarth
                 )
                 Text(
                     text = scheme.issuingDepartment,
@@ -730,7 +735,7 @@ fun SchemeCardView(
 
             // Benefit Spec Box (High-Contrast Living Intelligence style)
             Surface(
-                color = if (isDark) SurfaceDarkCardHigh else WarmIvoryBackground,
+                color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -751,7 +756,7 @@ fun SchemeCardView(
                             text = scheme.benefitAmountSpec,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (isDark) FreshLimeAccent else ForestGreenDeep
+                            color = if (isDark) SoilFreshLeaf else SoilCropGreen
                         )
                     }
                 }
@@ -796,7 +801,7 @@ fun SchemeCardView(
                         text = if (isExpanded) "▲ Hide Details" else "▼ View Documents & Steps",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (isDark) FreshLimeAccent else ForestGreenDeep
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
                 }
 
@@ -838,7 +843,7 @@ fun SchemeCardView(
                     )
                     scheme.requiredDocuments.forEach { doc ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("☑", color = FreshLeafGreen, fontSize = 12.sp)
+                            Text("☑", color = if (isDark) SoilFreshLeaf else SoilCropGreen, fontSize = 12.sp)
                             Text(doc, fontSize = 11.sp)
                         }
                     }
@@ -855,7 +860,7 @@ fun SchemeCardView(
 
                     // Official Source & Portal URL
                     Surface(
-                        color = if (isDark) Color.Black.copy(alpha = 0.3f) else SurfaceParchmentWarm,
+                        color = if (isDark) Color.Black.copy(alpha = 0.3f) else SoilFieldPaper,
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {

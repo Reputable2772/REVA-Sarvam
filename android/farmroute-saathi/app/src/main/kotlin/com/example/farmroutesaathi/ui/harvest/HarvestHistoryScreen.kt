@@ -171,6 +171,8 @@ fun HarvestHistoryScreen(
         }
     }
 
+    val isDark = UserSession.isDarkTheme
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -180,7 +182,8 @@ fun HarvestHistoryScreen(
         // Header Card with Farmer Profile and Summary
         Card(
             shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
+            border = androidx.compose.foundation.BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -207,13 +210,13 @@ fun HarvestHistoryScreen(
                     // Count Badge
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = ForestGreenDeep.copy(alpha = 0.12f)
+                        color = SoilCropGreen.copy(alpha = 0.12f)
                     ) {
                         Text(
                             text = "${harvests.size} " + (if (isKannada) "ದಾಖಲೆಗಳು" else "Lots"),
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = ForestGreenDeep,
+                            color = SoilCropGreen,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -229,7 +232,7 @@ fun HarvestHistoryScreen(
                         onClick = { selectedFilter = "ALL" },
                         label = { Text(if (isKannada) "ಎಲ್ಲವೂ" else "All (${harvests.size})", fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ForestGreenDeep,
+                            selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -238,7 +241,7 @@ fun HarvestHistoryScreen(
                         onClick = { selectedFilter = "TODAY" },
                         label = { Text(if (isKannada) "⚡ ಇಂದೇ ಮಾರಾಟ" else "⚡ Sell Today", fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ForestGreenDeep,
+                            selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -247,7 +250,7 @@ fun HarvestHistoryScreen(
                         onClick = { selectedFilter = "LATER" },
                         label = { Text(if (isKannada) "📅 ನಿಗದಿತ" else "📅 Scheduled", fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ForestGreenDeep,
+                            selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -256,7 +259,7 @@ fun HarvestHistoryScreen(
                         onClick = { selectedFilter = "TOMATO" },
                         label = { Text("🍅 Tomato", fontSize = 11.sp) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = ForestGreenDeep,
+                            selectedContainerColor = SoilCropGreen,
                             selectedLabelColor = Color.White
                         )
                     )
@@ -272,14 +275,15 @@ fun HarvestHistoryScreen(
         ) {
             Button(
                 onClick = { onDeclareHarvestClick?.invoke() },
-                colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
+                colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
             ) {
                 Text(
                     text = if (isKannada) "➕ ಹೊಸ ಕೊಯ್ಲು ನೋಂದಾಯಿಸಿ" else "➕ Declare New Harvest",
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
 
@@ -295,13 +299,14 @@ fun HarvestHistoryScreen(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = ForestGreenDeep)
+                CircularProgressIndicator(color = SoilCropGreen)
             }
         } else if (filteredHarvests.isEmpty()) {
             // Empty State
             Card(
                 shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
+                border = androidx.compose.foundation.BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
@@ -325,10 +330,10 @@ fun HarvestHistoryScreen(
                     )
                     Button(
                         onClick = { onDeclareHarvestClick?.invoke() },
-                        colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
+                        colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(if (isKannada) "➕ ಈಗಲೇ ಕೊಯ್ಲು ನೋಂದಾಯಿಸಿ" else "➕ Declare Harvest Now")
+                        Text(if (isKannada) "➕ ಈಗಲೇ ಕೊಯ್ಲು ನೋಂದಾಯಿಸಿ" else "➕ Declare Harvest Now", color = Color.White)
                     }
                 }
             }
@@ -338,6 +343,12 @@ fun HarvestHistoryScreen(
                 filteredHarvests.forEach { item ->
                     HarvestHistoryCard(
                         item = item,
+                        isKannada = isKannada,
+                        onViewMandiRates = { onMandiComparisonClick?.invoke(item.lotId) }
+                    )
+                }
+            }
+        }
                         isKannada = isKannada,
                         onViewMandiRates = { onMandiComparisonClick?.invoke(item.lotId) }
                     )
@@ -363,9 +374,12 @@ fun HarvestHistoryCard(
         else -> "🌾"
     }
 
+    val isDark = UserSession.isDarkTheme
+
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.2.dp, if (isDark) BorderDarkSubtle else BorderPaperLight),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -378,21 +392,21 @@ fun HarvestHistoryCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant
+                    color = if (isDark) SurfaceDarkCardHigh else SoilFieldPaper
                 ) {
                     Text(
                         text = item.lotId,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = if (item.sellImmediately) ForestGreenDeep.copy(alpha = 0.12f) else HarvestGold.copy(alpha = 0.18f)
+                    color = if (item.sellImmediately) SoilCropGreen.copy(alpha = 0.12f) else SoilHarvestGold.copy(alpha = 0.18f)
                 ) {
                     Text(
                         text = if (item.sellImmediately)
@@ -401,7 +415,7 @@ fun HarvestHistoryCard(
                             (if (isKannada) "📅 ನಿಗದಿತ ಕೊಯ್ಲು" else "📅 SCHEDULED"),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (item.sellImmediately) ForestGreenDeep else HarvestGoldDark,
+                        color = if (item.sellImmediately) (if (isDark) SoilFreshLeaf else SoilCropGreen) else HarvestGoldDark,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
@@ -440,17 +454,17 @@ fun HarvestHistoryCard(
                         text = "${item.quantityKg.toInt()} kg",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 18.sp,
-                        color = ForestGreenDeep
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = FreshLeafGreen.copy(alpha = 0.12f)
+                        color = SoilCropGreen.copy(alpha = 0.12f)
                     ) {
                         Text(
                             text = item.status,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ForestGreenDeep,
+                            color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                         )
                     }
@@ -462,7 +476,7 @@ fun HarvestHistoryCard(
             // Direct Mandi Comparison CTA Button
             Button(
                 onClick = onViewMandiRates,
-                colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep),
+                colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
@@ -476,7 +490,8 @@ fun HarvestHistoryCard(
                         text = if (isKannada) "ಮಾರುಕಟ್ಟೆ ದರಗಳು & ಆದಾಯ ಪರಿಶೀಲಿಸಿ (${item.crop})"
                         else "View Mandi Rates & Net Profit (${item.crop})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        color = Color.White
                     )
                 }
             }

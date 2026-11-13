@@ -47,7 +47,7 @@ fun MainScreen(
 ) {
     val currentLangCode = UserSession.selectedLanguageCode
     val isKannada = (currentLangCode == "kn")
-    var isDarkTheme by remember { mutableStateOf(false) }
+    val isDarkTheme = UserSession.isDarkTheme
     var selectedTab by remember { mutableStateOf(RoleTab.FARMER) }
     var backendStatus by remember { mutableStateOf("Checking backend...") }
     var voiceState by remember { mutableStateOf(SaathiVoiceState.IDLE) }
@@ -71,7 +71,7 @@ fun MainScreen(
                     onLanguageToggle = {
                         // UserSession.selectedLanguageCode was updated by dialog; recomposes automatically
                     },
-                    onThemeToggle = { isDarkTheme = !isDarkTheme },
+                    onThemeToggle = { UserSession.toggleTheme() },
                     onLogout = onLogout,
                     onHarvestClick = { onDeclareHarvestClick?.invoke() },
                     onVoiceAssistantClick = { showVoiceAssistantDialog = true }
@@ -229,10 +229,10 @@ fun FarmerDashboardView(
         // ====================================================================
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isSystemInDarkTheme()) SurfaceDarkCard else Color.White
+                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
             ),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.12f)),
+            border = BorderStroke(1.dp, if (UserSession.isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
         ) {
             Row(
@@ -292,7 +292,7 @@ fun FarmerDashboardView(
         // ====================================================================
         Card(
             colors = CardDefaults.cardColors(
-                containerColor = if (isSystemInDarkTheme()) SurfaceDarkCardHigh else SoilFieldPaper
+                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCardHigh else SoilFieldPaper
             ),
             shape = RoundedCornerShape(18.dp),
             border = BorderStroke(1.2.dp, SoilFreshLeaf.copy(alpha = 0.45f)),
@@ -605,9 +605,9 @@ private fun SecondaryServiceCard(
         modifier = modifier.clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSystemInDarkTheme()) SurfaceDarkCard else Color.White
+            containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
         ),
-        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.12f)),
+        border = BorderStroke(1.dp, if (UserSession.isDarkTheme) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -653,7 +653,7 @@ private fun FarmerPoolingDialog(
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isSystemInDarkTheme()) SurfaceDarkCard else Color.White
+                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
             ),
             border = BorderStroke(1.2.dp, SoilCropGreen),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
@@ -792,7 +792,7 @@ private fun WeatherAdvisoryDialog(
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = if (isSystemInDarkTheme()) SurfaceDarkCard else Color.White
+                containerColor = if (UserSession.isDarkTheme) SurfaceDarkCard else Color.White
             ),
             border = BorderStroke(1.2.dp, SoilHarvestGold),
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),

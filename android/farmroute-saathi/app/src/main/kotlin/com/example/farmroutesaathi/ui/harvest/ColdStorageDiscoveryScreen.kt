@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.UserSession
+import com.example.farmroutesaathi.ui.components.LanguageSelectionDialog
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -85,6 +85,7 @@ fun ColdStorageDiscoveryScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val isDark = UserSession.isDarkTheme
 
     var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
     var selectedRadiusKm by remember { mutableStateOf(50.0) }
@@ -95,98 +96,84 @@ fun ColdStorageDiscoveryScreen(
     var isSpeakingAudio by remember { mutableStateOf(false) }
     var useGpsLocation by remember { mutableStateOf(true) }
     var manualLocationText by remember { mutableStateOf(locationText) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
     fun loadData() {
         isLoading = true
         scope.launch {
             try {
-                val farmerId = UserSession.currentFarmer?.phone ?: "9845012345"
+                val lat = if (useGpsLocation) 13.133 else 13.133
+                val lon = if (useGpsLocation) 78.133 else 78.133
+                val langCode = if (isKannada) "kn-IN" else "en-IN"
+
                 val res = ApiClient.discoverColdStorage(
-                    farmerId = farmerId,
+                    farmerLat = lat,
+                    farmerLon = lon,
                     crop = crop,
                     quantityKg = quantityKg,
-                    latitude = if (useGpsLocation) farmerLat else 13.136,
-                    longitude = if (useGpsLocation) farmerLon else 78.129,
-                    locationText = manualLocationText,
-                    radiusKm = selectedRadiusKm
+                    radiusKm = selectedRadiusKm,
+                    language = langCode
                 )
                 val json = JSONObject(res)
-                val facList = mutableListOf<ColdStorageItem>()
                 val arr = json.optJSONArray("facilities") ?: JSONArray()
+                val list = mutableListOf<ColdStorageItem>()
+
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
                     val mArr = obj.optJSONArray("mandi_distances") ?: JSONArray()
                     val mList = mutableListOf<MandiDistanceItem>()
                     for (j in 0 until mArr.length()) {
                         val mObj = mArr.getJSONObject(j)
-                        mList.add(
-                            MandiDistanceItem(
-                                mandiName = mObj.optString("mandi_name", "APMC"),
-                                distanceKm = mObj.optDouble("distance_km", 0.0)
-                            )
-                        )
+                        mList.add(MandiDistanceItem(mObj.optString("mandi_name"), mObj.optDouble("distance_km")))
                     }
 
                     val dArr = obj.optJSONArray("direct_farmer_to_mandi") ?: JSONArray()
                     val dList = mutableListOf<MandiDistanceItem>()
-                    for (j in 0 until dArr.length()) {
-                        val dObj = dArr.getJSONObject(j)
-                        dList.add(
-                            MandiDistanceItem(
-                                mandiName = dObj.optString("mandi_name", "APMC"),
-                                distanceKm = dObj.optDouble("distance_km", 0.0)
-                            )
-                        )
+                    for (k in 0 until dArr.length()) {
+                        val dObj = dArr.getJSONObject(k)
+                        dList.add(MandiDistanceItem(dObj.optString("mandi_name"), dObj.optDouble("distance_km")))
                     }
 
-                    val cropsArr = obj.optJSONArray("crop_compatibility") ?: JSONArray()
-                    val cropList = mutableListOf<String>()
-                    for (k in 0 until cropsArr.length()) {
-                        cropList.add(cropsArr.getString(k))
-                    }
-
-                    facList.add(
+                    list.add(
                         ColdStorageItem(
-                            facilityId = obj.optString("facility_id", "CS-$i"),
+                            facilityId = obj.optString("facility_id", "FAC-$i"),
                             name = obj.optString("name", "Cold Storage"),
                             district = obj.optString("district", "Kolar"),
-                            address = obj.optString("address", ""),
-                            latitude = obj.optDouble("latitude", 13.13),
-                            longitude = obj.optDouble("longitude", 78.13),
-                            totalCapacityMt = obj.optDouble("total_capacity_mt", 100.0),
-                            availableCapacityMt = obj.optDouble("available_capacity_mt", 0.0),
-                            capacityVerified = obj.optBoolean("capacity_verified", false),
-                            cropCompatibility = cropList,
-                            storageType = obj.optString("storage_type", "Cold Storage"),
-                            contactPhone = obj.optString("contact_phone", "+91 98450 22001"),
-                            rentalChargesPerQuintalDay = obj.optDouble("rental_charges_per_quintal_day", 16.0),
-                            distanceFarmerKm = obj.optDouble("distance_farmer_km", 5.0),
-                            travelTimeMin = obj.optInt("travel_time_min", 15),
-                            routeType = obj.optString("route_type", "ROAD"),
+                            address = obj.optString("address", "NHB Registered Facility"),
+                            latitude = obj.optDouble("latitude", 13.14),
+                            longitude = obj.optDouble("longitude", 78.14),
+                            totalCapacityMt = obj.optDouble("total_capacity_mt", 5000.0),
+                            availableCapacityMt = obj.optDouble("available_capacity_mt", 120.0),
+                            capacityVerified = obj.optBoolean("capacity_verified", true),
+                            cropCompatibility = listOf("Tomato", "Vegetables"),
+                            storageType = obj.optString("storage_type", "Chilled Atmosphere"),
+                            contactPhone = obj.optString("contact_phone", "9845012345"),
+                            rentalChargesPerQuintalDay = obj.optDouble("rental_charges_per_quintal_day", 1.80),
+                            distanceFarmerKm = obj.optDouble("distance_farmer_km", 14.5),
+                            travelTimeMin = obj.optInt("travel_time_min", 25),
+                            routeType = obj.optString("route_type", "State Highway 96"),
                             mandiDistances = mList,
                             directFarmerToMandi = dList,
-                            rankingScore = obj.optDouble("ranking_score", 80.0),
-                            recommendationReason = obj.optString("recommendation_reason", "Nearby facility"),
-                            status = obj.optString("status", "OPERATIONAL")
+                            rankingScore = obj.optDouble("ranking_score", 92.0),
+                            recommendationReason = obj.optString("recommendation_reason", "Nearest verified facility on direct APMC route"),
+                            status = obj.optString("status", "AVAILABLE")
                         )
                     )
                 }
-                facilities = facList
+                facilities = list
 
-                // Fetch Weather harvest alerts
-                val wRes = ApiClient.getWeatherHarvestAlerts(farmerId)
+                val wRes = ApiClient.getWeatherRiskAlert(lat = lat, lon = lon, crop = crop)
                 val wJson = JSONObject(wRes)
                 if (wJson.optBoolean("has_active_alert", false)) {
-                    val aff = wJson.optJSONObject("affected_harvest")
                     weatherAlert = WeatherRiskAlert(
                         hasActiveAlert = true,
                         warningId = wJson.optString("warning_id", "IMD-001"),
                         district = wJson.optString("district", "Kolar"),
-                        severity = wJson.optString("severity", "ORANGE"),
-                        headline = wJson.optString("headline", "Weather warning"),
-                        headlineKannada = wJson.optString("headline_kannada", "ಹವಾಮಾನ ಎಚ್ಚರಿಕೆ"),
-                        vulnerability = aff?.optString("vulnerability", "") ?: "Perishable produce at risk.",
-                        recommendedAction = wJson.optString("recommended_action", "Move to cold storage."),
+                        severity = wJson.optString("severity", "ORANGE WARNING"),
+                        headline = wJson.optString("headline", "Heavy Unseasonal Rainfall Warning"),
+                        headlineKannada = wJson.optString("headline_kn", "ಭಾರಿ ಅಕಾಲಿಕ ಮಳೆ ಎಚ್ಚರಿಕೆ: ಕೊಯ್ಲು ತಕ್ಷಣ ರಕ್ಷಿಸಿ"),
+                        vulnerability = wJson.optString("vulnerability", "Harvested Solanaceous crop susceptible to damp rot"),
+                        recommendedAction = wJson.optString("recommended_action", "Move harvest to nearest cold storage within 24 hours"),
                         recommendedFacilityName = wJson.optString("recommended_facility_name", "Kolar APMC Cold Chain")
                     )
                 }
@@ -202,60 +189,102 @@ fun ColdStorageDiscoveryScreen(
         loadData()
     }
 
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            onDismiss = { showLanguageDialog = false },
+            onLanguageSelected = { lang ->
+                UserSession.setLanguage(lang)
+                isKannada = lang.code == "kn"
+                showLanguageDialog = false
+                loadData()
+            }
+        )
+    }
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             Surface(
-                color = ForestGreenDeep,
-                modifier = Modifier.fillMaxWidth(),
-                shadowElevation = 6.dp
+                color = if (isDark) SurfaceDarkCard else Color.White,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(onClick = onBackClick) {
-                                Text("←", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column {
+                        IconButton(onClick = onBackClick) {
+                            Text(
+                                text = "←",
+                                fontSize = 22.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Column {
+                            Text(
+                                text = if (isKannada) "ಸ್ಮಾರ್ಟ್ ಶೀತಲಾಗಾರ ಶೋಧನೆ" else "Smart Cold Storage Discovery",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (isKannada) "ರಾಷ್ಟ್ರೀಯ ತೋಟಗಾರಿಕಾ ಮಂಡಳಿ (NHB) ದತ್ತಾಂಶ" else "National Horticulture Board (NHB) Registry",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Theme toggle pill
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clickable { UserSession.toggleTheme() }
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = if (isKannada) "ಸ್ಮಾರ್ಟ್ ಶೀತಲಾಗಾರ ಶೋಧನೆ" else "Smart Cold Storage Discovery",
-                                    color = Color.White,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = if (isKannada) "ರಾಷ್ಟ್ರೀಯ ತೋಟಗಾರಿಕಾ ಮಂಡಳಿ (NHB) ದತ್ತಾಂಶ" else "National Horticulture Board (NHB) Registry",
-                                    color = HarvestGoldLight,
-                                    fontSize = 11.sp
+                                    text = if (isDark) "🌙" else "☀️",
+                                    fontSize = 13.sp
                                 )
                             }
                         }
 
-                        // Language Switcher
+                        // Language selector pill
                         Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = Color.White.copy(alpha = 0.15f),
-                            modifier = Modifier.clickable { isKannada = !isKannada }
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.2.dp, SoilCropGreen),
+                            modifier = Modifier.clickable { showLanguageDialog = true }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("🌐 ", fontSize = 12.sp)
+                                Text("🌐 ", fontSize = 11.sp)
                                 Text(
-                                    text = if (isKannada) "ಕನ್ನಡ" else "English",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = if (isKannada) "ಕನ್ನಡ" else "EN",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp,
+                                    color = if (isDark) Color(0xFF689F60) else SoilCropGreen
                                 )
                             }
                         }
@@ -268,20 +297,19 @@ fun ColdStorageDiscoveryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingVals)
-                .background(CreamBackgroundLight)
                 .verticalScroll(rememberScrollState())
         ) {
-
             // ==========================================
-            // FARMER LOCATION & SEARCH RADIUS BAR
+            // 1. FARMER LOCATION & SEARCH RADIUS BAR
             // ==========================================
-            Card(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(2.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = if (isDark) SurfaceDarkCard else Color.White,
+                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.outline),
+                shadowElevation = 2.dp
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(
@@ -291,30 +319,31 @@ fun ColdStorageDiscoveryScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("📍", fontSize = 18.sp)
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
                                     text = if (isKannada) "ರೈತರ ಸ್ಥಳ (Farmer Location)" else "Farmer Location",
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = ForestGreenDeep
+                                    fontSize = 13.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
                                     text = if (useGpsLocation) "$manualLocationText (13.133° N, 78.133° E)" else "$manualLocationText (PIN: 563101)",
                                     fontSize = 12.sp,
-                                    color = Color.DarkGray
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
                         Surface(
                             shape = RoundedCornerShape(12.dp),
-                            color = if (useGpsLocation) ForestGreenLight.copy(alpha = 0.15f) else AmberWarning.copy(alpha = 0.15f)
+                            color = (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.35f))
                         ) {
                             Text(
                                 text = if (useGpsLocation) "✓ GPS Active" else "Fallback PIN",
-                                color = if (useGpsLocation) ForestGreenDeep else AmberWarningDark,
-                                fontSize = 10.sp,
+                                color = if (isDark) Color(0xFF689F60) else SoilCropGreen,
+                                fontSize = 10.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
@@ -322,7 +351,7 @@ fun ColdStorageDiscoveryScreen(
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
@@ -334,16 +363,28 @@ fun ColdStorageDiscoveryScreen(
                             text = if (isKannada) "ಶೋಧನೆಯ ತ್ರಿಜ್ಯ (Radius):" else "Search Radius:",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             listOf(15.0, 30.0, 50.0, 75.0).forEach { r ->
-                                FilterChip(
-                                    selected = selectedRadiusKm == r,
-                                    onClick = { selectedRadiusKm = r },
-                                    label = { Text("${r.toInt()} km", fontSize = 10.sp) },
-                                    modifier = Modifier.height(32.dp)
-                                )
+                                val isSelected = selectedRadiusKm == r
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) (if (isDark) Color(0xFF5E9457) else SoilCropGreen) else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(
+                                        1.dp,
+                                        if (isSelected) (if (isDark) Color(0xFF5E9457) else SoilCropGreen) else MaterialTheme.colorScheme.outlineVariant
+                                    ),
+                                    modifier = Modifier.clickable { selectedRadiusKm = r }
+                                ) {
+                                    Text(
+                                        text = "${r.toInt()} km",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -351,19 +392,17 @@ fun ColdStorageDiscoveryScreen(
             }
 
             // ==========================================
-            // WEATHER RISK HARVEST PROTECTION ALERT
+            // 2. WEATHER RISK HARVEST PROTECTION ALERT
             // ==========================================
             weatherAlert?.let { alert ->
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = AmberWarning.copy(alpha = 0.12f)
-                    ),
-                    border = BorderStroke(1.5.dp, AmberWarning),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isDark) Color(0xFF2E1C06) else Color(0xFFFEF3C7),
+                    border = BorderStroke(1.5.dp, HarvestGoldDark.copy(alpha = 0.5f)),
+                    shadowElevation = 2.dp
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -375,16 +414,16 @@ fun ColdStorageDiscoveryScreen(
                                         text = if (isKannada) "ಭಾರತೀಯ ಹವಾಮಾನ ಇಲಾಖೆ (IMD) ಎಚ್ಚರಿಕೆ" else "IMD WEATHER PROTECTION ALERT",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = AmberWarningDark
+                                        color = if (isDark) Color(0xFFFDE68A) else HarvestGoldDark
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Surface(
                                         shape = RoundedCornerShape(6.dp),
-                                        color = AmberWarning
+                                        color = HarvestGoldDark
                                     ) {
                                         Text(
                                             text = alert.severity,
-                                            color = Color.Black,
+                                            color = Color.White,
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -394,8 +433,9 @@ fun ColdStorageDiscoveryScreen(
                                 Text(
                                     text = if (isKannada) alert.headlineKannada else alert.headline,
                                     fontSize = 12.sp,
-                                    color = Color.Black,
-                                    fontWeight = FontWeight.SemiBold
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
@@ -403,14 +443,16 @@ fun ColdStorageDiscoveryScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "⚠️ " + (if (isKannada) "ಕೊಯ್ಲು ಮಾಡಿದ ಟೊಮೆಟೊ ನೀರು ನಿಲ್ಲುವ ಅಪಾಯ: 24-36 ಗಂಟೆಗಳಲ್ಲಿ ಕೊಳೆಯುವ ಸಾಧ್ಯತೆ. ತಕ್ಷಣ ಶೀತಲಾಗಾರಕ್ಕೆ ಸ್ಥಳಾಂತರಿಸಿ." else alert.vulnerability),
-                            fontSize = 11.sp,
-                            color = Color(0xFF6B3A00)
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 15.sp
                         )
 
                         Spacer(modifier = Modifier.height(10.dp))
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = ForestGreenDeep.copy(alpha = 0.08f),
+                            color = (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.3f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -423,7 +465,7 @@ fun ColdStorageDiscoveryScreen(
                                     text = if (isKannada) "ಶಿಫಾರಸು: ${alert.recommendedFacilityName} ನಲ್ಲಿ ಜಾಗ ಕಾದಿರಿಸಿ." else "Recommended: Safe storage at ${alert.recommendedFacilityName}.",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = ForestGreenDeep
+                                    color = if (isDark) Color(0xFF689F60) else SoilCropGreen
                                 )
                             }
                         }
@@ -432,14 +474,15 @@ fun ColdStorageDiscoveryScreen(
             }
 
             // ==========================================
-            // HARVEST DETAILS PILL
+            // 3. HARVEST DETAILS PILL
             // ==========================================
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = ForestGreenDeep.copy(alpha = 0.06f),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -453,12 +496,12 @@ fun ColdStorageDiscoveryScreen(
                             text = "${quantityKg.toInt()} kg $crop",
                             fontWeight = FontWeight.Bold,
                             fontSize = 13.sp,
-                            color = ForestGreenDeep
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = " • Lot: $harvestId",
                             fontSize = 11.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
@@ -466,21 +509,22 @@ fun ColdStorageDiscoveryScreen(
                         text = if (facilities.isNotEmpty()) "${facilities.size} Facilities Found" else "Searching...",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = HarvestGoldDark
+                        color = if (isDark) Color(0xFF689F60) else SoilCropGreen
                     )
                 }
             }
 
             // ==========================================
-            // VOICE RECOMMENDATION BANNER
+            // 4. VOICE RECOMMENDATION BANNER
             // ==========================================
-            Card(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = ForestGreenDeep),
-                elevation = CardDefaults.cardElevation(3.dp)
+                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(18.dp),
+                color = if (isDark) SurfaceDarkCard else Color.White,
+                border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.outline),
+                shadowElevation = 2.dp
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Row(
@@ -488,20 +532,23 @@ fun ColdStorageDiscoveryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Text("🎙️", fontSize = 20.sp)
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = if (isKannada) "ಸರ್ವಂ ಸಾರಥಿ ಧ್ವನಿ ವಿವರಣೆ" else "Sarvam Saathi Voice Guidance",
-                                    color = Color.White,
+                                    text = if (isKannada) "ಸರ್ವಂ ಸಾಥಿ ಧ್ವನಿ ವಿವರಣೆ" else "Sarvam Saathi Voice Guidance",
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
                                 )
                                 Text(
-                                    text = if (isKannada) "ಬುಲ್ ಬುಲ್ ಧ್ವನಿ ಮುಖಾಂತರ ಆಲಿಸಿ" else "Listen via Sarvam Bulbul TTS",
-                                    color = HarvestGoldLight,
-                                    fontSize = 10.sp
+                                    text = if (isKannada) "ಬುಲ್ ಬುಲ್ ಧ್ವನಿ ಮುಖಾಂತರ ಆಲಿಸಿ" else "Listen via Sarvam Saaras TTS",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp
                                 )
                             }
                         }
@@ -530,14 +577,16 @@ fun ColdStorageDiscoveryScreen(
                                     }
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = HarvestGold),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isDark) Color(0xFF5E9457) else SoilCropGreen,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (isSpeakingAudio) "⏳ Loading..." else if (isKannada) "▶ ಆಲಿಸಿ" else "▶ Listen",
-                                color = Color.Black,
-                                fontSize = 12.sp,
+                                text = if (isSpeakingAudio) "⏳ Loading..." else if (isKannada) "▶ ಆಲಿಸಿ 🔊" else "▶ Listen 🔊",
+                                fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -546,14 +595,15 @@ fun ColdStorageDiscoveryScreen(
                     voiceTranscript?.let { transcript ->
                         Spacer(modifier = Modifier.height(10.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = Color.White.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "\"$transcript\"",
-                                color = Color.White,
-                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 11.5.sp,
                                 modifier = Modifier.padding(10.dp),
                                 lineHeight = 16.sp
                             )
@@ -562,10 +612,10 @@ fun ColdStorageDiscoveryScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // ==========================================
-            // RANKED COLD STORAGE FACILITY CARDS
+            // 5. RANKED COLD STORAGE FACILITY CARDS
             // ==========================================
             if (isLoading) {
                 Box(
@@ -575,21 +625,23 @@ fun ColdStorageDiscoveryScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator(color = ForestGreenDeep)
+                        CircularProgressIndicator(color = if (isDark) Color(0xFF689F60) else SoilCropGreen)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = if (isKannada) "ಹತ್ತಿರದ ಶೀತಲಾಗಾರಗಳನ್ನು ಹುಡುಕಲಾಗುತ್ತಿದೆ..." else "Searching nearby cold storage facilities...",
-                            fontSize = 13.sp,
-                            color = Color.Gray
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
             } else if (facilities.isEmpty()) {
-                Card(
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                        .padding(14.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isDark) SurfaceDarkCard else Color.White,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier.padding(24.dp),
@@ -600,12 +652,13 @@ fun ColdStorageDiscoveryScreen(
                         Text(
                             text = if (isKannada) "ಈ ತ್ರಿಜ್ಯದಲ್ಲಿ ಯಾವುದೇ ಶೀತಲಾಗಾರ ಕಂಡುಬಂದಿಲ್ಲ" else "No cold storage found within ${selectedRadiusKm.toInt()} km",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = if (isKannada) "ದಯವಿಟ್ಟು ಶೋಧನಾ ತ್ರಿಜ್ಯವನ್ನು ಹೆಚ್ಚಿಸಿ." else "Please increase the search radius above.",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -615,6 +668,7 @@ fun ColdStorageDiscoveryScreen(
                         facility = facility,
                         rank = index + 1,
                         isKannada = isKannada,
+                        isDark = isDark,
                         onCallFacility = { phone ->
                             val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone"))
                             context.startActivity(intent)
@@ -625,11 +679,11 @@ fun ColdStorageDiscoveryScreen(
                             context.startActivity(mapIntent)
                         }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 }
@@ -639,16 +693,21 @@ fun ColdStorageCard(
     facility: ColdStorageItem,
     rank: Int,
     isKannada: Boolean,
+    isDark: Boolean,
     onCallFacility: (String) -> Unit,
     onViewDirections: (Double, Double, String) -> Unit
 ) {
-    ElevatedCard(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 14.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+        color = if (isDark) SurfaceDarkCard else Color.White,
+        border = BorderStroke(
+            1.2.dp,
+            if (rank == 1) (if (isDark) Color(0xFF5E9457) else SoilCropGreen) else MaterialTheme.colorScheme.outline
+        ),
+        shadowElevation = if (rank == 1) 4.dp else 2.dp
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
@@ -664,7 +723,7 @@ fun ColdStorageCard(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = if (rank == 1) HarvestGold else ForestGreenDeep.copy(alpha = 0.1f),
+                        color = if (rank == 1) (if (isDark) Color(0xFF5E9457) else SoilCropGreen) else MaterialTheme.colorScheme.surfaceVariant,
                         modifier = Modifier.size(28.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
@@ -672,7 +731,7 @@ fun ColdStorageCard(
                                 text = "#$rank",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
-                                color = if (rank == 1) Color.Black else ForestGreenDeep
+                                color = if (rank == 1) Color.White else MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -683,25 +742,25 @@ fun ColdStorageCard(
                             text = facility.name,
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.sp,
-                            color = ForestGreenDeep
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "${facility.address}, ${facility.district}",
-                            fontSize = 11.sp,
-                            color = Color.Gray
+                            fontSize = 11.5.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = ForestGreenLight.copy(alpha = 0.15f)
+                    color = (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.15f)
                 ) {
                     Text(
                         text = "${facility.rankingScore.toInt()}% Match",
-                        fontSize = 10.sp,
+                        fontSize = 10.5.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ForestGreenDeep,
+                        color = if (isDark) Color(0xFF689F60) else SoilCropGreen,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
                     )
                 }
@@ -717,12 +776,12 @@ fun ColdStorageCard(
                 if (facility.capacityVerified) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = Color(0xFFE8F5E9),
-                        border = BorderStroke(1.dp, Color(0xFF4CAF50))
+                        color = (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, (if (isDark) Color(0xFF5E9457) else SoilCropGreen).copy(alpha = 0.4f))
                     ) {
                         Text(
-                            text = "✓ ${facility.availableCapacityMt.toInt()}T Space Verified",
-                            color = Color(0xFF2E7D32),
+                            text = "✓ ${facility.availableCapacityMt.toInt()}T Verified Space",
+                            color = if (isDark) Color(0xFF689F60) else SoilCropGreen,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -732,11 +791,11 @@ fun ColdStorageCard(
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = AmberWarning.copy(alpha = 0.15f),
-                        border = BorderStroke(1.dp, AmberWarning)
+                        border = BorderStroke(1.dp, AmberWarning.copy(alpha = 0.5f))
                     ) {
                         Text(
-                            text = "⚠️ Contact to confirm space",
-                            color = AmberWarningDark,
+                            text = "⚠️ Contact to confirm",
+                            color = HarvestGoldDark,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -746,11 +805,11 @@ fun ColdStorageCard(
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFEDE7F6)
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Text(
-                        text = "🍅 Tomato Suitable",
-                        color = Color(0xFF512DA8),
+                        text = "🍅 Tomato Ready",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -759,11 +818,11 @@ fun ColdStorageCard(
 
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = Color(0xFFFFF3E0)
+                    color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Text(
                         text = "₹${facility.rentalChargesPerQuintalDay.toInt()}/Q/day",
-                        color = Color(0xFFE65100),
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -778,7 +837,8 @@ fun ColdStorageCard(
             // ==========================================
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = CreamBackgroundLight,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
@@ -786,7 +846,7 @@ fun ColdStorageCard(
                         text = if (isKannada) "ರಸ್ತೆ ಮಾರ್ಗ ಮತ್ತು ಮಾರುಕಟ್ಟೆ ದೂರ (Routing & Mandi Logistics)" else "ROAD DISTANCES & MANDI LOGISTICS",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ForestGreenDeep
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -801,27 +861,28 @@ fun ColdStorageCard(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (isKannada) "ರೈತರ ಸ್ಥಳ ➔ ಶೀತಲಾಗಾರ:" else "Farmer ➔ Storage:",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.SemiBold
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         }
                         Text(
                             text = "${facility.distanceFarmerKm} km (~${facility.travelTimeMin} min)",
-                            fontSize = 12.sp,
+                            fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
-                            color = ForestGreenDeep
+                            color = if (isDark) Color(0xFF689F60) else SoilCropGreen
                         )
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Spacer(modifier = Modifier.height(4.dp))
 
                     // Legs 2-4: Storage to Mandis
                     Text(
                         text = if (isKannada) "ಶೀತಲಾಗಾರದಿಂದ ಮಾರುಕಟ್ಟೆಗಳಿಗೆ:" else "From Storage ➔ Downstream Mandis:",
                         fontSize = 10.sp,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
                     facility.mandiDistances.forEach { m ->
@@ -836,20 +897,20 @@ fun ColdStorageCard(
                             Text(
                                 text = "  • ${m.mandiName}:",
                                 fontSize = 11.sp,
-                                color = Color.DarkGray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "${m.distanceKm} km",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.Black
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                                 directM?.let { dm ->
                                     Text(
                                         text = " (vs direct ${dm.distanceKm} km)",
                                         fontSize = 10.sp,
-                                        color = Color.Gray
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                             }
@@ -864,7 +925,7 @@ fun ColdStorageCard(
             Text(
                 text = "💡 ${facility.recommendationReason}",
                 fontSize = 11.sp,
-                color = Color.DarkGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 15.sp
             )
 
@@ -877,9 +938,11 @@ fun ColdStorageCard(
             ) {
                 OutlinedButton(
                     onClick = { onCallFacility(facility.contactPhone) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, ForestGreenDeep)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.2.dp, if (isDark) Color(0xFF5E9457) else SoilCropGreen)
                 ) {
                     Text("📞", fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(4.dp))
@@ -887,15 +950,20 @@ fun ColdStorageCard(
                         text = if (isKannada) "ಕರೆ ಮಾಡಿ" else "Call Facility",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ForestGreenDeep
+                        color = if (isDark) Color(0xFF689F60) else SoilCropGreen
                     )
                 }
 
                 Button(
                     onClick = { onViewDirections(facility.latitude, facility.longitude, facility.name) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreenDeep)
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isDark) Color(0xFF5E9457) else SoilCropGreen,
+                        contentColor = Color.White
+                    )
                 ) {
                     Text("🗺️", fontSize = 14.sp)
                     Spacer(modifier = Modifier.width(4.dp))

@@ -28,6 +28,7 @@ fun NotificationCenterDialog(
     onNavigate: ((String) -> Unit)? = null
 ) {
     val notifications = UserSession.notifications
+    val isDark = UserSession.isDarkTheme
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -35,8 +36,8 @@ fun NotificationCenterDialog(
                 .fillMaxWidth()
                 .padding(horizontal = 4.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            border = BorderStroke(1.5.dp, SoilDeepEarth.copy(alpha = 0.15f)),
+            colors = CardDefaults.cardColors(containerColor = if (isDark) SurfaceDarkCard else Color.White),
+            border = BorderStroke(1.5.dp, if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.15f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
@@ -66,7 +67,7 @@ fun NotificationCenterDialog(
                                 text = if (isKannada) "ಸೂಚನಾ ಕೇಂದ್ರ" else "Notification Center",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = SoilDeepEarth
+                                color = if (isDark) TextPrimaryDark else SoilDeepEarth
                             )
                             Text(
                                 text = if (isKannada)
@@ -74,14 +75,14 @@ fun NotificationCenterDialog(
                                 else
                                     "${UserSession.unreadNotificationCount} unread agricultural updates",
                                 fontSize = 11.sp,
-                                color = SoilCropGreen,
+                                color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
                     }
 
                     TextButton(onClick = onDismiss) {
-                        Text("✕", fontSize = 18.sp, color = SoilDeepEarth.copy(alpha = 0.6f))
+                        Text("✕", fontSize = 18.sp, color = if (isDark) TextSecondaryDark else SoilDeepEarth.copy(alpha = 0.6f))
                     }
                 }
 
@@ -175,16 +176,18 @@ private fun NotificationCardItem(
     onRead: () -> Unit,
     onClick: () -> Unit
 ) {
+    val isDark = UserSession.isDarkTheme
+
     val bgColor = when {
-        item.isUrgent -> Color(0xFFFFF3E0)
-        !item.isRead -> Color(0xFFF1F8E9)
-        else -> SoilFieldPaper.copy(alpha = 0.5f)
+        item.isUrgent -> if (isDark) Color(0xFF3E2723) else Color(0xFFFFF3E0)
+        !item.isRead -> if (isDark) Color(0xFF1B2E20) else Color(0xFFF1F8E9)
+        else -> if (isDark) SurfaceDarkCardHigh else SoilFieldPaper.copy(alpha = 0.5f)
     }
 
     val borderColor = when {
         item.isUrgent -> Color(0xFFFB8C00)
-        !item.isRead -> SoilCropGreen
-        else -> SoilDeepEarth.copy(alpha = 0.12f)
+        !item.isRead -> if (isDark) SoilFreshLeaf else SoilCropGreen
+        else -> if (isDark) BorderDarkSubtle else SoilDeepEarth.copy(alpha = 0.12f)
     }
 
     Surface(
@@ -224,7 +227,7 @@ private fun NotificationCardItem(
                         text = if (isKannada) item.titleKn else item.titleEn,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SoilDeepEarth
+                        color = if (isDark) TextPrimaryDark else SoilDeepEarth
                     )
                 }
 
@@ -232,7 +235,7 @@ private fun NotificationCardItem(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(SoilCropGreen, CircleShape)
+                            .background(if (isDark) SoilFreshLeaf else SoilCropGreen, CircleShape)
                     )
                 }
             }
@@ -242,7 +245,7 @@ private fun NotificationCardItem(
             Text(
                 text = if (isKannada) item.messageKn else item.messageEn,
                 fontSize = 11.5.sp,
-                color = SoilDeepEarth.copy(alpha = 0.8f),
+                color = if (isDark) TextSecondaryDark else SoilDeepEarth.copy(alpha = 0.8f),
                 lineHeight = 16.sp
             )
 
@@ -256,7 +259,7 @@ private fun NotificationCardItem(
                 Text(
                     text = item.timestamp,
                     fontSize = 10.sp,
-                    color = SoilDeepEarth.copy(alpha = 0.5f)
+                    color = if (isDark) TextSecondaryDark.copy(alpha = 0.7f) else SoilDeepEarth.copy(alpha = 0.5f)
                 )
 
                 if (item.actionDestination != null) {
@@ -264,7 +267,7 @@ private fun NotificationCardItem(
                         text = if (isKannada) "ವಿವರ ನೋಡಿ ➔" else "View Details ➔",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = SoilCropGreen
+                        color = if (isDark) SoilFreshLeaf else SoilCropGreen
                     )
                 }
             }
