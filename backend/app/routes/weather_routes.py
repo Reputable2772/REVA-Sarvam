@@ -10,13 +10,18 @@ router = APIRouter(prefix="/weather", tags=["Agri Weather Intelligence"])
 @router.get("/harvest-risk/{farmer_id}")
 def check_harvest_weather_risk(
     farmer_id: str,
+    language_code: Optional[str] = Query("kn-IN", description="Preferred language code (e.g. kn-IN, hi-IN, te-IN, ta-IN, en-IN)"),
     db: Session = Depends(get_db)
 ):
     """
     Evaluates weather risk for all lots scheduled for today by the specified farmer.
     If heavy rain or adverse conditions are predicted, returns proactive rescheduling advisory.
     """
-    risks = WeatherProtectionService.check_scheduled_harvest_weather_risk(farmer_id=farmer_id, db=db)
+    risks = WeatherProtectionService.check_scheduled_harvest_weather_risk(
+        farmer_id=farmer_id,
+        db=db,
+        language_code=language_code or "kn-IN"
+    )
     return {
         "success": True,
         "farmer_id": farmer_id,

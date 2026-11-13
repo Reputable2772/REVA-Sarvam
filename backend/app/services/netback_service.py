@@ -13,15 +13,40 @@ class NetbackService:
     3. Direct Institutional Buyer via Virtual FPO (aggregated load, zero middleman commission)
     """
 
-    @staticmethod
+    @classmethod
+    def _resolve_dynamic_modal_price(
+        cls,
+        crop: str,
+        district: Optional[str] = None,
+        state: Optional[str] = None,
+        fallback: float = 24.0
+    ) -> float:
+        try:
+            from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
+            service = PanIndiaMandiService.get_instance()
+            records = service.search_mandis(commodity=crop, district=district, state=state, limit=1)
+            if not records and district:
+                records = service.search_mandis(commodity=crop, state=state, limit=1)
+            if not records:
+                records = service.search_mandis(commodity=crop, limit=1)
+            if records and records[0].get("modal_price_kg"):
+                p = float(records[0]["modal_price_kg"])
+                if p > 0:
+                    return p
+        except Exception:
+            pass
+        return fallback
+
+    @classmethod
     def calculate_comparison(
+        cls,
         quantity_kg: float,
         crop: str = "Tomato",
         kolar_rate: Optional[float] = None, # Legacy alias for local_rate
         bangarpet_rate: Optional[float] = None, # Legacy alias for distant_rate
         local_rate: Optional[float] = None,
         distant_rate: Optional[float] = None,
-        direct_rate: float = 28.50,
+        direct_rate: Optional[float] = None,
         shared_freight_cost: Optional[float] = None,
         origin_location: Optional[Union[str, Tuple[float, float]]] = None,
         origin_district: Optional[str] = None,
@@ -39,10 +64,25 @@ class NetbackService:
         Computes complete cost deductions, road distance travelled, and effective net return per kg
         across all three selling routes for any farmer and mandi.
         """
-        # Resolve rates (supporting both generic and legacy parameter names)
-        r_local = local_rate if local_rate is not None else (kolar_rate if kolar_rate is not None else 24.0)
-        r_distant = distant_rate if distant_rate is not None else (bangarpet_rate if bangarpet_rate is not None else 28.0)
-        r_direct = direct_rate if direct_rate is not None else 28.50
+        # Resolve rates dynamically from AGMARKNET dataset if not explicitly specified
+        if local_rate is not None:
+            r_local = local_rate
+        elif kolar_rate is not None:
+            r_local = kolar_rate
+        else:
+            r_local = cls._resolve_dynamic_modal_price(crop, origin_district, origin_state, fallback=24.0)
+
+        if distant_rate is not None:
+            r_distant = distant_rate
+        elif bangarpet_rate is not None:
+            r_distant = bangarpet_rate
+        else:
+            r_distant = round(r_local * 1.16, 2)
+
+        if direct_rate is not None:
+            r_direct = direct_rate
+        else:
+            r_direct = round(r_local * 1.18, 2)
 
         # Resolve channel names
         name_local = local_mandi_name or "Local Mandi (Nearest APMC)"

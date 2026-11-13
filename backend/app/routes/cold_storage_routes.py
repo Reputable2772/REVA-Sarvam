@@ -104,16 +104,16 @@ def discover_cold_storage(
         if dist_km <= radius:
             travel_time_min = int(round((dist_km / 40.0) * 60)) + 5
 
-            mandi_distances = [
-                {"mandi_name": "Kolar APMC", "distance_km": round(max(3.0, dist_km * 0.8 + 2.5), 1)},
-                {"mandi_name": "Bangarpet APMC", "distance_km": round(max(5.0, dist_km * 0.9 + 6.0), 1)},
-                {"mandi_name": "Malur APMC", "distance_km": round(max(8.0, dist_km * 1.1 + 10.0), 1)}
-            ]
-            direct_farmer_to_mandi = [
-                {"mandi_name": "Kolar APMC", "distance_km": 10.2},
-                {"mandi_name": "Bangarpet APMC", "distance_km": 16.5},
-                {"mandi_name": "Malur APMC", "distance_km": 22.0}
-            ]
+            mandi_distances, direct_farmer_to_mandi = DistanceService.resolve_nearby_mandis(
+                district=f.district or "",
+                location=f.location or "",
+                lat=f.latitude,
+                lon=f.longitude,
+                db=db,
+                farmer_lat=farmer_lat,
+                farmer_lon=farmer_lon,
+                limit=3
+            )
 
             capacity_score = min(30.0, (f.available_capacity_tonnes / max(1.0, f.total_capacity_tonnes)) * 30.0)
             distance_score = max(0.0, 50.0 - dist_km)
@@ -145,7 +145,8 @@ def discover_cold_storage(
 
     facility_cards.sort(key=lambda x: x["distance_farmer_km"])
     if facility_cards:
-        facility_cards[0]["recommendation_reason"] = f"Nearest verified facility with active {req.crop or 'Tomato'}-compatible multi-chamber bays and shortest haul to Kolar APMC."
+        top_mandi = facility_cards[0]["mandi_distances"][0]["mandi_name"] if facility_cards[0].get("mandi_distances") else "regional APMC"
+        facility_cards[0]["recommendation_reason"] = f"Nearest verified facility with active {req.crop or 'Tomato'}-compatible multi-chamber bays and shortest haul to {top_mandi}."
 
     return {
         "success": True,

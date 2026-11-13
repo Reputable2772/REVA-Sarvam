@@ -17,7 +17,8 @@ class SchemeMatchingService:
         cls,
         farmer_id: str,
         db: Session,
-        voluntary_profile_override: Optional[Dict[str, Any]] = None
+        voluntary_profile_override: Optional[Dict[str, Any]] = None,
+        language_code: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         farmer = db.query(Farmer).filter(Farmer.farmer_id == farmer_id).first()
         if not farmer:
@@ -63,7 +64,7 @@ class SchemeMatchingService:
                 match_status = "INELIGIBLE"
                 reason_en = f"This scheme applies only to {', '.join(app_states)}. Your registered state is {farmer_state}."
                 reason_kn = f"ಈ ಯೋಜನೆಯು {', '.join(app_states)} ರಾಜ್ಯಗಳಿಗೆ ಮಾತ್ರ ಅನ್ವಯಿಸುತ್ತದೆ. ನಿಮ್ಮ ರಾಜ್ಯ {farmer_state}."
-                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
+                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules, language_code=language_code))
                 continue
 
             matched_rules.append(f"Geographic eligibility confirmed for {farmer_state}, {farmer_district}")
@@ -84,7 +85,7 @@ class SchemeMatchingService:
                 match_status = "POTENTIALLY_RELEVANT"
                 reason_en = f"Applies to {', '.join(app_crops)}. If you diversify into these crops, this assistance is applicable."
                 reason_kn = f"ಇದು {', '.join(app_crops)} ಬೆಳೆಗಳಿಗೆ ಅನ್ವಯಿಸುತ್ತದೆ. ನೀವು ಈ ಬೆಳೆಗಳನ್ನು ಬೆಳೆದರೆ ಈ ಸೌಲಭ್ಯ ಲಭ್ಯ."
-                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
+                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules, language_code=language_code))
                 continue
 
             # 3. FPO distinction
@@ -99,7 +100,7 @@ class SchemeMatchingService:
                     fpo_region = f"{farmer_district} " if farmer_district else "local "
                     reason_en = f"Institutional FPO grant (Paid to FPO company, not individual farmers). Join your {fpo_region}FPO cluster to benefit."
                     reason_kn = "ಸಾಂಸ್ಥಿಕ FPO ಅನುದಾನ (ವೈಯಕ್ತಿಕ ರೈತರಿಗಲ್ಲ, FPO ಸಂಸ್ಥೆಗೆ). ಸಮಗ್ರ ಲಾಭ ಪಡೆಯಲು ಸ್ಥಳೀಯ FPO ಗೆ ಸೇರಿ."
-                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
+                results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules, language_code=language_code))
                 continue
 
             # 4. Landholding requirement
@@ -112,7 +113,7 @@ class SchemeMatchingService:
                     match_status = "INELIGIBLE"
                     reason_en = f"Exceeds smallholder ceiling of {sch.max_landholding_hectares} hectares (Your land: {landholding_ha} ha)."
                     reason_kn = f"ನಿಗದಿತ ಗರಿಷ್ಠ {sch.max_landholding_hectares} ಹೆಕ್ಟೇರ್ ಮಿತಿಯನ್ನು ಮೀರಿದೆ (ನಿಮ್ಮ ಜಮೀನು: {landholding_ha} ಹೆಕ್ಟೇರ್)."
-                    results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
+                    results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules, language_code=language_code))
                     continue
                 else:
                     matched_rules.append(f"Smallholder landholding ceiling satisfied ({landholding_ha} ha <= {sch.max_landholding_hectares} ha)")
@@ -141,7 +142,7 @@ class SchemeMatchingService:
                 reason_en = f"Matches your location{loc_desc}{crop_desc}, and smallholder farmer profile."
                 reason_kn = f"ನಿಮ್ಮ ಸ್ಥಳ{loc_desc_kn}{crop_desc_kn}, ಮತ್ತು ರೈತ ಪ್ರೊಫೈಲ್‌ಗೆ ನಿಖರವಾಗಿ ಸರಿಹೊಂದುತ್ತದೆ."
 
-            results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules))
+            results.append(cls._format_result(sch, match_status, reason_en, reason_kn, missing_fields, matched_rules, language_code=language_code))
 
         # Rank: LIKELY_ELIGIBLE first, then MORE_INFO_REQUIRED, then POTENTIALLY_RELEVANT, then INELIGIBLE
         status_rank = {
@@ -190,8 +191,29 @@ class SchemeMatchingService:
         reason_en: str,
         reason_kn: str,
         missing_fields: List[str],
-        matched_rules: List[str]
+        matched_rules: List[str],
+        language_code: Optional[str] = None
     ) -> Dict[str, Any]:
+        target_lang = "kn-IN"
+        reason_localized = reason_kn
+        if language_code:
+            from backend.app.services.sarvam_service import SarvamService
+            target_lang = SarvamService.normalize_language_code(language_code)
+            if target_lang == "kn-IN":
+                reason_localized = reason_kn
+            elif target_lang == "en-IN":
+                reason_localized = reason_en
+            else:
+                try:
+                    trans = SarvamService.translate_text(
+                        text=reason_en,
+                        target_language_code=target_lang,
+                        source_language_code="en-IN"
+                    )
+                    reason_localized = trans.get("translated_text", reason_en)
+                except Exception:
+                    reason_localized = reason_en
+
         return {
             "scheme_id": sch.scheme_id,
             "title_en": sch.title_en,
@@ -220,6 +242,8 @@ class SchemeMatchingService:
             "match_status": match_status,
             "relevance_reason_en": reason_en,
             "relevance_reason_kn": reason_kn,
+            "relevance_reason_localized": reason_localized,
+            "language_code": target_lang,
             "missing_fields": missing_fields,
             "matched_rules": matched_rules
         }

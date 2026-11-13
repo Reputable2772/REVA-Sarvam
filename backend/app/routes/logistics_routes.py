@@ -147,6 +147,17 @@ def plan_route(req: RoutePlanRequest):
     num_stops = len(req.villages)
     shared_per_farmer = round(total_freight / max(num_stops, 1), 2)
 
+    # Dynamically compute solo transport benchmark for each origin village to destination
+    individual_solo_costs = []
+    for v in req.villages:
+        v_coords = VILLAGE_COORDINATES.get(v) or DistanceService.resolve_coordinates(v)
+        v_solo_km = calculate_haversine_road_distance(v_coords[0], v_coords[1], dest_coords[0], dest_coords[1])
+        v_solo_cost = FLEET_SPECS[0]["base_charge"] + (v_solo_km * FLEET_SPECS[0]["per_km_rate"]) + FLEET_SPECS[0]["handling_cost"]
+        individual_solo_costs.append(v_solo_cost)
+
+    avg_solo_benchmark = round(sum(individual_solo_costs) / max(len(individual_solo_costs), 1), 2)
+    farmer_savings = round(max(0.0, avg_solo_benchmark - shared_per_farmer), 2)
+
     return {
         "success": True,
         "destination": req.destination,
@@ -155,8 +166,8 @@ def plan_route(req: RoutePlanRequest):
         "vehicle": vehicle,
         "total_freight_cost": round(total_freight, 2),
         "shared_cost_per_farmer": shared_per_farmer,
-        "individual_transport_benchmark": 3292.0,
-        "farmer_logistics_savings": round(3292.0 - shared_per_farmer, 2),
+        "individual_transport_benchmark": avg_solo_benchmark,
+        "farmer_logistics_savings": farmer_savings,
         "waypoints": waypoints
     }
 

@@ -16,7 +16,8 @@ class WeatherProtectionService:
     def check_scheduled_harvest_weather_risk(
         cls,
         farmer_id: str,
-        db: Session
+        db: Session,
+        language_code: str = "kn-IN"
     ) -> List[Dict[str, Any]]:
         clean_fid = str(farmer_id).strip()
         farmer = db.query(Farmer).filter(
@@ -76,6 +77,23 @@ class WeatherProtectionService:
                 f"ನಾಳೆ ಹವಾಮಾನವು ಉತ್ತಮವಾಗಿದೆ ({tomorrow_condition}). ದಯವಿಟ್ಟು ನಾಳೆಗೆ ಕೊಯ್ಲನ್ನು ಮುಂದೂಡಿ."
             )
 
+            from backend.app.services.sarvam_service import SarvamService
+            target_lang = SarvamService.normalize_language_code(language_code or "kn-IN")
+            if target_lang == "kn-IN":
+                advisory_localized = advisory_kn
+            elif target_lang == "en-IN":
+                advisory_localized = advisory_en
+            else:
+                try:
+                    trans = SarvamService.translate_text(
+                        text=advisory_en,
+                        target_language_code=target_lang,
+                        source_language_code="en-IN"
+                    )
+                    advisory_localized = trans.get("translated_text", advisory_en)
+                except Exception:
+                    advisory_localized = advisory_en
+
             # Auto-dispatch notification if not already sent for this lot today
             existing_notif = db.query(NotificationRecord).filter(
                 NotificationRecord.recipient_id == farmer_id,
@@ -87,7 +105,7 @@ class WeatherProtectionService:
                 notif = NotificationRecord(
                     recipient_id=farmer_id,
                     title="⛈️ Weather Alert: Postpone Harvest to Tomorrow",
-                    body=advisory_en,
+                    body=advisory_localized if target_lang != "en-IN" else advisory_en,
                     type="weather_reschedule_alert",
                     read=False,
                     metadata_json=json.dumps({
@@ -96,7 +114,8 @@ class WeatherProtectionService:
                         "current_date": today_str,
                         "recommended_date": tomorrow_str,
                         "action": "RESCHEDULE_WEATHER",
-                        "risk_level": risk_level
+                        "risk_level": risk_level,
+                        "language_code": target_lang
                     })
                 )
                 db.add(notif)
@@ -121,6 +140,8 @@ class WeatherProtectionService:
                 },
                 "advisory_en": advisory_en if is_high_risk else "Weather conditions are suitable for harvest today.",
                 "advisory_kn": advisory_kn if is_high_risk else "ಇಂದು ಕೊಯ್ಲು ಮಾಡಲು ಹವಾಮಾನ ಸೂಕ್ತವಾಗಿದೆ.",
+                "advisory_localized": advisory_localized if is_high_risk else "Weather conditions are suitable for harvest today.",
+                "language_code": target_lang,
                 "should_reschedule": is_high_risk
             })
 

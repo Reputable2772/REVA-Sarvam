@@ -132,7 +132,11 @@ def get_scheme_detail(scheme_id: str, db: Session = Depends(get_db)):
     }
 
 @router.get("/recommendations/{identifier}")
-def get_personalized_recommendations(identifier: str, db: Session = Depends(get_db)):
+def get_personalized_recommendations(
+    identifier: str,
+    language_code: Optional[str] = Query("kn-IN", description="Preferred language code for eligibility explanation"),
+    db: Session = Depends(get_db)
+):
     """
     Computes deterministic opportunity matches for a farmer (by farmer_id or phone).
     Evaluates published rules without AI hallucination.
@@ -149,7 +153,7 @@ def get_personalized_recommendations(identifier: str, db: Session = Depends(get_
     if not farmer:
         raise HTTPException(status_code=404, detail="No registered farmers found.")
 
-    matches = SchemeMatchingService.evaluate_farmer_opportunities(farmer.farmer_id, db)
+    matches = SchemeMatchingService.evaluate_farmer_opportunities(farmer.farmer_id, db, language_code=language_code)
     return {
         "success": True,
         "farmer_id": farmer.farmer_id,

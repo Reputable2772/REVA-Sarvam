@@ -407,11 +407,16 @@ def get_cold_storage_voice_explanation(
     if dist_km <= 0.05:
         dist_km = 4.2
 
-    mandi_distances = [
-        {"mandi_name": "Kolar APMC", "distance_km": round(dist_km + 4.3, 1)},
-        {"mandi_name": "Bangarpet APMC", "distance_km": round(dist_km + 9.8, 1)},
-        {"mandi_name": "Malur APMC", "distance_km": round(dist_km + 16.8, 1)}
-    ]
+    mandi_distances, _ = DistanceService.resolve_nearby_mandis(
+        district=district,
+        location=facility.location if facility else "",
+        lat=fac_lat,
+        lon=fac_lon,
+        db=db,
+        farmer_lat=farmer_lat,
+        farmer_lon=farmer_lon,
+        limit=3
+    )
 
     spoken_res = SarvamService.generate_cold_storage_spoken_summary(
         facility_name=fac_name,
