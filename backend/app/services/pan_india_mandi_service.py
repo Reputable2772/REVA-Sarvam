@@ -231,7 +231,15 @@ class PanIndiaMandiService:
             # Electronic weighment fee
             weighment = 40.0
 
-            total_deductions = round(transport_cost + commission + unloading + weighment, 2)
+            # Transit degradation & perishability shrinkage over long hauls
+            is_perishable = any(p in commodity.lower() for p in ["tomato", "vegetable", "fruit", "onion", "potato", "chilli", "brinjal", "capsicum", "cabbage", "cauliflower"])
+            if is_perishable:
+                transit_loss_pct = 2.0 if distance_km <= 20.0 else min(20.0, round(2.0 + 2.5 * ((distance_km - 20.0) / 50.0), 1))
+            else:
+                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(5.0, round(0.5 + 0.5 * ((distance_km - 50.0) / 100.0), 1))
+            transit_loss = round(gross_revenue * (transit_loss_pct / 100.0), 2)
+
+            total_deductions = round(transport_cost + commission + unloading + weighment + transit_loss, 2)
             net_take_home = round(gross_revenue - total_deductions, 2)
             effective_rate = round(net_take_home / quantity_kg, 2) if quantity_kg > 0 else 0.0
 
@@ -251,6 +259,8 @@ class PanIndiaMandiService:
                     "commission_pct": comm_pct,
                     "unloading": unloading,
                     "weighment": weighment,
+                    "transit_loss": transit_loss,
+                    "transit_loss_pct": transit_loss_pct,
                     "total": total_deductions
                 },
                 "net_take_home": net_take_home,
@@ -310,29 +320,55 @@ class PanIndiaMandiService:
         if not matched:
             matched = [r for r in records if "tomato" in r["commodity"].lower()]
 
-        # Filter: prioritize farmer's state/district, plus target mandi if specified
-        same_district = [r for r in matched if r["district"].lower() == farmer_district.lower()]
-        same_state = [r for r in matched if r["state"].lower() == farmer_state.lower() and r not in same_district]
-        other_states = [r for r in matched if r["state"].lower() != farmer_state.lower()]
+        # Fast Haversine pre-filtering across dataset to identify regional candidates
+        from backend.app.services.distance_service import DistanceService
 
-        candidates: List[Dict[str, Any]] = []
-        candidates.extend(same_district[:4])
-        candidates.extend(same_state[:4])
+        origin_point = farmer_coords or farmer_village or farmer_district or farmer_state
+        lat1, lon1 = DistanceService.resolve_coordinates(origin_point, farmer_district, farmer_state)
 
+        candidates_with_dist = []
+        seen_markets = set()
+        for m in matched:
+            market_key = f"{m['market']}-{m['state']}"
+            if market_key in seen_markets:
+                continue
+            seen_markets.add(market_key)
+            lat2, lon2 = DistanceService.resolve_coordinates(m["market"], m["district"], m["state"])
+            d_approx = DistanceService.haversine_distance_km(lat1, lon1, lat2, lon2)
+            candidates_with_dist.append((m, d_approx))
+
+        # Sort candidates by approximate distance ascending
+        candidates_with_dist.sort(key=lambda x: x[1])
+
+        # Filter: realistic regional APMC catchment radius (<= 85 km)
+        regional_candidates = [x for x in candidates_with_dist if x[1] <= 85.0]
+
+        selected_candidates: List[Dict[str, Any]] = []
+        if len(regional_candidates) >= 3:
+            selected_candidates.extend([x[0] for x in regional_candidates[:4]])
+        else:
+            selected_candidates.extend([x[0] for x in candidates_with_dist[:4]])
+
+        # If user explicitly searched for a specific target_mandi, always include it
         if target_mandi:
-            specific = [r for r in matched if target_mandi.lower() in r["market"].lower()]
-            for s in specific:
-                if s not in candidates:
-                    candidates.append(s)
+            t_clean = target_mandi.strip().lower()
+            target_match = next((x[0] for x in candidates_with_dist if t_clean in x[0]["market"].lower()), None)
+            if target_match and target_match not in selected_candidates:
+                selected_candidates.append(target_match)
 
-        if len(candidates) < 3:
-            candidates.extend(other_states[:3])
+        # Include 1 distant APMC in the same state for comparison if available (e.g. highest headline price)
+        # to demonstrate transparent netback arbitrage vs freight & transit degradation
+        distant_state = [x for x in candidates_with_dist if x[0]["state"].lower() == farmer_state.lower() and x[1] > 85.0]
+        if distant_state:
+            distant_highest = max(distant_state, key=lambda x: x[0]["modal_price_kg"])[0]
+            if distant_highest not in selected_candidates and len(selected_candidates) < 5:
+                selected_candidates.append(distant_highest)
 
         crates = max(1, round(quantity_kg / 25.0))
         results = []
-        from backend.app.services.distance_service import DistanceService
 
-        for m in candidates:
+        # For the selected candidates, compute exact turn-by-turn road distance via OpenStreetMap OSRM
+        for m in selected_candidates:
             market_name = m["market"]
             distance_km = instance._estimate_distance(
                 farmer_state, farmer_district, m["state"], m["district"], market_name,
@@ -354,7 +390,15 @@ class PanIndiaMandiService:
             unloading_cost = round(crates * 5.0, 2)
             weighing_fee = 30.0
 
-            total_deductions = round(commission_cost + transport_cost + unloading_cost + weighing_fee, 2)
+            # Transit degradation & perishability shrinkage over long hauls
+            is_perishable = any(p in crop_clean for p in ["tomato", "vegetable", "fruit", "onion", "potato", "chilli", "brinjal", "capsicum", "cabbage", "cauliflower"])
+            if is_perishable:
+                transit_loss_pct = 2.0 if distance_km <= 20.0 else min(20.0, round(2.0 + 2.5 * ((distance_km - 20.0) / 50.0), 1))
+            else:
+                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(5.0, round(0.5 + 0.5 * ((distance_km - 50.0) / 100.0), 1))
+            transit_loss_cost = round(gross_revenue * (transit_loss_pct / 100.0), 2)
+
+            total_deductions = round(commission_cost + transport_cost + unloading_cost + weighing_fee + transit_loss_cost, 2)
             net_take_home = round(gross_revenue - total_deductions, 2)
             effective_rate_per_kg = round(net_take_home / quantity_kg, 2) if quantity_kg > 0 else 0.0
 
@@ -375,6 +419,8 @@ class PanIndiaMandiService:
                     "commission_pct": comm_pct,
                     "unloading_cost": unloading_cost,
                     "weighing_fee": weighing_fee,
+                    "transit_loss_cost": transit_loss_cost,
+                    "transit_loss_pct": transit_loss_pct,
                     "total_deductions": total_deductions
                 },
                 "net_take_home": net_take_home,

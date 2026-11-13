@@ -137,21 +137,33 @@ STATE_CENTROIDS: Dict[str, Tuple[float, float]] = {
     "maharashtra": (19.7515, 75.7139),
     "telangana": (18.1124, 79.0193),
     "kerala": (10.8505, 76.2711),
+    "goa": (15.2993, 74.1240),
+    "puducherry": (11.9416, 79.8083),
     "delhi": (28.7041, 77.1025),
+    "chandigarh": (30.7333, 76.7794),
     "gujarat": (22.2587, 71.1924),
     "madhya pradesh": (22.9734, 78.6569),
     "rajasthan": (27.0238, 74.2179),
     "uttar pradesh": (26.8467, 80.9462),
     "punjab": (31.1471, 75.3412),
     "haryana": (29.0588, 76.0856),
-    "west bengal": (22.9868, 87.8550),
-    "bihar": (25.0961, 85.3131),
-    "odisha": (20.9517, 85.0985),
-    "assam": (26.2006, 92.9376),
-    "chhattisgarh": (21.2787, 81.8661),
-    "jharkhand": (23.6102, 85.2799),
-    "uttarakhand": (30.0668, 79.0193),
     "himachal pradesh": (31.1048, 77.1734),
+    "jammu and kashmir": (33.7782, 76.5762),
+    "jammu & kashmir": (33.7782, 76.5762),
+    "ladakh": (34.1526, 77.5771),
+    "uttarakhand": (30.0668, 79.0193),
+    "bihar": (25.0961, 85.3131),
+    "jharkhand": (23.6102, 85.2799),
+    "west bengal": (22.9868, 87.8550),
+    "odisha": (20.9517, 85.0985),
+    "chhattisgarh": (21.2787, 81.8661),
+    "assam": (26.2006, 92.9376),
+    "sikkim": (27.5330, 88.5122),
+    "arunachal pradesh": (28.2180, 94.7278),
+    "meghalaya": (25.4670, 91.3662),
+    "manipur": (24.6637, 93.9063),
+    "nagaland": (26.1584, 94.5624),
+    "mizoram": (23.1645, 92.9376),
     "tripura": (23.9408, 91.9882)
 }
 
@@ -222,6 +234,99 @@ class DistanceService:
         n = re.sub(r"[,/.-]", " ", n)
         return " ".join(n.split())
 
+    _geocoding_cache: Dict[str, Tuple[float, float]] = {}
+    _routing_cache: Dict[str, Tuple[float, float]] = {}
+
+    @classmethod
+    def query_osm_nominatim_geocode(
+        cls,
+        location: str,
+        district: Optional[str] = None,
+        state: Optional[str] = None
+    ) -> Optional[Tuple[float, float]]:
+        """
+        Dynamically geocodes any town, village, or APMC market using OpenStreetMap Nominatim API.
+        Zero hardcoding required. In-memory cached.
+        """
+        cache_key = f"{location}|{district}|{state}".lower().strip()
+        if cache_key in cls._geocoding_cache:
+            return cls._geocoding_cache[cache_key]
+
+        import urllib.request
+        import urllib.parse
+        import json
+        from backend.app.config import settings
+
+        query_parts = [p.strip() for p in [location, district, state, "India"] if p and p.strip()]
+        query_str = ", ".join(query_parts)
+
+        try:
+            url = f"{settings.NOMINATIM_GEOCODING_URL}?q={urllib.parse.quote(query_str)}&format=json&limit=1"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": settings.OSM_USER_AGENT}
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data and len(data) > 0:
+                    lat = float(data[0]["lat"])
+                    lon = float(data[0]["lon"])
+                    cls._geocoding_cache[cache_key] = (lat, lon)
+                    return (lat, lon)
+        except Exception:
+            pass
+
+        return None
+
+    @classmethod
+    def query_osrm_road_route(
+        cls,
+        lat1: float,
+        lon1: float,
+        lat2: float,
+        lon2: float
+    ) -> Optional[Dict[str, float]]:
+        """
+        Queries OpenStreetMap OSRM routing engine for live road driving distance and duration.
+        Returns distance in km and duration in minutes.
+        Zero hardcoding required. In-memory cached.
+        """
+        route_key = f"{round(lat1, 4)},{round(lon1, 4)}->{round(lat2, 4)},{round(lon2, 4)}"
+        if route_key in cls._routing_cache:
+            dist_km, dur_min = cls._routing_cache[route_key]
+            return {"distance_km": dist_km, "duration_minutes": dur_min}
+
+        import urllib.request
+        import json
+        from backend.app.config import settings
+
+        if not getattr(settings, "ENABLE_OSM_ROUTING", True):
+            return None
+
+        try:
+            # OSRM format: /route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=false
+            url = f"{settings.OSRM_ROUTING_URL}/{lon1},{lat1};{lon2},{lat2}?overview=false"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": settings.OSM_USER_AGENT}
+            )
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("code") == "Ok" and "routes" in data and len(data["routes"]) > 0:
+                    route = data["routes"][0]
+                    dist_meters = float(route.get("distance", 0.0))
+                    dur_seconds = float(route.get("duration", 0.0))
+
+                    dist_km = max(1.0, round(dist_meters / 1000.0, 1))
+                    dur_min = round(dur_seconds / 60.0, 1)
+
+                    cls._routing_cache[route_key] = (dist_km, dur_min)
+                    return {"distance_km": dist_km, "duration_minutes": dur_min}
+        except Exception:
+            pass
+
+        return None
+
     @classmethod
     def resolve_coordinates(
         cls,
@@ -233,9 +338,8 @@ class DistanceService:
         Resolves (latitude, longitude) for any location.
         Supports:
         1. Explicit GPS coordinate tuple (lat, lon)
-        2. Named town / mandi / district matching in pan-India registry
-        3. District fallback
-        4. State centroid fallback
+        2. Dynamic OpenStreetMap Nominatim live geocoding (zero hardcoding)
+        3. Local registry matching & centroid fallback
         """
         # If coordinates tuple passed directly from GPS/device
         if isinstance(location, (tuple, list)) and len(location) == 2:
@@ -251,7 +355,7 @@ class DistanceService:
         dist_clean = cls.clean_name(district) if district else ""
         state_clean = cls.clean_name(state) if state else ""
 
-        # 1. Exact match in pan-India coordinates registry
+        # 1. Exact match in coordinates registry / cache
         if loc_clean in DISTRICT_COORDINATES:
             return DISTRICT_COORDINATES[loc_clean]
 
@@ -274,8 +378,13 @@ class DistanceService:
                 if s_key in state_clean or state_clean in s_key:
                     return coords
 
-        # 5. Fallback centroid (geographic center of southern peninsula)
-        return (13.5000, 77.5000)
+        # 5. Dynamic OpenStreetMap Nominatim Geocoding for unindexed locations
+        osm_coords = cls.query_osm_nominatim_geocode(str(location), district, state)
+        if osm_coords:
+            return osm_coords
+
+        # 6. Fallback centroid: geographic center of India (Nagpur, MP/MH border)
+        return (21.1458, 79.0882)
 
     @classmethod
     def calculate_haversine_road_distance(
@@ -338,6 +447,11 @@ class DistanceService:
             # When origin and destination are the same location or local aggregation point
             return 3.0
 
+        # Attempt live turn-by-turn routing via OpenStreetMap OSRM API
+        osrm_res = cls.query_osrm_road_route(lat1, lon1, lat2, lon2)
+        if osrm_res and osrm_res.get("distance_km", 0.0) > 0:
+            return osrm_res["distance_km"]
+
         # When farmer is located in the same rural district as the APMC market yard
         # (e.g. farmer village to district APMC center)
         norm_orig = str(origin).lower().strip() if isinstance(origin, str) else ""
@@ -357,10 +471,16 @@ class DistanceService:
         return distance
 
     @classmethod
-    def select_vehicle(cls, quantity_kg: float) -> Dict[str, Any]:
-        """Dynamically selects the optimal commercial vehicle class based on lot weight."""
+    def select_vehicle(cls, quantity_kg: float, distance_km: float = 0.0) -> Dict[str, Any]:
+        """
+        Dynamically selects the optimal commercial vehicle class based on lot weight and distance.
+        Enforces highway safety & commercial transport rules: 3-wheeler autos are restricted to local hauls (<= 35 km).
+        """
         for v in FLEET_CLASSES:
             if quantity_kg <= v["max_payload_kg"]:
+                # 3-wheelers cannot be hired for long-distance highway hauls (> 35 km)
+                if distance_km > 35.0 and v["id"] == "VEH-3W-AUTO":
+                    continue
                 return v
         return FLEET_CLASSES[-1]
 
@@ -384,14 +504,19 @@ class DistanceService:
         dist = max(1.0, float(distance_km))
         qty = max(1.0, float(quantity_kg))
 
-        vehicle = cls.select_vehicle(qty)
+        vehicle = cls.select_vehicle(qty, distance_km=dist)
         base_fare = vehicle["base_fare"]
         rate_per_km = vehicle["long_haul_per_km"] if dist > 25.0 else vehicle["per_km_rate"]
+
+        # Realistic toll & long-haul highway surcharge (applicable on solo inter-district hauls > 50 km)
+        toll_charge = 0.0
+        if dist > 50.0 and haul_type.lower() == "solo":
+            toll_charge = round(150.0 * (dist / 100.0), 2)
 
         if haul_type.lower() == "solo":
             # Dedicated vehicle hire
             distance_charge = round(dist * rate_per_km, 2)
-            total_freight = round(base_fare + distance_charge, 2)
+            total_freight = round(base_fare + distance_charge + toll_charge, 2)
             share_factor = 1.0
             per_kg_cost = round(total_freight / qty, 2)
             savings_vs_solo = 0.0
@@ -403,7 +528,7 @@ class DistanceService:
             effective_pool_kg = pool_total_weight_kg if (pool_total_weight_kg and pool_total_weight_kg > qty) else pool_baseline_capacity
             share_factor = min(0.90, max(0.05, round(qty / effective_pool_kg, 4)))
 
-            full_vehicle_cost = base_fare + (dist * rate_per_km)
+            full_vehicle_cost = base_fare + (dist * rate_per_km) + toll_charge
             total_freight = round(full_vehicle_cost * share_factor, 2)
             per_kg_cost = round(total_freight / qty, 2)
 
