@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "644653278774",
+    "project_id": "reva-sarvam",
+    "storage_bucket": "reva-sarvam.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:644653278774:android:c006cfa98e0c0a079f5a97",
+        "android_client_info": {
+          "package_name": "com.example.farmroutesaathi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCY5Lyc4CI48RzqA0pD8QbiTz6aT_yPuQg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

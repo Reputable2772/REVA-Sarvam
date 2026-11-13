@@ -6,8 +6,23 @@ import json
 from datetime import datetime, timezone
 from backend.app.database import get_db
 from backend.app.models.models import DevicePushToken, NotificationRecord, AuditLog
+from backend.app.services.fcm_service import FCMService
 
 router = APIRouter(prefix="/notifications", tags=["Phase 17 — Push Notifications (FCM)"])
+
+@router.get("/fcm-status")
+def get_fcm_status():
+    """
+    Returns the active FCM operating mode (Live Firebase Admin SDK vs. Simulated Broadcast).
+    """
+    is_live = FCMService.is_live_fcm_available()
+    return {
+        "success": True,
+        "is_live_fcm": is_live,
+        "mode": "FCM Live Dispatch" if is_live else "FCM Simulated Broadcast",
+        "channel_id": "farmroute_alerts",
+        "sound": "default"
+    }
 
 class RegisterTokenRequest(BaseModel):
     device_id: str
@@ -73,19 +88,26 @@ def send_push_alert(
         created_at=datetime.now(timezone.utc)
     )
     db.add(notification)
-
-    # Check registered devices
-    devices = db.query(DevicePushToken).filter(DevicePushToken.user_id == req.recipient_id).all()
-    device_count = len(devices)
-
     db.commit()
+
+    # Dispatch via FCM
+    fcm_result = FCMService.dispatch_to_user(
+        recipient_id=req.recipient_id,
+        title=req.title,
+        body=req.body,
+        notification_type=req.notification_type or "general",
+        metadata=req.metadata or {},
+        db=db
+    )
 
     return {
         "success": True,
         "notification_id": notification.id,
         "recipient_id": req.recipient_id,
-        "dispatched_to_devices": device_count,
-        "mode": "FCM Simulated Broadcast" if device_count > 0 else "Stored to In-App Inbox",
+        "dispatched_to_devices": fcm_result.get("dispatched_count", 0),
+        "success_count": fcm_result.get("success_count", 0),
+        "failure_count": fcm_result.get("failure_count", 0),
+        "mode": fcm_result.get("mode", "FCM Simulated Broadcast"),
         "title": req.title,
         "body": req.body,
         "metadata": req.metadata or {}
@@ -128,4 +150,3 @@ def get_user_notifications(
         "count": len(formatted),
         "notifications": formatted
     }
-
