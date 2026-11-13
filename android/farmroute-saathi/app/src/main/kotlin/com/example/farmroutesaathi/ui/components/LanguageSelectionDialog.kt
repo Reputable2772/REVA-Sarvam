@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.SupportedLanguage
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
@@ -26,7 +27,6 @@ fun LanguageSelectionDialog(
 ) {
     val languages = UserSession.supportedLanguages
     var currentSelectedCode by remember { mutableStateOf(UserSession.selectedLanguageCode) }
-    val isKn = UserSession.isKannadaPreferred
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -62,13 +62,13 @@ fun LanguageSelectionDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (isKn) "ಭಾಷೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ" else "Select Language",
+                                text = "Select Language",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SoilDeepEarth
                             )
                             Text(
-                                text = if (isKn) "ಸರ್ವಂ ಧ್ವನಿ ಮತ್ತು ಇಂಟರ್ಫೇಸ್" else "Sarvam Voice & Interface",
+                                text = "Sarvam Voice & 11 Indic Interfaces",
                                 fontSize = 12.sp,
                                 color = SoilCropGreen,
                                 fontWeight = FontWeight.SemiBold
@@ -87,7 +87,9 @@ fun LanguageSelectionDialog(
 
                 // Language List with Radio Selection
                 LazyColumn(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(languages) { lang ->
@@ -103,7 +105,7 @@ fun LanguageSelectionDialog(
                                 .fillMaxWidth()
                                 .clickable {
                                     currentSelectedCode = lang.code
-                                    UserSession.selectedLanguageCode = lang.code
+                                    UserSession.setLanguage(lang)
                                     onLanguageSelected(lang)
                                 }
                         ) {
@@ -132,7 +134,7 @@ fun LanguageSelectionDialog(
                                     selected = isSelected,
                                     onClick = {
                                         currentSelectedCode = lang.code
-                                        UserSession.selectedLanguageCode = lang.code
+                                        UserSession.setLanguage(lang)
                                         onLanguageSelected(lang)
                                     },
                                     colors = RadioButtonDefaults.colors(
@@ -157,7 +159,7 @@ fun LanguageSelectionDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen)
                 ) {
                     Text(
-                        text = if (isKn) "ದೃಢೀಕರಿಸಿ" else "Apply Language",
+                        text = "Apply Language",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

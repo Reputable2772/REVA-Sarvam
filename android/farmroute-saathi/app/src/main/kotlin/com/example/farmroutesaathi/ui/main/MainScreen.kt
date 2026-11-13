@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation3.runtime.NavKey
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.benefits.FarmerBenefitsScreen
 import com.example.farmroutesaathi.ui.harvest.HarvestHistoryScreen
@@ -44,7 +45,8 @@ fun MainScreen(
     onColdStorageClick: ((String, String, Double) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
+    val currentLangCode = UserSession.selectedLanguageCode
+    val isKannada = (currentLangCode == "kn")
     var isDarkTheme by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(RoleTab.FARMER) }
     var backendStatus by remember { mutableStateOf("Checking backend...") }
@@ -67,8 +69,7 @@ fun MainScreen(
                     isDarkTheme = isDarkTheme,
                     backendStatus = backendStatus,
                     onLanguageToggle = {
-                        isKannada = !isKannada
-                        UserSession.isKannadaPreferred = isKannada
+                        // UserSession.selectedLanguageCode was updated by dialog; recomposes automatically
                     },
                     onThemeToggle = { isDarkTheme = !isDarkTheme },
                     onLogout = onLogout,
@@ -257,13 +258,13 @@ fun FarmerDashboardView(
                     }
                     Column {
                         Text(
-                            text = if (isKannada) "ಸ್ವಾಗತ, $farmerName" else "Welcome, $farmerName",
+                            text = AppLocalization.t("welcome_farmer", "name" to farmerName),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (isKannada) "📍 $farmerLocation, $farmerState • ಕೃಷಿ ಕ್ಲಸ್ಟರ್ #12" else "📍 $farmerLocation, $farmerState • Agri Cluster #12",
+                            text = "📍 $farmerLocation, $farmerState • Agri Cluster #12",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -315,7 +316,7 @@ fun FarmerDashboardView(
                     ) {
                         Text("🌱", fontSize = 14.sp)
                         Text(
-                            text = if (isKannada) "ಸಕ್ರಿಯ ಕೊಯ್ಲು ಕೇಂದ್ರ" else "ACTIVE HARVEST FOCUS",
+                            text = AppLocalization.t("active_harvest_focus"),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 0.8.sp,
@@ -438,9 +439,9 @@ fun FarmerDashboardView(
         // CTA 1: Register Harvest
         FarmerActionTile(
             icon = "🌱",
-            title = if (isKannada) "ಹೊಸ ಕೊಯ್ಲು ನೋಂದಣಿ" else "Register Harvest Lot",
+            title = AppLocalization.t("register_cta"),
             subtitle = if (isKannada) "ಬೆಳೆ, ತೂಕ, ಗುಣಮಟ್ಟ ಮತ್ತು ಶೇಖರಣಾ ಅಗತ್ಯತೆ ನಮೂದಿಸಿ" else "Record crop, quantity, grade, date & storage needs",
-            badgeText = if (isKannada) "ಧ್ವನಿ + ಫಾರ್ಮ್" else "Voice + Form",
+            badgeText = AppLocalization.t("register_cta_sub"),
             containerColor = SoilCropGreen,
             contentColor = Color.White,
             onClick = { onDeclareHarvestClick?.invoke() }
@@ -449,9 +450,9 @@ fun FarmerDashboardView(
         // CTA 2: Compare Markets
         FarmerActionTile(
             icon = "📊",
-            title = if (isKannada) "ಮಾರುಕಟ್ಟೆ ಆದಾಯ ಹೋಲಿಕೆ (Netback)" else "Compare APMC Markets & FPO",
+            title = AppLocalization.t("compare_mandi_cta"),
             subtitle = if (isKannada) "ಕೋಲಾರ, ಬೆಂಗಳೂರು ಎಪಿಎಂಸಿ ನಿವ್ವಳ ಕೈಗೆ ಬರುವ ದರ ಪರಿಶೀಲಿಸಿ" else "Deterministic netback take-home after transport & commission",
-            badgeText = if (isKannada) "3 ಮಂಡಿಗಳು" else "3 Mandis",
+            badgeText = AppLocalization.t("compare_mandi_cta_sub"),
             containerColor = SoilHarvestGold,
             contentColor = SoilDeepEarth,
             onClick = { onMandiComparisonClick?.invoke(currentLot) }
@@ -460,9 +461,9 @@ fun FarmerDashboardView(
         // CTA 3: Find Cold Storage
         FarmerActionTile(
             icon = "❄️",
-            title = if (isKannada) "ಶೀತಲಾಗಾರ ಶೋಧನೆ & ರಕ್ಷಣೆ" else "Discover Cold Storage Facilities",
+            title = AppLocalization.t("cold_storage_cta"),
             subtitle = if (isKannada) "ಎನ್‌ಎಚ್‌ಬಿ ನೋಂದಾಯಿತ ಸೌಲಭ್ಯಗಳು, ಸಾಮರ್ಥ್ಯ ಮತ್ತು ಸಾಗಾಟ ದೂರ" else "NHB verified storage, multi-leg routes & weather protection",
-            badgeText = if (isKannada) "4.2 ಕಿ.ಮೀ ಹತ್ತಿರ" else "4.2 km Nearby",
+            badgeText = AppLocalization.t("cold_storage_cta_sub"),
             containerColor = SoilDeepEarth,
             contentColor = Color.White,
             onClick = { onColdStorageClick?.invoke(currentLot, activeCrop, activeQty) }
@@ -484,14 +485,14 @@ fun FarmerDashboardView(
         ) {
             SecondaryServiceCard(
                 icon = "📜",
-                title = if (isKannada) "ಕೊಯ್ಲು ಇತಿಹಾಸ" else "Harvest History",
+                title = AppLocalization.t("harvest_history"),
                 subtitle = if (isKannada) "ಹಿಂದಿನ ಲಾಟ್‌ಗಳು" else "Past lot records",
                 modifier = Modifier.weight(1f),
                 onClick = { onViewHistoryClick?.invoke() }
             )
             SecondaryServiceCard(
                 icon = "🏛️",
-                title = if (isKannada) "ಸರ್ಕಾರಿ ಯೋಜನೆಗಳು" else "Govt Schemes",
+                title = AppLocalization.t("schemes_cta"),
                 subtitle = if (isKannada) "ಪಿಎಂ-ಕಿಸಾನ್, ವಿಮೆ" else "PM-KISAN, PMFBY",
                 modifier = Modifier.weight(1f),
                 onClick = { onViewBenefitsClick?.invoke() }
@@ -504,14 +505,14 @@ fun FarmerDashboardView(
         ) {
             SecondaryServiceCard(
                 icon = "👥",
-                title = if (isKannada) "ರೈತ ಸಮೂಹ ವಾಹನ" else "Farmer Pooling",
+                title = AppLocalization.t("pooling_cta"),
                 subtitle = if (isKannada) "ಸಾಗಾಟ ವೆಚ್ಚ ಕಡಿತ" else "Save 67% freight",
                 modifier = Modifier.weight(1f),
                 onClick = { onViewPoolingClick?.invoke() }
             )
             SecondaryServiceCard(
                 icon = "⛅",
-                title = if (isKannada) "ಹವಾಮಾನ ಸಲಹೆ" else "Weather Advisory",
+                title = AppLocalization.t("weather_cta"),
                 subtitle = if (isKannada) "ಐಎಂಡಿ ಮಳೆ ಎಚ್ಚರಿಕೆ" else "IMD 48h rain alert",
                 modifier = Modifier.weight(1f),
                 onClick = { onViewWeatherClick?.invoke() }

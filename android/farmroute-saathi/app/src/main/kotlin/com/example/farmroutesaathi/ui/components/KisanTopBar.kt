@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
 
@@ -92,14 +93,14 @@ fun KisanTopBar(
 
                     Column {
                         Text(
-                            text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ" else "FarmRoute Saathi",
+                            text = AppLocalization.t("app_name"),
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.3.sp
                         )
                         Text(
-                            text = if (isKannada) "ಮಣ್ಣಿನಿಂದ ಮಾರುಕಟ್ಟೆಗೆ • From Soil to Market" else "FROM SOIL TO MARKET",
+                            text = AppLocalization.t("tagline"),
                             style = MaterialTheme.typography.bodySmall,
                             color = SoilHarvestGold,
                             fontSize = 10.sp,
@@ -277,7 +278,7 @@ fun KisanTopBar(
                             .clickable { onLogout() }
                     ) {
                         Text(
-                            text = if (isKannada) "🚪 ನಿರ್ಗಮಿಸಿ" else "🚪 Logout",
+                            text = "🚪 " + AppLocalization.t("logout"),
                             fontSize = 10.5.sp,
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
@@ -293,7 +294,8 @@ fun KisanTopBar(
     if (showLanguageDialog) {
         LanguageSelectionDialog(
             onDismiss = { showLanguageDialog = false },
-            onLanguageSelected = {
+            onLanguageSelected = { lang ->
+                UserSession.setLanguage(lang)
                 showLanguageDialog = false
                 onLanguageToggle()
             }

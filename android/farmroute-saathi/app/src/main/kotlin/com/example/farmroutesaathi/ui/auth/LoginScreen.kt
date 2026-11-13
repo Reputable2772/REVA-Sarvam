@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.FarmerProfile
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.components.LanguageSelectionDialog
@@ -54,7 +55,10 @@ enum class AuthStep {
 fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
+    // Reactive language subscription for instant re-composition across all 11 languages
+    val currentLangCode = UserSession.selectedLanguageCode
+    val selectedLang = UserSession.selectedLanguage
+
     var showLanguageDialog by remember { mutableStateOf(false) }
     var currentStep by remember { mutableStateOf(AuthStep.PHONE_ENTRY) }
     var phoneNumber by remember { mutableStateOf("") }
@@ -145,12 +149,12 @@ fun LoginScreen(
                     // Small Brand Sprout Pill
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = SoilFieldPaper.copy(alpha = 0.92f),
+                        color = SoilFieldPaper.copy(alpha = 0.95f),
                         border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.2f)),
                         shadowElevation = 2.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🌱", fontSize = 13.sp)
@@ -178,7 +182,7 @@ fun LoginScreen(
                         ) {
                             Text("🌐 ", fontSize = 12.sp)
                             Text(
-                                text = "${UserSession.selectedLanguage.nativeName} (${UserSession.selectedLanguage.code.uppercase()})",
+                                text = "${selectedLang.nativeName} (${selectedLang.code.uppercase()})",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SoilCropGreen
@@ -210,7 +214,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ" else "FarmRoute Saathi",
+                        text = AppLocalization.t("app_name"),
                         fontSize = 24.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = SoilDeepEarth,
@@ -219,53 +223,59 @@ fun LoginScreen(
 
                     // Primary Slogan: "Your Land. Your Harvest. Your Better Tomorrow."
                     Text(
-                        text = if (isKannada)
-                            "ನಿಮ್ಮ ಭೂಮಿ • ನಿಮ್ಮ ಬೆಳೆ • ನಿಮ್ಮ ಉತ್ತಮ ನಾಳೆ"
-                        else
-                            "Your Land. Your Harvest. Your Better Tomorrow.",
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = AppLocalization.t("tagline_long"),
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = SoilCropGreen,
-                        letterSpacing = 0.4.sp
+                        letterSpacing = 0.3.sp,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
 
-                    // Secondary Tagline: "From Soil to Market"
-                    Text(
-                        text = if (isKannada) "ಮಣ್ಣಿನಿಂದ ಮಾರುಕಟ್ಟೆಗೆ • FROM SOIL TO MARKET" else "FROM SOIL TO MARKET",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = SoilHarvestGold,
-                        letterSpacing = 1.2.sp
-                    )
+                    // Secondary Tagline: "FROM SOIL TO MARKET"
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = SoilHarvestGold.copy(alpha = 0.15f),
+                        border = BorderStroke(0.8.dp, SoilHarvestGold.copy(alpha = 0.35f)),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        Text(
+                            text = AppLocalization.t("tagline"),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SoilHarvestGoldDark,
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
             // ================================================================
-            // SECTION B: WELCOME AND LOGIN
-            // "Welcome to FarmRoute"
-            // "Your harvest. Your choices. Better returns."
+            // SECTION B: AUTHENTICATION CONTAINER (STEP-BASED FLOW)
+            // Step 1: Phone Entry | Step 2: MPIN Entry | Step 3: Onboarding
             // ================================================================
             Crossfade(
                 targetState = currentStep,
-                animationSpec = tween(280),
-                label = "AuthStepTransition"
+                animationSpec = tween(350),
+                label = "auth_step_crossfade"
             ) { step ->
                 when (step) {
                     AuthStep.PHONE_ENTRY -> {
                         SoilPhoneEntryCard(
-                            isKannada = isKannada,
                             phoneNumber = phoneNumber,
-                            onPhoneChange = { if (it.length <= 10 && it.all { char -> char.isDigit() }) phoneNumber = it },
+                            onPhoneChange = { input ->
+                                if (input.length <= 10 && input.all { c -> c.isDigit() }) {
+                                    phoneNumber = input
+                                    errorMessage = null
+                                }
+                            },
                             isLoading = isLoading,
                             errorMessage = errorMessage,
                             onContinue = {
                                 if (phoneNumber.length != 10) {
-                                    errorMessage = if (isKannada)
-                                        "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ 10-ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ"
-                                    else
-                                        "Please enter a valid 10-digit mobile number"
+                                    errorMessage = "Please enter a valid 10-digit mobile number"
                                     return@SoilPhoneEntryCard
                                 }
                                 focusManager.clearFocus()
@@ -275,27 +285,16 @@ fun LoginScreen(
                                     try {
                                         val checkRes = ApiClient.checkAccount(phoneNumber)
                                         isLoading = false
-                                        if (checkRes.contains("\"exists\":true")) {
-                                            detectedFarmerName = if (checkRes.contains("\"name\":\"")) {
-                                                checkRes.substringAfter("\"name\":\"").substringBefore("\"")
-                                            } else {
-                                                "Manjunatha Gowda"
-                                            }
-                                            detectedDistrict = if (checkRes.contains("\"district\":\"")) {
-                                                checkRes.substringAfter("\"district\":\"").substringBefore("\"")
-                                            } else {
-                                                "Kolar"
-                                            }
-                                            detectedState = if (checkRes.contains("\"state\":\"")) {
-                                                checkRes.substringAfter("\"state\":\"").substringBefore("\"")
-                                            } else {
-                                                "Karnataka"
-                                            }
+                                        if (checkRes.exists) {
+                                            detectedFarmerName = checkRes.name
+                                            detectedState = checkRes.state
+                                            detectedDistrict = checkRes.district
                                             currentStep = AuthStep.MPIN_ENTRY
                                         } else {
                                             regName = ""
-                                            regState = "Karnataka"
-                                            regDistrict = "Kolar"
+                                            regPincode = "563101"
+                                            regMpin = ""
+                                            regConfirmMpin = ""
                                             currentStep = AuthStep.ONBOARDING
                                         }
                                     } catch (e: Exception) {
@@ -309,7 +308,6 @@ fun LoginScreen(
 
                     AuthStep.MPIN_ENTRY -> {
                         SoilMpinEntryCard(
-                            isKannada = isKannada,
                             phoneNumber = phoneNumber,
                             farmerName = detectedFarmerName,
                             mpinInput = mpinInput,
@@ -334,10 +332,7 @@ fun LoginScreen(
                             },
                             onLogin = {
                                 if (mpinInput.length != 4) {
-                                    errorMessage = if (isKannada)
-                                        "ದಯವಿಟ್ಟು 4-ಅಂಕಿಯ MPIN ನಮೂದಿಸಿ"
-                                    else
-                                        "Please enter your 4-digit MPIN"
+                                    errorMessage = AppLocalization.t("enter_4_mpin_err")
                                     return@SoilMpinEntryCard
                                 }
                                 isLoading = true
@@ -358,10 +353,7 @@ fun LoginScreen(
                                         )
                                         onLoginSuccess()
                                     } else {
-                                        errorMessage = if (isKannada)
-                                            "ತಪ್ಪಾದ MPIN. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸಿ"
-                                        else
-                                            "Incorrect MPIN. Please try again."
+                                        errorMessage = AppLocalization.t("incorrect_mpin_err")
                                     }
                                 }
                             }
@@ -370,7 +362,6 @@ fun LoginScreen(
 
                     AuthStep.ONBOARDING -> {
                         SoilOnboardingCard(
-                            isKannada = isKannada,
                             phoneNumber = phoneNumber,
                             name = regName,
                             onNameChange = { regName = it },
@@ -398,19 +389,19 @@ fun LoginScreen(
                             },
                             onRegister = {
                                 if (regName.isBlank()) {
-                                    errorMessage = if (isKannada) "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಹೆಸರನ್ನು ನಮೂದಿಸಿ" else "Please enter your full name"
+                                    errorMessage = AppLocalization.t("enter_full_name_err")
                                     return@SoilOnboardingCard
                                 }
                                 if (regPincode.length != 6) {
-                                    errorMessage = if (isKannada) "ದಯವಿಟ್ಟು ಮಾನ್ಯವಾದ 6-ಅಂಕಿಯ ಪಿನ್‌ಕೋಡ್ ನಮೂದಿಸಿ" else "Please enter a 6-digit pincode"
+                                    errorMessage = AppLocalization.t("enter_pincode_err")
                                     return@SoilOnboardingCard
                                 }
                                 if (regMpin.length != 4) {
-                                    errorMessage = if (isKannada) "ದಯವಿಟ್ಟು 4-ಅಂಕಿಯ ಹೊಸ MPIN ನಮೂದಿಸಿ" else "Please set a 4-digit MPIN"
+                                    errorMessage = AppLocalization.t("set_new_mpin_err")
                                     return@SoilOnboardingCard
                                 }
                                 if (regMpin != regConfirmMpin) {
-                                    errorMessage = if (isKannada) "MPIN ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ" else "MPIN confirmation does not match"
+                                    errorMessage = AppLocalization.t("mpin_mismatch_err")
                                     return@SoilOnboardingCard
                                 }
                                 isLoading = true
@@ -467,10 +458,7 @@ fun LoginScreen(
                         Text("🌾", fontSize = 14.sp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (isKannada)
-                                "ರೈತರಿಗಾಗಿ ನಿರ್ಮಿಸಲಾಗಿದೆ • ಮಾರುಕಟ್ಟೆಗಳೊಂದಿಗೆ ಸಂಪರ್ಕಿಸಲಾಗಿದೆ"
-                            else
-                                "Built for farmers. Connected to markets.",
+                            text = AppLocalization.t("built_for_farmers"),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = SoilDeepEarth
@@ -481,10 +469,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 Text(
-                    text = if (isKannada)
-                        "ಕೃಷಿ ತಂತ್ರಜ್ಞಾನ ದೃಢೀಕರಣ • ರಾಷ್ಟ್ರೀಯ ತೋಟಗಾರಿಕಾ ಮಂಡಳಿ & AGMARKNET ಬೆಂಬಲಿತ"
-                    else
-                        "Authentic Indian AgriTech • Backed by NHB & AGMARKNET market intelligence",
+                    text = AppLocalization.t("trust_footer"),
                     fontSize = 10.sp,
                     color = SoilDeepEarth.copy(alpha = 0.6f),
                     textAlign = TextAlign.Center
@@ -499,7 +484,6 @@ fun LoginScreen(
                 onDismiss = { showLanguageDialog = false },
                 onLanguageSelected = { lang ->
                     UserSession.setLanguage(lang)
-                    isKannada = (lang.code == "kn")
                     showLanguageDialog = false
                 }
             )
@@ -522,92 +506,93 @@ private fun FarmlandHeroLandscape(
         val width = size.width
         val height = size.height
 
-        // 1. Natural Sky Gradient
+        // 1. Natural Sky (#A9C5C9 to soft morning ivory)
         drawRect(
             brush = Brush.verticalGradient(
-                colors = listOf(
-                    SoilNaturalSky,
-                    SoilNaturalSky.copy(alpha = 0.6f),
-                    SoilFieldPaper
-                ),
+                colors = listOf(SoilNaturalSky, Color(0xFFD6E4E2), SoilFieldPaper),
                 startY = 0f,
-                endY = height * 0.75f
+                endY = height * 0.55f
             ),
-            size = Size(width, height)
+            size = Size(width, height * 0.55f)
         )
 
-        // 2. Golden Morning Sun (#D7A747)
-        val sunCenter = Offset(width * 0.75f, height * 0.32f)
+        // 2. Golden Morning Sun (#D7A747) rising over hills
+        val sunCenter = Offset(width * 0.74f, height * 0.28f)
+        val sunRadius = 40.dp.toPx()
+        // Sun halo / glow
         drawCircle(
-            color = SoilHarvestGold.copy(alpha = 0.35f),
-            radius = 52.dp.toPx(),
+            color = SoilHarvestGold.copy(alpha = 0.22f),
+            radius = sunRadius * 1.55f,
             center = sunCenter
         )
+        // Sun disk
         drawCircle(
-            color = SoilHarvestGold.copy(alpha = 0.85f),
-            radius = 34.dp.toPx(),
+            brush = Brush.radialGradient(
+                colors = listOf(Color(0xFFFFE082), SoilHarvestGold),
+                center = sunCenter,
+                radius = sunRadius
+            ),
+            radius = sunRadius,
             center = sunCenter
         )
 
-        // 3. Distant Mountain/Hill Ridge (Fresh Leaf tint)
-        val hillPath1 = Path().apply {
-            moveTo(0f, height * 0.50f)
+        // 3. Distant Rolling Agricultural Terraces - Light Green (#91A96D)
+        val terrace1 = Path().apply {
+            moveTo(0f, height * 0.40f)
             cubicTo(
-                width * 0.25f, height * 0.42f,
-                width * 0.50f, height * 0.54f,
-                width, height * 0.44f
+                width * 0.25f, height * 0.36f,
+                width * 0.55f, height * 0.44f,
+                width, height * 0.38f
             )
             lineTo(width, height)
             lineTo(0f, height)
             close()
         }
-        drawPath(
-            path = hillPath1,
-            color = SoilFreshLeaf.copy(alpha = 0.5f)
-        )
+        drawPath(path = terrace1, color = SoilFreshLeaf.copy(alpha = 0.85f))
 
-        // 4. Middle Ground: Rolling Crop Terraces (#486B43)
-        val hillPath2 = Path().apply {
-            moveTo(0f, height * 0.60f)
+        // 4. Middle Crop Fields - Deep Crop Green (#486B43)
+        val terrace2 = Path().apply {
+            moveTo(0f, height * 0.47f)
             cubicTo(
-                width * 0.35f, height * 0.54f,
-                width * 0.70f, height * 0.68f,
-                width, height * 0.58f
+                width * 0.35f, height * 0.52f,
+                width * 0.70f, height * 0.45f,
+                width, height * 0.50f
             )
             lineTo(width, height)
             lineTo(0f, height)
             close()
         }
-        drawPath(
-            path = hillPath2,
-            color = SoilCropGreen.copy(alpha = 0.75f)
-        )
+        drawPath(path = terrace2, color = SoilCropGreen)
 
-        // 5. Foreground: Fertile Soil Field Furrows (#493A2D)
-        val soilPath = Path().apply {
-            moveTo(0f, height * 0.74f)
+        // 5. Rich Fertile Soil Bed (#493A2D)
+        val soilBed = Path().apply {
+            moveTo(0f, height * 0.56f)
             cubicTo(
-                width * 0.30f, height * 0.70f,
-                width * 0.65f, height * 0.76f,
-                width, height * 0.72f
+                width * 0.40f, height * 0.54f,
+                width * 0.75f, height * 0.59f,
+                width, height * 0.55f
             )
             lineTo(width, height)
             lineTo(0f, height)
             close()
         }
         drawPath(
-            path = soilPath,
-            color = SoilDeepEarth
+            path = soilBed,
+            brush = Brush.verticalGradient(
+                colors = listOf(SoilDeepEarth, Color(0xFF382A20)),
+                startY = height * 0.55f,
+                endY = height
+            )
         )
 
         // 6. Natural Agricultural Furrow Lines in fertile soil
         val furrowColor = SoilHarvestGold.copy(alpha = 0.25f)
         for (i in 1..4) {
-            val yOffset = height * (0.76f + i * 0.05f)
+            val yOffset = height * (0.64f + i * 0.05f)
             drawLine(
                 color = furrowColor,
                 start = Offset(0f, yOffset),
-                end = Offset(width, yOffset - 6.dp.toPx()),
+                end = Offset(width, yOffset - 4.dp.toPx()),
                 strokeWidth = 2.dp.toPx()
             )
         }
@@ -616,7 +601,7 @@ private fun FarmlandHeroLandscape(
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(Color.Transparent, SoilFieldPaper),
-                startY = height * 0.85f,
+                startY = height * 0.82f,
                 endY = height
             ),
             size = Size(width, height)
@@ -629,7 +614,6 @@ private fun FarmlandHeroLandscape(
 // ============================================================================
 @Composable
 private fun SoilPhoneEntryCard(
-    isKannada: Boolean,
     phoneNumber: String,
     onPhoneChange: (String) -> Unit,
     isLoading: Boolean,
@@ -641,9 +625,9 @@ private fun SoilPhoneEntryCard(
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
@@ -652,17 +636,14 @@ private fun SoilPhoneEntryCard(
         ) {
             // Welcome Header
             Text(
-                text = if (isKannada) "ಫಾರ್ಮ್‌ರೂಟ್‌ಗೆ ಸುಸ್ವಾಗತ" else "Welcome to FarmRoute",
+                text = AppLocalization.t("welcome_title"),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = SoilDeepEarth
             )
 
             Text(
-                text = if (isKannada)
-                    "ನಿಮ್ಮ ಕೊಯ್ಲು • ನಿಮ್ಮ ಆಯ್ಕೆ • ಉತ್ತಮ ಆದಾಯ"
-                else
-                    "Your harvest. Your choices. Better returns.",
+                text = AppLocalization.t("welcome_sub"),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = SoilCropGreen,
@@ -670,26 +651,34 @@ private fun SoilPhoneEntryCard(
             )
 
             Text(
-                text = if (isKannada)
-                    "ಮುಂದುವರಿಯಲು ನಿಮ್ಮ 10-ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ನಮೂದಿಸಿ"
-                else
-                    "Enter your 10-digit mobile number to access your farmland hub",
+                text = AppLocalization.t("enter_mobile_desc"),
                 fontSize = 12.sp,
-                color = SoilDeepEarth.copy(alpha = 0.7f),
+                color = SoilDeepEarth.copy(alpha = 0.75f),
                 modifier = Modifier.padding(bottom = 18.dp)
             )
 
-            // Mobile Number Input Field
+            // Mobile Number Input Field with EXPLICIT high-contrast colors
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = onPhoneChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (isKannada) "ರೈತರ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ" else "Farmer Mobile Number") },
+                textStyle = LocalTextStyle.current.copy(
+                    color = Color(0xFF1B2A1E),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp
+                ),
+                label = {
+                    Text(
+                        text = AppLocalization.t("farmer_mobile_label"),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
                 prefix = {
                     Text(
                         text = "🇮🇳 +91 ",
                         fontWeight = FontWeight.Bold,
-                        color = SoilDeepEarth
+                        color = SoilDeepEarth,
+                        fontSize = 16.sp
                     )
                 },
                 singleLine = true,
@@ -700,10 +689,17 @@ private fun SoilPhoneEntryCard(
                 keyboardActions = KeyboardActions(onDone = { onContinue() }),
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color(0xFF1B2A1E),
+                    unfocusedTextColor = Color(0xFF1B2A1E),
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
                     focusedBorderColor = SoilCropGreen,
+                    unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
                     focusedLabelColor = SoilCropGreen,
-                    unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.25f),
-                    cursorColor = SoilCropGreen
+                    unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
+                    cursorColor = SoilCropGreen,
+                    focusedPrefixColor = SoilDeepEarth,
+                    unfocusedPrefixColor = SoilDeepEarth
                 )
             )
 
@@ -749,7 +745,7 @@ private fun SoilPhoneEntryCard(
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (isKannada) "ಮುಂದುವರಿಯಿರಿ" else "Continue to FarmHub",
+                            text = AppLocalization.t("continue_farmhub"),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -770,7 +766,6 @@ private fun SoilPhoneEntryCard(
 // ============================================================================
 @Composable
 private fun SoilMpinEntryCard(
-    isKannada: Boolean,
     phoneNumber: String,
     farmerName: String,
     mpinInput: String,
@@ -786,9 +781,9 @@ private fun SoilMpinEntryCard(
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
@@ -797,7 +792,7 @@ private fun SoilMpinEntryCard(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = if (isKannada) "ಸ್ವಾಗತ, $farmerName" else "Welcome back, $farmerName",
+                text = AppLocalization.t("welcome_back", "name" to farmerName),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = SoilDeepEarth,
@@ -811,11 +806,12 @@ private fun SoilMpinEntryCard(
                 Text(
                     text = "🇮🇳 +91 $phoneNumber",
                     fontSize = 13.sp,
-                    color = SoilDeepEarth.copy(alpha = 0.7f)
+                    color = SoilDeepEarth.copy(alpha = 0.75f),
+                    fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = if (isKannada) "(ಬದಲಾಯಿಸಿ)" else "(Change)",
+                    text = AppLocalization.t("change_mobile"),
                     fontSize = 12.sp,
                     color = SoilCropGreen,
                     fontWeight = FontWeight.Bold,
@@ -824,7 +820,7 @@ private fun SoilMpinEntryCard(
             }
 
             Text(
-                text = if (isKannada) "ನಿಮ್ಮ 4-ಅಂಕಿಯ MPIN ನಮೂದಿಸಿ" else "Enter your 4-digit security MPIN",
+                text = AppLocalization.t("enter_mpin"),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = SoilDeepEarth
@@ -942,7 +938,7 @@ private fun SoilMpinEntryCard(
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (isKannada) "ದೃಢೀಕರಿಸಿ ಮತ್ತು ಲಾಗಿನ್ ಆಗಿ" else "Verify & Enter FarmHub",
+                            text = AppLocalization.t("verify_enter"),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -956,7 +952,7 @@ private fun SoilMpinEntryCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = if (isKannada) "ರಕ್ಷಿತ ಲಾಗಿನ್ • ನಿಮ್ಮ 4-ಅಂಕಿಯ ರಹಸ್ಯ MPIN ನಮೂದಿಸಿ" else "Secure Login • Enter your 4-digit secret MPIN",
+                text = AppLocalization.t("secure_login_hint"),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
                 color = SoilDeepEarth.copy(alpha = 0.6f)
@@ -971,7 +967,6 @@ private fun SoilMpinEntryCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SoilOnboardingCard(
-    isKannada: Boolean,
     phoneNumber: String,
     name: String,
     onNameChange: (String) -> Unit,
@@ -996,14 +991,32 @@ private fun SoilOnboardingCard(
     onBackToPhone: () -> Unit,
     onRegister: () -> Unit
 ) {
+    // Common textfield colors with EXPLICIT high-contrast dark text
+    val fieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color(0xFF1B2A1E),
+        unfocusedTextColor = Color(0xFF1B2A1E),
+        focusedContainerColor = Color.White,
+        unfocusedContainerColor = Color.White,
+        focusedBorderColor = SoilCropGreen,
+        unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.35f),
+        focusedLabelColor = SoilCropGreen,
+        unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.75f),
+        cursorColor = SoilCropGreen
+    )
+    val fieldTextStyle = LocalTextStyle.current.copy(
+        color = Color(0xFF1B2A1E),
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 15.sp
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1011,35 +1024,30 @@ private fun SoilOnboardingCard(
                 .padding(22.dp)
         ) {
             Text(
-                text = if (isKannada) "ಹೊಸ ಕಿಸಾನ್ ನೋಂದಣಿ" else "Register Farmland Account",
+                text = AppLocalization.t("register_title"),
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
                 color = SoilDeepEarth
             )
 
             Text(
-                text = if (isKannada)
-                    "ಮೊಬೈಲ್: +91 $phoneNumber (ಹೊಸ ರೈತ)"
-                else
-                    "Mobile: +91 $phoneNumber (New Farmland Account)",
+                text = AppLocalization.t("mobile_new_farmer", "phone" to phoneNumber),
                 fontSize = 12.sp,
                 color = SoilCropGreen,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 2.dp, bottom = 14.dp)
             )
 
-            // Full Name
+            // Full Name Input
             OutlinedTextField(
                 value = name,
                 onValueChange = onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (isKannada) "ರೈತರ ಪೂರ್ಣ ಹೆಸರು" else "Farmer Full Name") },
+                textStyle = fieldTextStyle,
+                label = { Text(AppLocalization.t("farmer_name_label")) },
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = SoilCropGreen,
-                    focusedLabelColor = SoilCropGreen
-                )
+                colors = fieldColors
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -1054,20 +1062,23 @@ private fun SoilOnboardingCard(
                     value = state,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(if (isKannada) "ರಾಜ್ಯ (State - AGMARKNET)" else "State (AGMARKNET)") },
+                    textStyle = fieldTextStyle,
+                    label = { Text(AppLocalization.t("state_label")) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = stateExpanded) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
                 ExposedDropdownMenu(
                     expanded = stateExpanded,
-                    onDismissRequest = { onStateExpandedChange(false) }
+                    onDismissRequest = { onStateExpandedChange(false) },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     statesList.forEach { s ->
                         DropdownMenuItem(
-                            text = { Text(s) },
+                            text = { Text(s, color = Color(0xFF1B2A1E), fontWeight = FontWeight.Medium) },
                             onClick = {
                                 onStateChange(s)
                                 onStateExpandedChange(false)
@@ -1089,20 +1100,23 @@ private fun SoilOnboardingCard(
                     value = district,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(if (isKannada) "ಜಿಲ್ಲೆ (District)" else "District") },
+                    textStyle = fieldTextStyle,
+                    label = { Text(AppLocalization.t("district_label")) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = districtExpanded) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
                 ExposedDropdownMenu(
                     expanded = districtExpanded,
-                    onDismissRequest = { onDistrictExpandedChange(false) }
+                    onDismissRequest = { onDistrictExpandedChange(false) },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     districtsList.forEach { d ->
                         DropdownMenuItem(
-                            text = { Text(d) },
+                            text = { Text(d, color = Color(0xFF1B2A1E), fontWeight = FontWeight.Medium) },
                             onClick = {
                                 onDistrictChange(d)
                                 onDistrictExpandedChange(false)
@@ -1114,15 +1128,17 @@ private fun SoilOnboardingCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Pincode
+            // Pincode Input
             OutlinedTextField(
                 value = pincode,
                 onValueChange = onPincodeChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (isKannada) "ಪಿನ್‌ಕೋಡ್ (6 ಅಂಕಿ)" else "Pincode (6-digit)") },
+                textStyle = fieldTextStyle,
+                label = { Text(AppLocalization.t("pincode_label")) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = fieldColors
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -1136,22 +1152,26 @@ private fun SoilOnboardingCard(
                     value = mpin,
                     onValueChange = onMpinChange,
                     modifier = Modifier.weight(1f),
-                    label = { Text(if (isKannada) "ಹೊಸ MPIN" else "Set MPIN") },
+                    textStyle = fieldTextStyle,
+                    label = { Text(AppLocalization.t("set_mpin_label")) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
 
                 OutlinedTextField(
                     value = confirmMpin,
                     onValueChange = onConfirmMpinChange,
                     modifier = Modifier.weight(1f),
-                    label = { Text(if (isKannada) "ದೃಢೀಕರಿಸಿ" else "Confirm") },
+                    textStyle = fieldTextStyle,
+                    label = { Text(AppLocalization.t("confirm_mpin_label")) },
                     visualTransformation = PasswordVisualTransformation(),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors
                 )
             }
 
@@ -1193,7 +1213,7 @@ private fun SoilOnboardingCard(
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = if (isKannada) "ನೋಂದಣಿ ಪೂರ್ಣಗೊಳಿಸಿ ➔" else "Complete Registration & Enter ➔",
+                            text = AppLocalization.t("complete_reg_btn") + " ➔",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -1209,7 +1229,7 @@ private fun SoilOnboardingCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (isKannada) "← ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಬದಲಾಯಿಸಿ" else "← Change Mobile Number",
+                    text = AppLocalization.t("change_number_btn"),
                     color = SoilDeepEarth,
                     fontWeight = FontWeight.SemiBold
                 )
