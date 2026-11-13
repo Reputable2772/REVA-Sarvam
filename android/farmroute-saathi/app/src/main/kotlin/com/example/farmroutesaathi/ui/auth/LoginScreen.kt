@@ -496,13 +496,12 @@ fun LoginScreen(
 
         if (showLanguageDialog) {
             LanguageSelectionDialog(
-                currentLanguage = UserSession.selectedLanguage,
+                onDismiss = { showLanguageDialog = false },
                 onLanguageSelected = { lang ->
                     UserSession.setLanguage(lang)
                     isKannada = (lang.code == "kn")
                     showLanguageDialog = false
-                },
-                onDismiss = { showLanguageDialog = false }
+                }
             )
         }
     }

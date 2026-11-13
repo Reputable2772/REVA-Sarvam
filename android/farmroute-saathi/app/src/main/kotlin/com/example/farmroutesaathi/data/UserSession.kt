@@ -83,6 +83,10 @@ object UserSession {
     val selectedLanguage: SupportedLanguage
         get() = supportedLanguages.find { it.code == selectedLanguageCode } ?: supportedLanguages.first()
 
+    fun setLanguage(lang: SupportedLanguage) {
+        selectedLanguageCode = lang.code
+    }
+
     var isKannadaPreferred: Boolean
         get() = selectedLanguageCode == "kn"
         set(value) {

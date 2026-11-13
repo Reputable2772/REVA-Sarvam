@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.farmroutesaathi.data.ApiClient
+import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -37,7 +38,7 @@ fun MandiComparisonScreen(
     harvestId: String,
     onBackClick: () -> Unit
 ) {
-    var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
+    var isKannada: Boolean by remember { mutableStateOf(UserSession.isKannadaPreferred) }
     var isLoading by remember { mutableStateOf(true) }
     var crop by remember { mutableStateOf("Tomato") }
     var quantityKg by remember { mutableStateOf(200.0) }
@@ -273,7 +274,10 @@ fun MandiComparisonScreen(
                         color = HarvestGold,
                         modifier = Modifier
                             .padding(end = 8.dp)
-                            .clickable { isKannada = !isKannada }
+                            .clickable {
+                                isKannada = !isKannada
+                                UserSession.isKannadaPreferred = isKannada
+                            }
                     ) {
                         Text(
                             text = if (isKannada) "EN" else "ಕನ್ನಡ",
