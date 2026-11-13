@@ -144,6 +144,29 @@ class DatasetImporter:
         return {"success": True, "count": count}
 
     @staticmethod
+    def load_local_agmarknet_csv(db: Session, filepath: str = "datasets/9ef84268-d588-465a-a308-a864a43d0070.csv") -> Dict[str, Any]:
+        """
+        Loads official AGMARKNET daily CSV directly from the local filesystem.
+        Optimized for Karnataka corridor mandis and major commodities.
+        """
+        import os
+        if not os.path.exists(filepath):
+            return {"success": False, "error": f"File not found: {filepath}"}
+
+        with open(filepath, mode="r", encoding="utf-8", errors="ignore") as f:
+            reader = csv.DictReader(f)
+            relevant_records = []
+            for row in reader:
+                # Include Karnataka records or major agricultural corridor entries
+                state = row.get("State", "")
+                if "Karnataka" in state or "Kolar" in row.get("District", "") or "Tomato" in row.get("Commodity", ""):
+                    relevant_records.append(row)
+
+            if relevant_records:
+                return DatasetImporter.import_mandi_prices_from_json(db, relevant_records)
+            return {"success": True, "message": "No matching regional records found"}
+
+    @staticmethod
     def get_summary(db: Session) -> Dict[str, Any]:
         farmers_count = db.query(Farmer).count()
         lots_count = db.query(HarvestLot).count()

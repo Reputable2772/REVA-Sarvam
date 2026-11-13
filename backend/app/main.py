@@ -8,6 +8,12 @@ from backend.app.routes.farmer_routes import router as farmer_router
 from backend.app.routes.logistics_routes import router as logistics_router
 from backend.app.routes.data_routes import router as data_router
 from backend.app.routes.demo_routes import router as demo_router
+from backend.app.routes.sarvam_routes import router as sarvam_router
+from backend.app.routes.auth_routes import router as auth_router
+from backend.app.routes.weather_routes import router as weather_router
+from backend.app.routes.cold_storage_routes import router as cold_storage_router
+from backend.app.routes.sync_routes import router as sync_router
+from backend.app.routes.notification_routes import router as notification_router
 
 # Initialize database schema
 Base.metadata.create_all(bind=engine)
@@ -35,7 +41,11 @@ def health_check():
         "version": settings.VERSION,
         "demo_mode": settings.DEMO_MODE,
         "database": "SQLite (WAL mode)",
-        "modules": ["farmer", "logistics", "data_importer", "demo_checkpoints"],
+        "modules": [
+            "farmer", "logistics", "data_importer", "demo_checkpoints",
+            "sarvam_voice_ai", "auth_otp", "weather_wttr_in",
+            "cold_storage_phase14", "offline_sync_phase15", "fcm_notifications_phase17"
+        ],
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -44,6 +54,12 @@ app.include_router(farmer_router, prefix=settings.API_V1_PREFIX)
 app.include_router(logistics_router, prefix=settings.API_V1_PREFIX)
 app.include_router(data_router, prefix=settings.API_V1_PREFIX)
 app.include_router(demo_router, prefix=settings.API_V1_PREFIX)
+app.include_router(sarvam_router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
+app.include_router(weather_router, prefix=settings.API_V1_PREFIX)
+app.include_router(cold_storage_router, prefix=settings.API_V1_PREFIX)
+app.include_router(sync_router, prefix=settings.API_V1_PREFIX)
+app.include_router(notification_router, prefix=settings.API_V1_PREFIX)
 
 if __name__ == "__main__":
     import uvicorn

@@ -56,6 +56,16 @@ def import_lots(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/load-local-agmarknet")
+def load_local_agmarknet_dataset(
+    filepath: Optional[str] = "datasets/9ef84268-d588-465a-a308-a864a43d0070.csv",
+    db: Session = Depends(get_db)
+):
+    """
+    Ingests live regional AGMARKNET records from datasets/ into the active database.
+    """
+    return DatasetImporter.load_local_agmarknet_csv(db, filepath or "datasets/9ef84268-d588-465a-a308-a864a43d0070.csv")
+
 @router.get("/mandi-prices")
 def get_mandi_prices(
     commodity: Optional[str] = None,
