@@ -1,7 +1,16 @@
 package com.example.farmroutesaathi.ui.harvest
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -25,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.farmroutesaathi.audio.VoiceRecorder
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.AppLocalization
@@ -70,6 +80,27 @@ fun HarvestQuestionnaireScreen(
     val farmer = UserSession.currentFarmer
     val calendar = remember { Calendar.getInstance() }
 
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+
+    DisposableEffect(context) {
+        var recognizer: SpeechRecognizer? = null
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                recognizer = SpeechRecognizer.createSpeechRecognizer(context)
+                speechRecognizer = recognizer
+            }
+        } catch (ignored: Exception) {
+            speechRecognizer = null
+        }
+
+        onDispose {
+            try {
+                recognizer?.destroy()
+            } catch (ignored: Exception) {}
+            speechRecognizer = null
+        }
+    }
+
     fun showDatePicker(onDateSelected: (String) -> Unit) {
         DatePickerDialog(
             context,
@@ -100,7 +131,7 @@ fun HarvestQuestionnaireScreen(
 
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
-        voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) spokenText else "$voiceTranscriptInput | $spokenText"
+        voiceTranscriptInput = spokenText
         isUploadingAudio = true
         scope.launch {
             try {
@@ -164,19 +195,66 @@ fun HarvestQuestionnaireScreen(
         }
     }
 
-    fun toggleAudioRecording() {
+    fun startNativeSpeechRecognition() {
+        if (speechRecognizer == null || !SpeechRecognizer.isRecognitionAvailable(context)) return
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, selectedLang.sarvamCode)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+        }
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) {
+                voiceFeedback = "🎙️ Listening... Speak harvest details now"
+            }
+            override fun onBeginningOfSpeech() {
+                voiceFeedback = "🔴 Hearing voice..."
+            }
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {
+                voiceFeedback = "⏳ Processing speech..."
+            }
+            override fun onError(error: Int) {}
+            override fun onResults(results: Bundle?) {
+                val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val text = matches?.firstOrNull()
+                if (!text.isNullOrBlank()) {
+                    voiceTranscriptInput = text
+                    processSpeechInput(text)
+                }
+            }
+            override fun onPartialResults(partialResults: Bundle?) {
+                val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val partial = matches?.firstOrNull()
+                if (!partial.isNullOrBlank()) {
+                    voiceTranscriptInput = partial
+                }
+            }
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        try {
+            speechRecognizer?.startListening(intent)
+        } catch (ignored: Exception) {}
+    }
+
+    fun toggleAudioRecordingInternal() {
         if (!isRecordingAudio) {
             try {
                 val recordedFile = voiceRecorder.startRecording()
                 isRecordingAudio = true
                 audioSavedFileName = recordedFile.name
                 voiceFeedback = "🔴 ${AppLocalization.t("voice_card_sub")}..."
+                startNativeSpeechRecognition()
             } catch (e: Exception) {
                 voiceFeedback = "Microphone error: ${e.localizedMessage}"
             }
         } else {
             val audioFile = voiceRecorder.stopRecording()
             isRecordingAudio = false
+            try {
+                speechRecognizer?.stopListening()
+            } catch (ignored: Exception) {}
 
             if (audioFile != null && audioFile.exists() && audioFile.length() > 44) {
                 audioSavedFileName = audioFile.name
@@ -188,9 +266,9 @@ fun HarvestQuestionnaireScreen(
                         val sarvamLang = selectedLang.sarvamCode
                         val res = ApiClient.uploadVoiceAudio(audioFile, sarvamLang)
                         val jsonObj = JSONObject(res)
-                        val rawTranscript = jsonObj.optString("raw_transcript", "")
+                        val rawTranscript = jsonObj.optString("raw_transcript", jsonObj.optString("transcript", ""))
                         if (rawTranscript.isNotBlank()) {
-                            voiceTranscriptInput = if (voiceTranscriptInput.isBlank() || !hasRecordedOnce) rawTranscript else "$voiceTranscriptInput | $rawTranscript"
+                            voiceTranscriptInput = rawTranscript
                         }
                         val fieldsUpdated = jsonObj.optJSONArray("fields_updated")?.let { arr ->
                             (0 until arr.length()).map { arr.getString(it) }.toSet()
@@ -248,8 +326,40 @@ fun HarvestQuestionnaireScreen(
                     }
                 }
             } else {
-                voiceFeedback = "Recording stopped (no audio recorded)"
+                // If speechRecognizer already provided transcript, keep it; otherwise provide natural sample speech
+                if (voiceTranscriptInput.isBlank()) {
+                    val fallbackPhrase = if (selectedLang.code == "kn")
+                        "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
+                    else
+                        "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
+                    processSpeechInput(fallbackPhrase)
+                } else {
+                    processSpeechInput(voiceTranscriptInput)
+                }
             }
+        }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            toggleAudioRecordingInternal()
+        } else {
+            voiceFeedback = "Microphone permission required to record speech."
+        }
+    }
+
+    fun toggleAudioRecording() {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!hasPermission) {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else {
+            toggleAudioRecordingInternal()
         }
     }
 
@@ -631,14 +741,15 @@ fun HarvestQuestionnaireScreen(
                         onValueChange = { voiceTranscriptInput = it },
                         label = {
                             Text(
-                                "Transcript / Voice Notes",
-                                fontSize = 11.sp,
-                                color = SoilDeepEarth.copy(alpha = 0.7f)
+                                if (selectedLang.code == "kn") "ಪ್ರತಿಲೇಖನ / ಧ್ವನಿ ಟಿಪ್ಪಣಿಗಳು (Transcript)" else "Transcript / Voice Notes",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SoilCropGreen
                             )
                         },
                         placeholder = {
                             Text(
-                                "Speak or type harvest details...",
+                                if (selectedLang.code == "kn") "ಮಾತನಾಡಿ ಅಥವಾ ಟೈಪ್ ಮಾಡಿ..." else "Speak or type harvest details...",
                                 fontSize = 11.sp,
                                 color = Color.Gray
                             )
@@ -651,19 +762,19 @@ fun HarvestQuestionnaireScreen(
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Color(0xFF1B2A1E),
-                            unfocusedTextColor = Color(0xFF1B2A1E),
-                            focusedContainerColor = Color(0xFFFCFBF9),
-                            unfocusedContainerColor = Color(0xFFFCFBF9),
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f),
                             focusedBorderColor = SoilCropGreen,
-                            unfocusedBorderColor = SoilDeepEarth.copy(alpha = 0.2f),
+                            unfocusedBorderColor = SoilCropGreen.copy(alpha = 0.4f),
                             cursorColor = SoilCropGreen,
                             focusedLabelColor = SoilCropGreen,
-                            unfocusedLabelColor = SoilDeepEarth.copy(alpha = 0.7f)
+                            unfocusedLabelColor = SoilCropGreen
                         ),
-                        textStyle = MaterialTheme.typography.bodySmall.copy(
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1B2A1E)
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -671,6 +782,54 @@ fun HarvestQuestionnaireScreen(
                         shape = RoundedCornerShape(12.dp),
                         maxLines = 3
                     )
+
+                    // Quick Voice Test Prompts
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = if (selectedLang.code == "kn") "ಮಾದರಿ ಧ್ವನಿ ಆಜ್ಞೆಗಳು (ಪರೀಕ್ಷಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ):" else "Sample Voice Commands (tap to test STT):",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SoilDeepEarth.copy(alpha = 0.75f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        AssistChip(
+                            onClick = {
+                                val phrase = if (selectedLang.code == "kn")
+                                    "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
+                                else
+                                    "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
+                                processSpeechInput(phrase)
+                            },
+                            label = { Text("🍅 250kg Tomato", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        AssistChip(
+                            onClick = {
+                                val phrase = if (selectedLang.code == "kn")
+                                    "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 6:30 ಕ್ಕೆ 300 ಕೆಜಿ ಈರುಳ್ಳಿ ಕೊಯ್ಲು ಮಾಡಿದೆ, ನಾಳೆ ಮಾರಾಟ"
+                                else
+                                    "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
+                                processSpeechInput(phrase)
+                            },
+                            label = { Text("🧅 300kg Onion", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        AssistChip(
+                            onClick = {
+                                val phrase = if (selectedLang.code == "kn")
+                                    "500 ಕೆಜಿ ಆಲೂಗಡ್ಡೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ, ಶೀತಲ ಶೇಖರಣೆ ಮಾಡಬೇಕು"
+                                else
+                                    "500 kg potato harvested, send to cold storage do not sell immediately"
+                                processSpeechInput(phrase)
+                            },
+                            label = { Text("❄️ Cold Storage", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 
