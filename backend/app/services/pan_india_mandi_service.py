@@ -260,9 +260,16 @@ class PanIndiaMandiService:
             # Transit degradation & perishability shrinkage over long hauls
             is_perishable = any(p in commodity.lower() for p in ["tomato", "vegetable", "fruit", "onion", "potato", "chilli", "brinjal", "capsicum", "cabbage", "cauliflower"])
             if is_perishable:
-                transit_loss_pct = 2.0 if distance_km <= 20.0 else min(20.0, round(2.0 + 2.5 * ((distance_km - 20.0) / 50.0), 1))
+                if distance_km <= 25.0:
+                    transit_loss_pct = 2.0
+                elif distance_km <= 85.0:
+                    transit_loss_pct = min(10.0, round(2.0 + 3.0 * ((distance_km - 25.0) / 30.0), 1))
+                else:
+                    lot_scale_penalty = 1.25 if quantity_kg < 1000.0 else 1.0
+                    base_loss = 8.0 + 7.0 * ((distance_km - 85.0) / 40.0)
+                    transit_loss_pct = min(35.0, round(base_loss * lot_scale_penalty, 1))
             else:
-                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(5.0, round(0.5 + 0.5 * ((distance_km - 50.0) / 100.0), 1))
+                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(8.0, round(0.5 + 0.75 * ((distance_km - 50.0) / 50.0), 1))
             transit_loss = round(gross_revenue * (transit_loss_pct / 100.0), 2)
 
             total_deductions = round(transport_cost + commission + unloading + weighment + transit_loss, 2)
@@ -427,9 +434,16 @@ class PanIndiaMandiService:
             # Transit degradation & perishability shrinkage over long hauls
             is_perishable = any(p in crop_clean for p in ["tomato", "vegetable", "fruit", "onion", "potato", "chilli", "brinjal", "capsicum", "cabbage", "cauliflower"])
             if is_perishable:
-                transit_loss_pct = 2.0 if distance_km <= 20.0 else min(20.0, round(2.0 + 2.5 * ((distance_km - 20.0) / 50.0), 1))
+                if distance_km <= 25.0:
+                    transit_loss_pct = 2.0
+                elif distance_km <= 85.0:
+                    transit_loss_pct = min(10.0, round(2.0 + 3.0 * ((distance_km - 25.0) / 30.0), 1))
+                else:
+                    lot_scale_penalty = 1.25 if quantity_kg < 1000.0 else 1.0
+                    base_loss = 8.0 + 7.0 * ((distance_km - 85.0) / 40.0)
+                    transit_loss_pct = min(35.0, round(base_loss * lot_scale_penalty, 1))
             else:
-                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(5.0, round(0.5 + 0.5 * ((distance_km - 50.0) / 100.0), 1))
+                transit_loss_pct = 0.5 if distance_km <= 50.0 else min(8.0, round(0.5 + 0.75 * ((distance_km - 50.0) / 50.0), 1))
             transit_loss_cost = round(gross_revenue * (transit_loss_pct / 100.0), 2)
 
             total_deductions = round(commission_cost + transport_cost + unloading_cost + weighing_fee + transit_loss_cost, 2)

@@ -157,7 +157,8 @@ def process_voice_command(req: VoiceCommandRequest):
 @router.post("/process-audio")
 async def process_voice_audio(
     file: UploadFile = File(...),
-    language_code: str = Form("kn-IN")
+    language_code: str = Form("kn-IN"),
+    generate_tts: bool = Form(False)
 ):
     """
     Direct audio upload endpoint for hardware recordings.
@@ -173,10 +174,13 @@ async def process_voice_audio(
     if not transcript:
         is_kn = "kn" in language_code
         msg = "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ." if is_kn else "Could not detect clear speech. Please speak again."
-        tts = SarvamService.synthesize_speech(
-            text=msg,
-            language_code=language_code
-        )
+        audio_base64 = ""
+        if generate_tts:
+            tts = SarvamService.synthesize_speech(
+                text=msg,
+                language_code=language_code
+            )
+            audio_base64 = tts.get("audio_base64", "")
         return {
             "success": False,
             "error": "NO_SPEECH_DETECTED",
@@ -186,7 +190,7 @@ async def process_voice_audio(
             "message_en": "No clear speech detected. Please speak again.",
             "message_kn": "ಧ್ವನಿ ಕೇಳಿಸಲಿಲ್ಲ, ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಮಾತನಾಡಿ.",
             "spoken_feedback": msg,
-            "audio_base64": tts.get("audio_base64", ""),
+            "audio_base64": audio_base64,
             "raw_transcript": "",
             "detected_language": language_code,
             "language_code": language_code
@@ -204,12 +208,16 @@ async def process_voice_audio(
     result["detected_language"] = detected_lang
     result["language_code"] = detected_lang
 
-    # Generate synthesized spoken audio response in the exact spoken language
-    tts = SarvamService.synthesize_speech(
-        text=result["spoken_feedback"],
-        language_code=detected_lang
-    )
-    result["audio_base64"] = tts.get("audio_base64", "")
+    if generate_tts:
+        # Generate synthesized spoken audio response in the exact spoken language
+        tts = SarvamService.synthesize_speech(
+            text=result["spoken_feedback"],
+            language_code=detected_lang
+        )
+        result["audio_base64"] = tts.get("audio_base64", "")
+    else:
+        result["audio_base64"] = ""
+
     result["summary_text"] = result.get("spoken_feedback", "")
     return result
 

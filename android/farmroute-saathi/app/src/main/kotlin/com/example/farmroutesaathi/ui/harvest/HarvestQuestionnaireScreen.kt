@@ -129,6 +129,44 @@ fun HarvestQuestionnaireScreen(
         ).show()
     }
 
+    fun normalizeCrop(c: String): String {
+        val lower = c.lowercase().trim()
+        return when {
+            lower.contains("tomato") || lower.contains("ಟೊಮೆಟೊ") || lower.contains("ಟೊಮ್ಯಾಟೊ") ||
+            lower.contains("टमाटर") || lower.contains("टोमॅटो") || lower.contains("தக்காளி") ||
+            lower.contains("టమాటా") || lower.contains("టమోటా") || lower.contains("টমেটো") ||
+            lower.contains("ટામેટા") || lower.contains("ਟਮਾਟਰ") || lower.contains("ଟମାଟୋ") -> "Tomato"
+
+            lower.contains("onion") || lower.contains("ಈರುಳ್ಳಿ") || lower.contains("प्याज") ||
+            lower.contains("कांदा") || lower.contains("வெங்காயம்") || lower.contains("உள்ளி") ||
+            lower.contains("ఉల్లి") || lower.contains("പേঁയাজ") || lower.contains("ડુંગળી") ||
+            lower.contains("ਪਿਆਜ਼") || lower.contains("ପିଆଜ") || lower.contains("സവാള") -> "Onion"
+
+            lower.contains("potato") || lower.contains("ಆಲೂ") || lower.contains("आलू") ||
+            lower.contains("बटाटा") || lower.contains("உருளை") || lower.contains("బంగాళాదుంప") ||
+            lower.contains("আলু") || lower.contains("બટાકા") || lower.contains("ਆਲੂ") ||
+            lower.contains("ଆଳୁ") || lower.contains("ഉരുളക്കിഴങ്ങ്") -> "Potato"
+
+            lower.contains("cabbage") || lower.contains("ಕೋಸು") || lower.contains("पत्तागोभी") ||
+            lower.contains("कोबी") || lower.contains("முட்டைகோஸ்") || lower.contains("கோஸ்") ||
+            lower.contains("క్యాబేజీ") || lower.contains("বাঁਧাকপি") || lower.contains("કોબીજ") ||
+            lower.contains("ਪੱਤਾਗੋਭੀ") || lower.contains("ବନ୍ଧାକୋବି") || lower.contains("കോബേജ്") -> "Cabbage"
+
+            lower.contains("carrot") || lower.contains("ಕ್ಯಾರೆಟ್") || lower.contains("गाजर") ||
+            lower.contains("கேரட்") || lower.contains("క్యారెట్") || lower.contains("গাজর") ||
+            lower.contains("ગાજર") || lower.contains("കാരറ്റ്") || lower.contains("ਗਾਜਰ") ||
+            lower.contains("ଗାଜର") -> "Carrot"
+
+            lower.contains("chilli") || lower.contains("chili") || lower.contains("ಮೆಣಸಿನ") ||
+            lower.contains("ಮಿರ್ಚಿ") || lower.contains("मिर्च") || lower.contains("मिरची") ||
+            lower.contains("மிளகாய்") || lower.contains("మిరప") || lower.contains("লঙ্কা") ||
+            lower.contains("મરચાં") || lower.contains("മുളക്") || lower.contains("ਮਿਰਚ") ||
+            lower.contains("ଲଙ୍କା") -> "Chilli"
+
+            else -> c
+        }
+    }
+
     fun processSpeechInput(spokenText: String) {
         if (spokenText.isBlank()) return
         voiceTranscriptInput = spokenText
@@ -152,16 +190,7 @@ fun HarvestQuestionnaireScreen(
                     val updateSell = isFirst || fieldsUpdated.contains("sell_immediately")
 
                     if (updateCrop && entities.has("crop") && entities.getString("crop").isNotBlank()) {
-                        val c = entities.getString("crop")
-                        crop = when {
-                            c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
-                            c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
-                            c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
-                            c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
-                            c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
-                            c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
-                            else -> c
-                        }
+                        crop = normalizeCrop(entities.getString("crop"))
                     }
                     if (updateQty && entities.has("quantity_kg")) {
                         val q = entities.optDouble("quantity_kg", 0.0)
@@ -245,7 +274,6 @@ fun HarvestQuestionnaireScreen(
                 isRecordingAudio = true
                 audioSavedFileName = recordedFile.name
                 voiceFeedback = "🔴 ${AppLocalization.t("voice_card_sub")}..."
-                startNativeSpeechRecognition()
             } catch (e: Exception) {
                 voiceFeedback = "Microphone error: ${e.localizedMessage}"
             }
@@ -284,16 +312,7 @@ fun HarvestQuestionnaireScreen(
                             val updateSell = isFirst || fieldsUpdated.contains("sell_immediately")
 
                             if (updateCrop && entities.has("crop") && entities.getString("crop").isNotBlank()) {
-                                val c = entities.getString("crop")
-                                crop = when {
-                                    c.equals("Tomato", ignoreCase = true) || c.contains("ಟೊಮೆಟೊ") -> "Tomato"
-                                    c.equals("Onion", ignoreCase = true) || c.contains("ಈರುಳ್ಳಿ") -> "Onion"
-                                    c.equals("Potato", ignoreCase = true) || c.contains("ಆಲೂ") -> "Potato"
-                                    c.equals("Cabbage", ignoreCase = true) || c.contains("ಕೋಸು") -> "Cabbage"
-                                    c.equals("Carrot", ignoreCase = true) || c.contains("ಕ್ಯಾರೆಟ್") -> "Carrot"
-                                    c.equals("Chilli", ignoreCase = true) || c.contains("ಮೆಣಸಿನ") -> "Chilli"
-                                    else -> c
-                                }
+                                crop = normalizeCrop(entities.getString("crop"))
                             }
                             if (updateQty && entities.has("quantity_kg")) {
                                 val q = entities.optDouble("quantity_kg", 0.0)
@@ -798,21 +817,29 @@ fun HarvestQuestionnaireScreen(
                     ) {
                         AssistChip(
                             onClick = {
-                                val phrase = if (selectedLang.code == "kn")
-                                    "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 250 ಕೆಜಿ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಬೆಳಿಗ್ಗೆ ಮಾರಾಟ ಮಾಡಬೇಕು"
-                                else
-                                    "I harvested 250 kg tomato today at 7 AM, planning to sell immediately tomorrow morning"
+                                val phrase = when (selectedLang.code) {
+                                    "kn" -> "ನಾನು ಇಂದು ಬೆಳಿಗ್ಗೆ 7 ಗಂಟೆಗೆ 2 ಟನ್ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಮಾರಾಟ"
+                                    "hi" -> "मैंने आज सुबह 7 बजे 2 टन टमाटर की कटाई की है, कल बेचूंगा"
+                                    "ta" -> "இன்று காலை 7 மணிக்கு 2 டன் தக்காளி அறுவடை செய்துள்ளேன், நாளை விற்க வேண்டும்"
+                                    "te" -> "ఈరోజు ఉదయం 7 గంటలకు 2 టన్నుల టమోటా కోత కోశాను, రేపు అమ్మాలి"
+                                    "mr" -> "मी आज सकाळी 7 वाजता 2 टन टोमॅटो काढले आहेत, उद्या विकणार"
+                                    else -> "I harvested 2 tons of tomato today at 7 AM, planning to sell immediately tomorrow morning"
+                                }
                                 processSpeechInput(phrase)
                             },
-                            label = { Text("🍅 250kg Tomato", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
+                            label = { Text("🍅 2 Tons Tomato", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
                             modifier = Modifier.weight(1f)
                         )
                         AssistChip(
                             onClick = {
-                                val phrase = if (selectedLang.code == "kn")
-                                    "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 6:30 ಕ್ಕೆ 300 ಕೆಜಿ ಈರುಳ್ಳಿ ಕೊಯ್ಲು ಮಾಡಿದೆ, ನಾಳೆ ಮಾರಾಟ"
-                                else
-                                    "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
+                                val phrase = when (selectedLang.code) {
+                                    "kn" -> "ನನ್ನ ಬಳಿ ಇಂದು ಬೆಳಿಗ್ಗೆ 6:30 ಕ್ಕೆ 300 ಕೆಜಿ ಈರುಳ್ಳಿ ಕೊಯ್ಲು ಮಾಡಿದೆ, ನಾಳೆ ಮಾರಾಟ"
+                                    "hi" -> "आज सुबह 6:30 बजे 300 किलो प्याज की कटाई हुई, कल बेचेंगे"
+                                    "ta" -> "இன்று காலை 6:30 மணிக்கு 300 கிலோ வெங்காயம் அறுவடை, நாளை விற்பனை"
+                                    "te" -> "ఈరోజు ఉదయం 6:30 గంటలకు 300 కిలోల ఉల్లిపాయల కోత, రేపు అమ్మకం"
+                                    "mr" -> "आज सकाळी 6:30 वाजता 300 किलो कांदा काढला, उद्या विक्री"
+                                    else -> "Harvested 300 kg onion today at 6:30 AM, selling tomorrow"
+                                }
                                 processSpeechInput(phrase)
                             },
                             label = { Text("🧅 300kg Onion", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },
@@ -820,10 +847,14 @@ fun HarvestQuestionnaireScreen(
                         )
                         AssistChip(
                             onClick = {
-                                val phrase = if (selectedLang.code == "kn")
-                                    "500 ಕೆಜಿ ಆಲೂಗಡ್ಡೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ, ಶೀತಲ ಶೇಖರಣೆ ಮಾಡಬೇಕು"
-                                else
-                                    "500 kg potato harvested, send to cold storage do not sell immediately"
+                                val phrase = when (selectedLang.code) {
+                                    "kn" -> "500 ಕೆಜಿ ಆಲೂಗಡ್ಡೆ ಕೊಯ್ಲು ಮಾಡಲಾಗಿದೆ, ಶೀತಲ ಶೇಖರಣೆ ಮಾಡಬೇಕು"
+                                    "hi" -> "500 किलो आलू की कटाई हुई है, इसे कोल्ड स्टोरेज में रखना है तुरंत नहीं बेचना"
+                                    "ta" -> "500 கிலோ உருளைக்கிழங்கு அறுவடை, குளிர்பதன கிடங்கில் சேமிக்க வேண்டும்"
+                                    "te" -> "500 కిలోల బంగాళాదుంప కోత, శీతల గిడ్డంగికి పంపాలి వెంటనే అమ్మవద్దు"
+                                    "mr" -> "500 किलो बटाटा काढला आहे, कोल्ड स्टोरेजमध्ये ठेवायचा आहे"
+                                    else -> "500 kg potato harvested, send to cold storage do not sell immediately"
+                                }
                                 processSpeechInput(phrase)
                             },
                             label = { Text("❄️ Cold Storage", fontSize = 10.sp, fontWeight = FontWeight.SemiBold) },

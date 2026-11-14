@@ -589,7 +589,7 @@ class SarvamService:
         # Regex for quantity across 11 Indian scripts (kg, quintal, ton)
         unit_pattern = (
             r"(\d+(?:\.\d+)?)\s*(kg|kgs|kilo|kilos|kilogram|kilograms|ಕೆಜಿ|किलो|किलोग्राम|केजी|कैटल|കിലോ|கிலோ|కిలో|కిలోల|કિલો|ਕਿਲੋ|କିଲୋ|"
-            r"quintal|quintals|ക്വിന്റൽ|क्विंटल|क्विंटलों|ಕ್ವಿಂಟಾಲ್|ಕವಿಂಟಾಲ್|ಕೈಂಟಾಲ್|কুইন্টাল|குவிண்டால்|குவிண்டால்கள்|క్వింటాల్|క్వింటాళ్ళు|క్వింటాళ్ల|ક્વિન્ટલ|ਕਵਿੰਟਲ|ਕੁਇੰਟਲ|ਕੁੰਟਲ|କ୍ୱିଣ୍ਟାଲ|"
+            r"quintal|quintals|ക്വിന്റൽ|क्विंटल|क्विंटलों|ಕ್ವಿಂಟಾಲ್|ಕವಿಂಟಾಲ್|ಕೈಂಟಾಲ್|কুইন্টাল|குவிண்டால்|குவிண்டால்கள்|క్వింటాల్|క్వింటాళ్ళు|క్వింటాళ్ల|ક્વિન્ટલ|ਕਵਿੰਟਲ|ਕੁਇੰਟਲ|ਕੁੰਟਲ|କ୍ୱିଣ୍ଟାଲ|"
             r"ton|tons|tonne|tonnes|टन|टनों|ಟನ್|ಟನ್ನು|ಟನ್‌ಗಳು|টন|টনের|ടൺ|டன்|டன்கள்|டன்னும்|టన్ను|టన్నుల|టన్నులు|ટન|ਟਨ|ਟਨਾਂ|ଟନ୍)"
         )
         qty_unit_match = re.search(unit_pattern, norm_text, re.IGNORECASE)
@@ -621,7 +621,7 @@ class SarvamService:
             fields_detected.append("quality_grade")
 
         # Crop detection across all 11 scripts
-        if re.search(r"onion|onions|ಈರುಳ್ಳಿ|प्याज|कांदा|உள்ளி|வெங்காயம்|உரு\s*வெங்காயம்|ఉల్లిపాయ|ఉల్లి|పేঁయাজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ|পিয়াঁজ|পেঁয়াজ|পেয়াজ|পিয়াজ|ഉള്ളി|സവാള|ചുവന്നുള്ളി", search_target, re.IGNORECASE):
+        if re.search(r"onion|onions|পে[\u0981]?[\u09af\u09df]\u09bc?াজ|ಈರುಳ್ಳಿ|प्याज|कांदा|உள்ளி|வெங்காயம்|உரு\s*வெங்காயம்|ఉల్లిపాయ|ఉల్లి|పేঁయাজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ|পিয়াঁজ|পেঁয়াজ|পেয়াজ|পিয়াজ|ഉള്ളി|സവാള|ചുവന്നുള്ളി", search_target, re.IGNORECASE):
             crop = "Onion"
             variety = "Nasik Red"
             fields_detected.append("crop")
@@ -665,7 +665,7 @@ class SarvamService:
             crop = "Maize"
             variety = "Pioneer Hybrid"
             fields_detected.append("crop")
-        elif re.search(r"tomato|tomatoes|tomat|ಟೊಮೆಟೊ|ಟೊಮ್ಯಾಟೊ|टमाटर|टोमॅटो|தக்காளி|టమాటా|టమోటా|টমেটো|ટામેટાં|ટામેટા|തക്കാളി|ਟਮਾਟਰ|ਟମାଟୋ", search_target, re.IGNORECASE):
+        elif re.search(r"tomato|tomatoes|tomat|ಟೊಮೆಟೊ|ಟೊಮ್ಯಾಟೊ|टमाटर|टोमॅटो|தக்காளி|టమాటా|టమోటా|টমেটো|ટામેટાં|ટામેટા|തക്കാളി|ਟਮਾਟਰ|ଟମାଟୋ", search_target, re.IGNORECASE):
             crop = "Tomato"
             variety = "Hybrid Red"
             fields_detected.append("crop")

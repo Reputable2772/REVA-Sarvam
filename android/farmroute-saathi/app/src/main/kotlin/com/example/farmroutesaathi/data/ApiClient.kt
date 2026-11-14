@@ -184,20 +184,22 @@ object ApiClient {
     ): String = withContext(Dispatchers.IO) {
         val candidateUrls = listOf(
             "$BASE_URL/api/voice/process-audio",
+            "http://10.47.118.125:8000/api/voice/process-audio",
             "http://10.0.2.2:8000/api/voice/process-audio",
             "http://localhost:8000/api/voice/process-audio"
         ).distinct()
 
         for (targetUrl in candidateUrls) {
+            var conn: HttpURLConnection? = null
             try {
                 val boundary = "==FarmRouteBoundary${System.currentTimeMillis()}=="
                 val url = URL(targetUrl)
-                val conn = url.openConnection() as HttpURLConnection
+                conn = url.openConnection() as HttpURLConnection
                 conn.requestMethod = "POST"
                 conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 conn.doOutput = true
-                conn.connectTimeout = 4000
-                conn.readTimeout = 12000
+                conn.connectTimeout = 8000
+                conn.readTimeout = 30000
 
                 val outputStream = conn.outputStream
                 val writer = java.io.PrintWriter(java.io.OutputStreamWriter(outputStream, "UTF-8"), true)
@@ -209,7 +211,14 @@ object ApiClient {
                 writer.append(languageCode).append("\r\n")
                 writer.flush()
 
-                // 2. Audio file field
+                // 2. Generate TTS flag (false for questionnaire to maximize responsiveness)
+                writer.append("--$boundary").append("\r\n")
+                writer.append("Content-Disposition: form-data; name=\"generate_tts\"").append("\r\n")
+                writer.append("Content-Type: text/plain; charset=UTF-8").append("\r\n\r\n")
+                writer.append("false").append("\r\n")
+                writer.flush()
+
+                // 3. Audio file field
                 writer.append("--$boundary").append("\r\n")
                 writer.append("Content-Disposition: form-data; name=\"file\"; filename=\"${audioFile.name}\"").append("\r\n")
                 writer.append("Content-Type: audio/wav").append("\r\n\r\n")
@@ -223,7 +232,6 @@ object ApiClient {
                 writer.append("\r\n")
                 writer.append("--$boundary--").append("\r\n")
                 writer.flush()
-                writer.close()
 
                 val code = conn.responseCode
                 if (code in 200..299) {
@@ -232,39 +240,52 @@ object ApiClient {
                     if (responseStr.isNotBlank() && responseStr.contains("{")) {
                         return@withContext responseStr
                     }
+                } else {
+                    val errStream = conn.errorStream
+                    if (errStream != null) {
+                        val errStr = BufferedReader(InputStreamReader(errStream)).use { it.readText() }
+                        android.util.Log.w("ApiClient", "uploadVoiceAudio HTTP $code: $errStr")
+                    }
                 }
-            } catch (ignored: Exception) {
-                // Try next endpoint candidate
+            } catch (e: Exception) {
+                android.util.Log.w("ApiClient", "uploadVoiceAudio failed on $targetUrl: ${e.message}")
+            } finally {
+                try { conn?.disconnect() } catch (ignored: Exception) {}
             }
         }
 
-        // Intelligent simulated STT fallback for offline/emulator environments
-        val isKn = "kn" in languageCode.lowercase()
-        val transcript = if (isKn)
-            "ನಾನು ಇಂದು 250 ಕೆಜಿ ಗ್ರೇಡ್ ಎ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಮಾರಾಟ"
-        else
-            "I have harvested 250 kg Grade A tomato today, planning to sell tomorrow morning"
-        val feedback = if (isKn)
-            "ನವೀಕರಿಸಲಾಗಿದೆ: 250 ಕೆಜಿ ಟೊಮೆಟೊ"
-        else
-            "Updated: 250kg Tomato"
+        // Multilingual simulated STT fallback for completely offline environments
+        val lang = languageCode.lowercase()
+        val (fallbackTranscript, fallbackFeedback, defaultCrop) = when {
+            "kn" in lang -> Triple("ನಾನು ಇಂದು 250 ಕೆಜಿ ಗ್ರೇಡ್ ಎ ಟೊಮೆಟೊ ಕೊಯ್ಲು ಮಾಡಿದ್ದೇನೆ, ನಾಳೆ ಮಾರಾಟ", "ನವೀಕರಿಸಲಾಗಿದೆ: 250 ಕೆಜಿ ಟೊಮೆಟೊ", "Tomato")
+            "hi" in lang -> Triple("मैंने आज 250 किलो टमाटर की कटाई की है, कल मंडी में बेचूंगा", "अपडेट किया गया: 250 किलो टमाटर", "Tomato")
+            "ta" in lang -> Triple("இன்று 250 கிலோ தக்காளி அறுவடை செய்துள்ளேன், நாளை சந்தைக்கு கொண்டு செல்கிறேன்", "புதுப்பிக்கப்பட்டது: 250 கிலோ தக்காளி", "Tomato")
+            "te" in lang -> Triple("నేను ఈరోజు 250 కిలోల టమోటా కోత కోశాను, రేపు మార్కెట్‌కు తీసుకువెళ్తాను", "నవీకరించబడింది: 250 కిలోల టమోటా", "Tomato")
+            "mr" in lang -> Triple("मी आज 250 किलो टोमॅटो काढले आहेत, उद्या बाजारात विकणार", "अपडेट केले: 250 किलो टोमॅटो", "Tomato")
+            "bn" in lang -> Triple("আমি আজ 250 কেজি টমেটো তুলেছি, কাল বাজারে বিক্রি করব", "আপডেট হয়েছে: 250 কেজি টমেটো", "Tomato")
+            "gu" in lang -> Triple("મેં આજે 250 કિલો ટામેટાં લણ્યાં છે, કાલે વેચીશ", "અપડેટ કર્યું: 250 કિલો ટામેટાં", "Tomato")
+            "ml" in lang -> Triple("ഞാൻ ഇന്ന് 250 കിലോ തക്കാളി വിളവെടുത്തു, നാളെ വിൽക്കും", "അപ്ഡേറ്റ് ചെയ്തു: 250 കിലോ തക്കാളി", "Tomato")
+            "pa" in lang -> Triple("ਮੈਂ ਅੱਜ 250 ਕਿਲੋ ਟਮਾਟਰ ਦੀ ਵਾਢੀ ਕੀਤੀ ਹੈ, ਕੱਲ੍ਹ ਵੇਚਾਂਗਾ", "ਅੱਪਡੇਟ ਕੀਤਾ: 250 ਕਿਲੋ ਟਮਾਟਰ", "Tomato")
+            "od" in lang -> Triple("ମୁଁ ଆଜି 250 କିଲୋ ଟମାଟୋ ଅମଳ କରିଛି, କାଲି ବିକ୍ରି କରିବି", "ଅପଡେଟ୍ ହୋଇଛି: 250 କିଲୋ ଟମାଟୋ", "Tomato")
+            else -> Triple("I have harvested 250 kg Grade A tomato today, planning to sell tomorrow morning", "Updated: 250kg Tomato", "Tomato")
+        }
         """
         {
           "success": true,
-          "raw_transcript": "$transcript",
-          "transcript": "$transcript",
+          "raw_transcript": "$fallbackTranscript",
+          "transcript": "$fallbackTranscript",
           "action": "UPDATE_HARVEST",
           "entities": {
-            "crop": "Tomato",
+            "crop": "$defaultCrop",
             "quantity_kg": 250.0,
-            "harvest_date": "2026-11-13",
+            "harvest_date": "2026-11-14",
             "harvest_time": "07:00 AM",
-            "expected_date_time": "2026-11-14 09:00 AM",
+            "expected_date_time": "2026-11-15 09:00 AM",
             "sell_immediately": true,
             "fields_detected": ["crop", "quantity_kg", "harvest_date", "harvest_time", "sell_immediately"]
           },
           "fields_updated": ["crop", "quantity_kg", "harvest_date", "harvest_time", "sell_immediately"],
-          "spoken_feedback": "$feedback"
+          "spoken_feedback": "$fallbackFeedback"
         }
         """.trimIndent()
     }
@@ -277,17 +298,36 @@ object ApiClient {
         val jsonBody = "{\"text\":\"$escapedText\",\"language_code\":\"$languageCode\"}"
         val res = postJson("$BASE_URL/api/voice/process-command", jsonBody)
         if (res.contains("\"simulated_ok\"") || res.contains("Failed to connect") || res.contains("Connection refused")) {
-            // Intelligent fallback parsing in mock mode
+            // Intelligent multilingual fallback parsing in mock mode
             val isKn = "kn" in languageCode.lowercase()
-            val crop = if (text.contains("ಈರುಳ್ಳಿ") || text.contains("onion", ignoreCase = true)) "Onion"
-                       else if (text.contains("ಆಲೂ") || text.contains("potato", ignoreCase = true)) "Potato"
-                       else if (text.contains("ಟೊಮೆಟೊ") || text.contains("tomato", ignoreCase = true)) "Tomato"
-                       else if (text.contains("ಮೆಣಸಿನ") || text.contains("chilli", ignoreCase = true)) "Chilli"
-                       else null
-            val qty = if (text.contains("100")) 100.0 else if (text.contains("300")) 300.0 else 200.0
-            val imm = !text.contains("cold", ignoreCase = true) && !text.contains("ಶೀತಲ")
-            val isWeather = text.contains("weather", ignoreCase = true) || text.contains("ಮಳೆ") || text.contains("ಹವಾಮಾನ") || text.contains("मौसम") || text.contains("వర్షం")
-            val isRates = text.contains("rate", ignoreCase = true) || text.contains("mandi", ignoreCase = true) || text.contains("ದರ") || text.contains("ಬೆಲೆ") || text.contains("भाव") || text.contains("ధర")
+            val lower = text.lowercase()
+            val crop = when {
+                lower.contains("onion") || lower.contains("ಈರುಳ್ಳಿ") || lower.contains("प्याज") || lower.contains("कांदा") || lower.contains("வெங்காயம்") || lower.contains("உள்ளி") || lower.contains("ఉల్లి") -> "Onion"
+                lower.contains("potato") || lower.contains("ಆಲೂ") || lower.contains("आलू") || lower.contains("बटाटा") || lower.contains("உருளை") || lower.contains("బంగాళాదుంప") -> "Potato"
+                lower.contains("cabbage") || lower.contains("ಕೋಸು") || lower.contains("पत्तागोभी") || lower.contains("முட்டைகோஸ்") || lower.contains("క్యాబేజీ") -> "Cabbage"
+                lower.contains("carrot") || lower.contains("ಕ್ಯಾರೆಟ್") || lower.contains("गाजर") || lower.contains("கேரட்") || lower.contains("క్యారెట్") -> "Carrot"
+                lower.contains("chilli") || lower.contains("chili") || lower.contains("ಮೆಣಸಿನ") || lower.contains("मिर्च") || lower.contains("मिளகாய்") || lower.contains("మిరప") -> "Chilli"
+                lower.contains("tomato") || lower.contains("ಟೊಮೆಟೊ") || lower.contains("टमाटर") || lower.contains("தக்காளி") || lower.contains("టమాటా") || lower.contains("టమోటా") -> "Tomato"
+                else -> null
+            }
+
+            // Universal ton / quintal / kg regex
+            val tonMatch = Regex("(\\d+(?:\\.\\d+)?)\\s*(?:ton|tons|tonne|tonnes|टन|ಟನ್|டன்|టన్ను)").find(lower)
+            val quintalMatch = Regex("(\\d+(?:\\.\\d+)?)\\s*(?:quintal|quintals|ക്വിന്റൽ|क्विंटल|ಕ್ವಿಂಟಾಲ್|குவிண்டால்|క్వింటాల్)").find(lower)
+            val kgMatch = Regex("(\\d+(?:\\.\\d+)?)\\s*(?:kg|kgs|kilo|kilos|ಕೆಜಿ|किलो|கிலோ|కిలో)").find(lower)
+            val numFallback = Regex("\\b(\\d{2,5})\\b").find(lower)
+
+            val qty = when {
+                tonMatch != null -> (tonMatch.groupValues[1].toDoubleOrNull() ?: 1.0) * 1000.0
+                quintalMatch != null -> (quintalMatch.groupValues[1].toDoubleOrNull() ?: 1.0) * 100.0
+                kgMatch != null -> kgMatch.groupValues[1].toDoubleOrNull() ?: 200.0
+                numFallback != null -> numFallback.groupValues[1].toDoubleOrNull() ?: 200.0
+                else -> 200.0
+            }
+
+            val imm = !text.contains("cold", ignoreCase = true) && !text.contains("ಶೀತಲ") && !text.contains("कोल्ड") && !text.contains("குளிர்பதன")
+            val isWeather = text.contains("weather", ignoreCase = true) || text.contains("ಮಳೆ") || text.contains("ಹವಾಮಾನ") || text.contains("मौसम") || text.contains("వర్షం") || text.contains("வானிலை")
+            val isRates = text.contains("rate", ignoreCase = true) || text.contains("mandi", ignoreCase = true) || text.contains("ದರ") || text.contains("ಬೆಲೆ") || text.contains("भाव") || text.contains("ధర") || text.contains("விலை")
 
             val action = if (isWeather) "NAVIGATE_WEATHER" else if (isRates) "NAVIGATE_MARKETPLACE" else if (crop != null) "UPDATE_HARVEST" else "CHAT_RESPONSE"
             val msgEn = if (isWeather) "Vijayapura Farmland Weather: 26°C, Partly Cloudy, 30% rain chance. Harvest in morning dry window."
@@ -298,8 +338,8 @@ object ApiClient {
                         else if (isRates) "ಮಾರುಕಟ್ಟೆ ವಿಶ್ಲೇಷಣೆ: ವರ್ಚುವಲ್ ಎಫ್‌ಪಿಒ ಮೂಲಕ ₹8,375 ನಿವ್ವಳ ಲಾಭ ಪಡೆಯಬಹುದು."
                         else if (crop != null) "ನವೀಕರಿಸಲಾಗಿದೆ: ${qty.toInt()} ಕೆಜಿ $crop."
                         else "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ: ಲೈವ್ ಮಂಡಿ ದರಗಳು, ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ, ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಮತ್ತು ಸರ್ಕಾರಿ ಯೋಜನೆಗಳಿಗೆ ನಾನು ನೆರವಾಗಬಲ್ಲೆ."
-            val entitiesJson = if (crop != null) "{\"crop\":\"$crop\",\"quantity_kg\":$qty,\"harvest_date\":\"2026-11-13\",\"harvest_time\":\"07:00 AM\",\"expected_date_time\":\"2026-11-14 09:00 AM\",\"sell_immediately\":$imm}" else "{}"
-            "{\"success\":true,\"transcript\":\"$escapedText\",\"action\":\"$action\",\"entities\":$entitiesJson,\"message_en\":\"$msgEn\",\"message_kn\":\"$msgKn\",\"spoken_feedback\":\"${if (isKn) msgKn else msgEn}\"}"
+            val entitiesJson = if (crop != null) "{\"crop\":\"$crop\",\"quantity_kg\":$qty,\"harvest_date\":\"2026-11-14\",\"harvest_time\":\"07:00 AM\",\"expected_date_time\":\"2026-11-15 09:00 AM\",\"sell_immediately\":$imm,\"fields_detected\":[\"crop\",\"quantity_kg\",\"harvest_date\",\"sell_immediately\"]}" else "{}"
+            "{\"success\":true,\"transcript\":\"$escapedText\",\"action\":\"$action\",\"entities\":$entitiesJson,\"fields_updated\":[\"crop\",\"quantity_kg\",\"harvest_date\",\"sell_immediately\"],\"message_en\":\"$msgEn\",\"message_kn\":\"$msgKn\",\"spoken_feedback\":\"${if (isKn) msgKn else msgEn}\"}"
         } else {
             res
         }

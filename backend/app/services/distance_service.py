@@ -591,13 +591,19 @@ class DistanceService:
 
         # Realistic toll & long-haul highway surcharge (applicable on solo inter-district hauls > 50 km)
         toll_charge = 0.0
+        empty_return_surcharge = 0.0
         if dist > 50.0 and haul_type.lower() == "solo":
             toll_charge = round(150.0 * (dist / 100.0), 2)
+            # Commercial empty-return haulage factor for inter-district solo hauls (> 85 km)
+            # Dedicated commercial vehicles returning from distant mandis to rural origin villages charge empty return backhaul
+            if dist > 85.0:
+                empty_multiplier = 0.35 if dist <= 150.0 else 0.50
+                empty_return_surcharge = round((dist * rate_per_km) * empty_multiplier, 2)
 
         if haul_type.lower() == "solo":
             # Dedicated vehicle hire
             distance_charge = round(dist * rate_per_km, 2)
-            total_freight = round(base_fare + distance_charge + toll_charge, 2)
+            total_freight = round(base_fare + distance_charge + toll_charge + empty_return_surcharge, 2)
             share_factor = 1.0
             per_kg_cost = round(total_freight / qty, 2)
             savings_vs_solo = 0.0
