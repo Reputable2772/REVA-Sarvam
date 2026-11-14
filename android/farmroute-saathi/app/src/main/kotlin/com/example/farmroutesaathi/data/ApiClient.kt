@@ -567,40 +567,60 @@ object ApiClient {
     }
 
     suspend fun getWeatherRiskAlert(
-        lat: Double = 13.133,
-        lon: Double = 78.133,
-        crop: String = "Tomato",
-        farmerId: String = "FARMER-01"
+        lat: Double = 0.0,
+        lon: Double = 0.0,
+        district: String = "",
+        crop: String = "Produce",
+        farmerId: String = ""
     ): String = withContext(Dispatchers.IO) {
-        getWeatherHarvestAlerts(farmerId)
+        val effectiveFarmerId = farmerId.ifBlank { UserSession.currentFarmer?.phone ?: "FARMER-01" }
+        val effectiveDistrict = district.ifBlank { UserSession.currentFarmer?.district ?: "Local" }
+        getWeatherHarvestAlerts(
+            farmerId = effectiveFarmerId,
+            district = effectiveDistrict,
+            crop = crop,
+            lat = lat,
+            lon = lon
+        )
     }
 
-    suspend fun getWeatherHarvestAlerts(farmerId: String): String = withContext(Dispatchers.IO) {
-        val res = getJson("$BASE_URL/api/weather/harvest-alerts?farmer_id=$farmerId")
+    suspend fun getWeatherHarvestAlerts(
+        farmerId: String,
+        district: String = "",
+        crop: String = "Produce",
+        lat: Double = 0.0,
+        lon: Double = 0.0
+    ): String = withContext(Dispatchers.IO) {
+        val dist = district.ifBlank { UserSession.currentFarmer?.district?.ifBlank { "Local" } ?: "Local" }
+        val qFarmer = java.net.URLEncoder.encode(farmerId, "UTF-8")
+        val qDist = java.net.URLEncoder.encode(dist, "UTF-8")
+        val qCrop = java.net.URLEncoder.encode(crop, "UTF-8")
+        val url = "$BASE_URL/api/weather/harvest-alerts?farmer_id=$qFarmer&district=$qDist&crop=$qCrop&latitude=$lat&longitude=$lon"
+        val res = getJson(url)
         if (res.contains("\"simulated_ok\"") || res.contains("404") || res.contains("Failed to connect") || res.contains("Connection refused")) {
-            val dist = UserSession.currentFarmer?.district?.ifBlank { "Local" } ?: "Local"
-            val crop = UserSession.activeHarvest?.crop ?: "Produce"
+            val effDist = dist.ifBlank { "Local" }
+            val effCrop = crop.ifBlank { UserSession.activeHarvest?.crop ?: "Produce" }
             val lotId = UserSession.activeHarvestId
             """
             {
               "has_active_alert": true,
-              "warning_id": "IMD-${dist.take(3).uppercase()}-20261113-RAIN",
-              "district": "$dist",
+              "warning_id": "IMD-${effDist.take(3).uppercase()}-20261113-RAIN",
+              "district": "$effDist",
               "alert_type": "HEAVY_RAINFALL",
               "severity": "ORANGE",
-              "headline": "Official IMD Alert: Moderate to Heavy Rainfall forecast in $dist district over the next 48 hours.",
-              "headline_kannada": "ಅಧಿಕೃತ ಐಎಂಡಿ ಮುನ್ಸೂಚನೆ: ಮುಂದಿನ 48 ಗಂಟೆಗಳಲ್ಲಿ $dist ಜಿಲ್ಲೆಯಲ್ಲಿ ಭಾರೀ ಮಳೆಯಾಗುವ ಸಾಧ್ಯತೆ.",
+              "headline": "Official IMD Alert: Moderate to Heavy Rainfall forecast in $effDist district over the next 48 hours.",
+              "headline_kannada": "ಅಧಿಕೃತ ಐಎಂಡಿ ಮುನ್ಸೂಚನೆ: ಮುಂದಿನ 48 ಗಂಟೆಗಳಲ್ಲಿ $effDist ಜಿಲ್ಲೆಯಲ್ಲಿ ಭಾರೀ ಮಳೆಯಾಗುವ ಸಾಧ್ಯತೆ.",
               "valid_until": "2026-11-15T18:00:00Z",
               "affected_harvest": {
                 "harvest_id": "$lotId",
-                "crop": "$crop",
+                "crop": "$effCrop",
                 "quantity_kg": 500.0,
                 "status": "AWAITING_SALE",
                 "vulnerability": "High moisture and waterlogging risk leading to premature rotting and skin cracking within 24-36 hrs."
               },
-              "recommended_action": "Move harvested $crop to the nearest covered cold storage facility immediately to prevent loss.",
+              "recommended_action": "Move harvested $effCrop to the nearest covered cold storage facility immediately to prevent loss.",
               "recommended_facility_id": "CS-001",
-              "recommended_facility_name": "$dist APMC Agro Cold Chain Hub (4.2 km)"
+              "recommended_facility_name": "$effDist APMC Agro Cold Chain Hub (4.2 km)"
             }
             """.trimIndent()
         } else {

@@ -32,6 +32,12 @@ import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import android.media.MediaPlayer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
+import android.util.Base64
+import java.io.File
+import java.io.FileOutputStream
 import java.util.Locale
 
 data class MandiDistanceItem(
@@ -105,9 +111,44 @@ fun ColdStorageDiscoveryScreen(
     var weatherAlert by remember { mutableStateOf<WeatherRiskAlert?>(null) }
     var voiceTranscript by remember { mutableStateOf<String?>(null) }
     var isSpeakingAudio by remember { mutableStateOf(false) }
+    var isVoiceLoading by remember { mutableStateOf(false) }
+    var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+    var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var useGpsLocation by remember { mutableStateOf(true) }
     var manualLocationText by remember { mutableStateOf(resolvedLocationText) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        val tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                val loc = when (UserSession.selectedLanguage.code) {
+                    "kn" -> Locale("kn", "IN")
+                    "hi" -> Locale("hi", "IN")
+                    "te" -> Locale("te", "IN")
+                    "ta" -> Locale("ta", "IN")
+                    "mr" -> Locale("mr", "IN")
+                    "gu" -> Locale("gu", "IN")
+                    "bn" -> Locale("bn", "IN")
+                    "ml" -> Locale("ml", "IN")
+                    "pa" -> Locale("pa", "IN")
+                    else -> Locale.ENGLISH
+                }
+                ttsEngine?.language = loc
+            }
+        }
+        ttsEngine = tts
+        onDispose {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (ignored: Exception) {}
+            try {
+                ttsEngine?.stop()
+                ttsEngine?.shutdown()
+            } catch (ignored: Exception) {}
+        }
+    }
 
     fun loadData() {
         isLoading = true
@@ -175,25 +216,143 @@ fun ColdStorageDiscoveryScreen(
                 }
                 facilities = list
 
-                val wRes = ApiClient.getWeatherRiskAlert(lat = lat, lon = lon, crop = crop)
+                val currentDistrict = manualLocationText.substringBefore(",").trim().ifBlank { defaultFarmerDistrict }
+                val wRes = ApiClient.getWeatherRiskAlert(
+                    lat = lat,
+                    lon = lon,
+                    district = currentDistrict,
+                    crop = crop,
+                    farmerId = UserSession.currentFarmer?.phone ?: "FARMER-01"
+                )
                 val wJson = JSONObject(wRes)
                 if (wJson.optBoolean("has_active_alert", false)) {
+                    val alertDist = wJson.optString("district", currentDistrict).ifBlank { currentDistrict }
+                    val headlineEn = wJson.optString("headline", "Official IMD Weather Report: Weather advisory in $alertDist.")
+                    val headlineKn = wJson.optString("headline_kannada", wJson.optString("headline_kn", "ಐಎಂಡಿ ಹವಾಮಾನ ವರದಿ: $alertDist ಪ್ರದೇಶದಲ್ಲಿ ಮುನ್ಸೂಚನೆ."))
+                    val vuln = wJson.optString("vulnerability", "Harvested $crop susceptible to ambient moisture and waterlogging damage.")
+                    val recAction = wJson.optString("recommended_action", "Move harvest to nearest cold storage within 24 hours.")
+                    val recFacility = wJson.optString("recommended_facility_name", "$alertDist Agro Cold Chain Hub")
+
                     weatherAlert = WeatherRiskAlert(
                         hasActiveAlert = true,
-                        warningId = wJson.optString("warning_id", "IMD-001"),
-                        district = wJson.optString("district", defaultFarmerDistrict),
+                        warningId = wJson.optString("warning_id", "IMD-${alertDist.take(3).uppercase()}-ALERT"),
+                        district = alertDist,
                         severity = wJson.optString("severity", "ORANGE WARNING"),
-                        headline = wJson.optString("headline", "Heavy Unseasonal Rainfall Warning"),
-                        headlineKannada = wJson.optString("headline_kn", "ಭಾರಿ ಅಕಾಲಿಕ ಮಳೆ ಎಚ್ಚರಿಕೆ: ಕೊಯ್ಲು ತಕ್ಷಣ ರಕ್ಷಿಸಿ"),
-                        vulnerability = wJson.optString("vulnerability", "Harvested Solanaceous crop susceptible to damp rot"),
-                        recommendedAction = wJson.optString("recommended_action", "Move harvest to nearest cold storage within 24 hours"),
-                        recommendedFacilityName = wJson.optString("recommended_facility_name", "$defaultFarmerDistrict Agro Cold Chain")
+                        headline = headlineEn,
+                        headlineKannada = headlineKn,
+                        vulnerability = vuln,
+                        recommendedAction = recAction,
+                        recommendedFacilityName = recFacility
                     )
                 }
             } catch (e: Exception) {
                 Toast.makeText(context, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             } finally {
                 isLoading = false
+            }
+        }
+    }
+
+    fun playVoiceExplanation() {
+        if (isSpeakingAudio) {
+            try {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+            } catch (ignored: Exception) {}
+            try {
+                ttsEngine?.stop()
+            } catch (ignored: Exception) {}
+            isSpeakingAudio = false
+            isVoiceLoading = false
+            return
+        }
+
+        if (facilities.isEmpty()) {
+            Toast.makeText(context, if (isKannada) "ಯಾವುದೇ ಸೌಲಭ್ಯ ಲಭ್ಯವಿಲ್ಲ" else "No cold storage facility found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val topFac = facilities.first()
+        isVoiceLoading = true
+        scope.launch {
+            try {
+                val langCode = UserSession.selectedLanguage.sarvamCode
+                val res = ApiClient.getColdStorageVoiceExplanation(
+                    facilityId = topFac.facilityId,
+                    farmerLat = resolvedFarmerLat,
+                    farmerLon = resolvedFarmerLon,
+                    languageCode = langCode
+                )
+                val obj = JSONObject(res)
+                val text = obj.optString("transcript", "")
+                val audioBase64 = obj.optString("audio_base64", "")
+                voiceTranscript = text
+                isVoiceLoading = false
+
+                var playedViaMediaPlayer = false
+
+                if (audioBase64.isNotBlank()) {
+                    try {
+                        val decodedBytes: ByteArray? = Base64.decode(audioBase64, Base64.DEFAULT)
+                        if (decodedBytes != null && decodedBytes.size > 200) {
+                            val tempFile = File.createTempFile("cs_tts_", ".wav", context.cacheDir)
+                            FileOutputStream(tempFile).use { it.write(decodedBytes) }
+
+                            val player = MediaPlayer().apply {
+                                setDataSource(tempFile.absolutePath)
+                                prepare()
+                                setOnCompletionListener {
+                                    isSpeakingAudio = false
+                                    tempFile.delete()
+                                }
+                                start()
+                            }
+                            mediaPlayer = player
+                            playedViaMediaPlayer = true
+                            isSpeakingAudio = true
+                            Toast.makeText(context, if (isKannada) "ಸರ್ವಂ ಧ್ವನಿ ಮಾರ್ಗದರ್ಶನ ಪ್ರಾರಂಭವಾಗಿದೆ" else "Playing Sarvam Voice Guidance...", Toast.LENGTH_SHORT).show()
+                        }
+                    } catch (e: Exception) {
+                        playedViaMediaPlayer = false
+                    }
+                }
+
+                if (!playedViaMediaPlayer && text.isNotBlank() && ttsEngine != null) {
+                    val loc = when (UserSession.selectedLanguage.code) {
+                        "kn" -> Locale("kn", "IN")
+                        "hi" -> Locale("hi", "IN")
+                        "te" -> Locale("te", "IN")
+                        "ta" -> Locale("ta", "IN")
+                        "mr" -> Locale("mr", "IN")
+                        "gu" -> Locale("gu", "IN")
+                        "bn" -> Locale("bn", "IN")
+                        "ml" -> Locale("ml", "IN")
+                        "pa" -> Locale("pa", "IN")
+                        else -> Locale.ENGLISH
+                    }
+                    ttsEngine?.language = loc
+                    ttsEngine?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {
+                            isSpeakingAudio = true
+                        }
+                        override fun onDone(utteranceId: String?) {
+                            isSpeakingAudio = false
+                        }
+                        override fun onError(utteranceId: String?) {
+                            isSpeakingAudio = false
+                        }
+                    })
+                    isSpeakingAudio = true
+                    ttsEngine?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "cs_voice_tts")
+                    Toast.makeText(context, if (isKannada) "ಧ್ವನಿ ಮಾರ್ಗದರ್ಶನ ಪ್ರಾರಂಭವಾಗಿದೆ" else "Playing Voice Guidance...", Toast.LENGTH_SHORT).show()
+                } else if (!playedViaMediaPlayer) {
+                    isSpeakingAudio = false
+                }
+            } catch (e: Exception) {
+                isSpeakingAudio = false
+                isVoiceLoading = false
+                Toast.makeText(context, "Voice error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -458,7 +617,7 @@ fun ColdStorageDiscoveryScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "⚠️ " + (if (isKannada) "ಕೊಯ್ಲು ಮಾಡಿದ ಟೊಮೆಟೊ ನೀರು ನಿಲ್ಲುವ ಅಪಾಯ: 24-36 ಗಂಟೆಗಳಲ್ಲಿ ಕೊಳೆಯುವ ಸಾಧ್ಯತೆ. ತಕ್ಷಣ ಶೀತಲಾಗಾರಕ್ಕೆ ಸ್ಥಳಾಂತರಿಸಿ." else alert.vulnerability),
+                            text = "⚠️ " + (if (isKannada) "ಕೊಯ್ಲು ಮಾಡಿದ $crop ನೀರು ನಿಲ್ಲುವ ಅಪಾಯ: 24-36 ಗಂಟೆಗಳಲ್ಲಿ ಕೊಳೆಯುವ ಸಾಧ್ಯತೆ. ತಕ್ಷಣ ಶೀತಲಾಗಾರಕ್ಕೆ ಸ್ಥಳಾಂತರಿಸಿ." else alert.vulnerability),
                             fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             lineHeight = 15.sp
@@ -570,38 +729,18 @@ fun ColdStorageDiscoveryScreen(
                         }
 
                         Button(
-                            onClick = {
-                                if (facilities.isNotEmpty()) {
-                                    val topFac = facilities.first()
-                                    isSpeakingAudio = true
-                                    scope.launch {
-                                        try {
-                                            val res = ApiClient.getColdStorageVoiceExplanation(
-                                                facilityId = topFac.facilityId,
-                                                farmerLat = resolvedFarmerLat,
-                                                farmerLon = resolvedFarmerLon,
-                                                languageCode = if (isKannada) "kn-IN" else "en-IN"
-                                            )
-                                            val obj = JSONObject(res)
-                                            voiceTranscript = obj.optString("transcript", "")
-                                            Toast.makeText(context, if (isKannada) "ಧ್ವನಿ ಮಾರ್ಗದರ್ಶನ ಪ್ರಾರಂಭವಾಗಿದೆ" else "Playing Voice Guidance...", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Voice error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
-                                        } finally {
-                                            isSpeakingAudio = false
-                                        }
-                                    }
-                                }
-                            },
+                            onClick = { playVoiceExplanation() },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isDark) Color(0xFF5E9457) else SoilCropGreen,
+                                containerColor = if (isSpeakingAudio) Color(0xFFC05621) else (if (isDark) Color(0xFF5E9457) else SoilCropGreen),
                                 contentColor = Color.White
                             ),
                             shape = RoundedCornerShape(20.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (isSpeakingAudio) "⏳ Loading..." else if (isKannada) "▶ ಆಲಿಸಿ 🔊" else "▶ Listen 🔊",
+                                text = if (isVoiceLoading) (if (isKannada) "⏳ ಲೋಡ್ ಆಗುತ್ತಿದೆ..." else "⏳ Loading...")
+                                       else if (isSpeakingAudio) (if (isKannada) "⏹ ನಿಲ್ಲಿಸಿ 🔇" else "⏹ Stop 🔇")
+                                       else if (isKannada) "▶ ಆಲಿಸಿ 🔊" else "▶ Listen 🔊",
                                 fontSize = 11.5.sp,
                                 fontWeight = FontWeight.Bold
                             )

@@ -26,6 +26,22 @@ DISTRICT_COORDINATES: Dict[str, Tuple[float, float]] = {
     "mangaluru": (12.9141, 74.8560),
     "udupi": (13.3409, 74.7421),
     "chikkamagaluru": (13.3161, 75.7720),
+    "chikkamagalur": (13.3161, 75.7720),
+    "chikkmagalur": (13.3161, 75.7720),
+    "chikmagalur": (13.3161, 75.7720),
+    "chickmagalur": (13.3161, 75.7720),
+    "bangalore": (12.9716, 77.5946),
+    "bangalore rural": (13.1000, 77.6000),
+    "mysore": (12.2958, 76.6394),
+    "belgaum": (15.8497, 74.4977),
+    "gulbarga": (17.3297, 76.8343),
+    "shimoga": (13.9299, 75.5681),
+    "bijapur": (16.8302, 75.7100),
+    "tumkur": (13.3409, 77.1006),
+    "bellary": (15.1394, 76.9214),
+    "chikkaballapur": (13.4333, 77.7333),
+    "chikballapur": (13.4333, 77.7333),
+    "chamarajanagara": (11.9261, 76.9437),
     "shivamogga": (13.9299, 75.5681),
     "davanagere": (14.4644, 75.9218),
     "chitradurga": (14.2251, 76.3980),
@@ -138,6 +154,17 @@ DISTRICT_COORDINATES: Dict[str, Tuple[float, float]] = {
     "indore": (22.7196, 75.8577),
     "bhopal": (23.2599, 77.4126),
     "jabalpur": (23.1815, 79.9864),
+    "dhar": (22.5986, 75.3023),
+    "kukshi": (22.2033, 74.7554),
+    "ujjain": (23.1765, 75.7885),
+    "gwalior": (26.2183, 78.1828),
+
+    # Chhattisgarh
+    "durg": (21.1904, 81.2849),
+    "raipur": (21.2514, 81.6296),
+    "bilaspur": (22.0797, 82.1409),
+    "rajnandgaon": (21.1000, 81.0300),
+    "dhamtari": (20.7070, 81.5497),
 
     # Delhi / NCR / Punjab / Haryana / UP
     "delhi": (28.6139, 77.2090),
@@ -187,7 +214,12 @@ STATE_CENTROIDS: Dict[str, Tuple[float, float]] = {
     "jharkhand": (23.6102, 85.2799),
     "west bengal": (22.9868, 87.8550),
     "odisha": (20.9517, 85.0985),
+    "orissa": (20.9517, 85.0985),
     "chhattisgarh": (21.2787, 81.8661),
+    "chattisgarh": (21.2787, 81.8661),
+    "keralam": (10.8505, 76.2711),
+    "nct of delhi": (28.7041, 77.1025),
+    "pondicherry": (11.9416, 79.8083),
     "assam": (26.2006, 92.9376),
     "sikkim": (27.5330, 88.5122),
     "arunachal pradesh": (28.2180, 94.7278),
@@ -257,12 +289,12 @@ class DistanceService:
 
     @classmethod
     def clean_name(cls, name: str) -> str:
-        """Strips common market suffixes and punctuation for clean matching."""
+        """Strips common market suffixes, parenthetical qualifiers, and punctuation for clean matching."""
         if not name:
             return ""
         n = name.lower().strip()
-        n = re.sub(r"\b(apmc|mandi|market|hub|dc|central|sub-yard|yard|rural|urban)\b", "", n)
-        n = re.sub(r"[,/.-]", " ", n)
+        n = re.sub(r"[\(\)\[\],/.-]", " ", n)
+        n = re.sub(r"\b(apmc|mandi|market|hub|dc|central|sub-yard|yard|rural|urban|f&v|fv|veg|fruits?|vegetables?|grains?)\b", "", n)
         return " ".join(n.split())
 
     _geocoding_cache: Dict[str, Tuple[float, float]] = {}
@@ -386,30 +418,57 @@ class DistanceService:
         dist_clean = cls.clean_name(district) if district else ""
         state_clean = cls.clean_name(state) if state else ""
 
-        # 1. Exact match in coordinates registry / cache
-        if loc_clean in DISTRICT_COORDINATES:
-            return DISTRICT_COORDINATES[loc_clean]
+        # State centroid resolution to validate regional boundaries
+        state_centroid = None
+        if state_clean:
+            if state_clean in STATE_CENTROIDS:
+                state_centroid = STATE_CENTROIDS[state_clean]
+            else:
+                for s_key, coords in STATE_CENTROIDS.items():
+                    if s_key == state_clean or s_key in state_clean or state_clean in s_key:
+                        state_centroid = coords
+                        break
 
-        # 2. Token / substring containment in registry
-        for key, coords in DISTRICT_COORDINATES.items():
-            if key == loc_clean or (loc_clean and (key in loc_clean or loc_clean in key)):
+        def _is_state_compatible(coords: Tuple[float, float]) -> bool:
+            """Ensure coordinates are within geographic bounds of state centroid (~550 km)."""
+            if not state_centroid:
+                return True
+            dist_to_centroid = cls.haversine_distance_km(coords[0], coords[1], state_centroid[0], state_centroid[1], tortuosity=1.0)
+            return dist_to_centroid <= 550.0
+
+        # 1. Exact match in coordinates registry
+        if loc_clean in DISTRICT_COORDINATES:
+            coords = DISTRICT_COORDINATES[loc_clean]
+            if _is_state_compatible(coords):
                 return coords
 
-        # 3. District-level match
+        # 2. Strict whole-token match in coordinates registry (NO unsafe substring containment like "durg" in "chitradurga")
+        if loc_clean:
+            loc_tokens = set(re.findall(r"\b[a-z0-9]+\b", loc_clean))
+            for key, coords in DISTRICT_COORDINATES.items():
+                key_tokens = set(re.findall(r"\b[a-z0-9]+\b", key))
+                if key_tokens and key_tokens.issubset(loc_tokens):
+                    if _is_state_compatible(coords):
+                        return coords
+
+        # 3. District-level exact and token match
         if dist_clean:
             if dist_clean in DISTRICT_COORDINATES:
-                return DISTRICT_COORDINATES[dist_clean]
+                coords = DISTRICT_COORDINATES[dist_clean]
+                if _is_state_compatible(coords):
+                    return coords
+            dist_tokens = set(re.findall(r"\b[a-z0-9]+\b", dist_clean))
             for key, coords in DISTRICT_COORDINATES.items():
-                if key in dist_clean or dist_clean in key:
-                    return coords
+                key_tokens = set(re.findall(r"\b[a-z0-9]+\b", key))
+                if key_tokens and key_tokens.issubset(dist_tokens):
+                    if _is_state_compatible(coords):
+                        return coords
 
-        # 4. State centroid match
-        if state_clean:
-            for s_key, coords in STATE_CENTROIDS.items():
-                if s_key in state_clean or state_clean in s_key:
-                    return coords
+        # 4. State centroid match (fast in-memory regional resolution)
+        if state_centroid:
+            return state_centroid
 
-        # 5. Dynamic OpenStreetMap Nominatim Geocoding for unindexed locations
+        # 5. Dynamic OpenStreetMap Nominatim Geocoding for unindexed locations without state context
         osm_coords = cls.query_osm_nominatim_geocode(str(location), district, state)
         if osm_coords:
             return osm_coords

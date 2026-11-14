@@ -117,3 +117,39 @@ def test_pan_india_mandi_evaluation_with_gps_coords():
     assert "transport_cost" in first["itemized_deductions"]
     assert first["distance_km"] > 0
     assert first["itemized_deductions"]["transport_cost"] > 0
+
+
+def test_interstate_resolution_and_spelling_variants():
+    # 1. Spelling variations for Chikkamagaluru
+    for orig in ["Chikkamagaluru", "Chikkamagalur", "Chikkmagalur", "Chikmagalur", "chickmagalur"]:
+        c = DistanceService.resolve_coordinates(orig)
+        assert abs(c[0] - 13.3161) < 0.05
+        assert abs(c[1] - 75.7720) < 0.05
+
+    # 2. Durg (Chhattisgarh) must resolve to Chhattisgarh, never Chitradurga (Karnataka)
+    durg_coords = DistanceService.resolve_coordinates("Durg APMC", district="Durg", state="Chattisgarh")
+    assert abs(durg_coords[0] - 21.1904) < 0.05
+    assert abs(durg_coords[1] - 81.2849) < 0.05
+
+    # 3. Chitradurga (Karnataka) resolves correctly
+    chitra_coords = DistanceService.resolve_coordinates("Chitradurga APMC", district="Chitradurga", state="Karnataka")
+    assert abs(chitra_coords[0] - 14.2251) < 0.05
+    assert abs(chitra_coords[1] - 76.3980) < 0.05
+
+    # 4. Long-haul road route from Chikkmagalur to Durg APMC must be > 1000 km, never ~151 km
+    route = DistanceService.calculate_road_route_details(
+        origin="Chikkmagalur",
+        destination="Durg APMC",
+        origin_state="Karnataka",
+        dest_district="Durg",
+        dest_state="Chattisgarh"
+    )
+    assert route["is_osrm_verified"] is True
+    assert route["distance_km"] > 1000.0
+    assert route["origin_coords"] == (13.3161, 75.772)
+    assert route["dest_coords"] == (21.1904, 81.2849)
+
+    # 5. Kukshi in Dhar (MP) must resolve to MP, never Dharwad (Karnataka)
+    kukshi_coords = DistanceService.resolve_coordinates("Kukshi(F&V) APMC", district="Dhar", state="Madhya Pradesh")
+    assert abs(kukshi_coords[0] - 22.2033) < 0.05 or abs(kukshi_coords[0] - 22.5986) < 0.05
+
