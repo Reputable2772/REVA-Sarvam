@@ -199,7 +199,7 @@ object ApiClient {
                 conn.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
                 conn.doOutput = true
                 conn.connectTimeout = 8000
-                conn.readTimeout = 30000
+                conn.readTimeout = 180000
 
                 val outputStream = conn.outputStream
                 val writer = java.io.PrintWriter(java.io.OutputStreamWriter(outputStream, "UTF-8"), true)
@@ -296,7 +296,7 @@ object ApiClient {
     ): String = withContext(Dispatchers.IO) {
         val escapedText = text.replace("\"", "\\\"").replace("\n", " ")
         val jsonBody = "{\"text\":\"$escapedText\",\"language_code\":\"$languageCode\"}"
-        val res = postJson("$BASE_URL/api/voice/process-command", jsonBody)
+        val res = postJson("$BASE_URL/api/voice/process-command", jsonBody, 180000)
         if (res.contains("\"simulated_ok\"") || res.contains("Failed to connect") || res.contains("Connection refused")) {
             // Intelligent multilingual fallback parsing in mock mode
             val isKn = "kn" in languageCode.lowercase()
