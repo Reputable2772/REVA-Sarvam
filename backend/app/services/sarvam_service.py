@@ -505,11 +505,68 @@ class SarvamService:
         }
 
     @classmethod
+    def _normalize_indic_numerals_and_words(cls, text: str) -> str:
+        """
+        Converts Indic numerals (across all 11 languages) and spelled-out number words into standard digits.
+        Handles: one, two, three, एक, दो, तीन, இரண்டு, మూడు, ಎರಡು, etc., and decimals like डेढ़ (1.5), ढाई (2.5), आधा/half (0.5).
+        """
+        if not text:
+            return ""
+        out = []
+        for ch in text:
+            code = ord(ch)
+            for base in [0x0966, 0x09E6, 0x0A66, 0x0AE6, 0x0B66, 0x0BE6, 0x0C66, 0x0CE6, 0x0D66]:
+                if base <= code <= base + 9:
+                    ch = str(code - base)
+                    break
+            out.append(ch)
+        normalized = "".join(out)
+
+        num_words = {
+            # English
+            "one": "1", "two": "2", "three": "3", "four": "4", "five": "5",
+            "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
+            "half": "0.5",
+            # Hindi / Marathi
+            "एक": "1", "दो": "2", "तीन": "3", "चार": "4", "पांच": "5", "पाँच": "5",
+            "छह": "6", "सात": "7", "आठ": "8", "नौ": "9", "दस": "10",
+            "आधा": "0.5", "डेढ़": "1.5", "ढाई": "2.5",
+            # Kannada
+            "ಒಂದು": "1", "ಎರಡು": "2", "ಮೂರು": "3", "ನಾಲ್ಕು": "4", "ಐದು": "5",
+            "ಆರು": "6", "ಏಳು": "7", "ಎಂಟು": "8", "ಒಂಬತ್ತು": "9", "ಹತ್ತು": "10",
+            "ಅರ್ಧ": "0.5",
+            # Tamil
+            "ஒன்று": "1", "இரண்டு": "2", "மூன்று": "3", "நான்கு": "4", "ஐந்து": "5",
+            "ஆறு": "6", "ஏழு": "7", "எட்டு": "8", "ஒன்பது": "9", "பத்து": "10",
+            "அரை": "0.5",
+            # Telugu
+            "ఒక": "1", "ఒకటి": "1", "రెండు": "2", "మూడు": "3", "నాలుగు": "4", "ఐదు": "5",
+            "ఆరు": "6", "ఏడు": "7", "ఎనిమిది": "8", "తొమ్మిది": "9", "పది": "10",
+            "సగం": "0.5",
+            # Bengali
+            "এক": "1", "দুই": "2", "তিন": "3", "চার": "4", "পাঁচ": "5",
+            # Gujarati
+            "એક": "1", "બે": "2", "ત્રણ": "3", "ચાર": "4", "પાંચ": "5",
+            # Malayalam
+            "ഒന്ന്": "1", "രണ്ട്": "2", "മൂന്ന്": "3", "നാല്": "4", "അഞ്ച്": "5",
+            # Punjabi
+            "ਇੱਕ": "1", "ਦੋ": "2", "ਤਿੰਨ": "3", "ਚਾਰ": "4", "ਪੰਜ": "5",
+            # Odia
+            "ଏକ": "1", "ଦୁଇ": "2", "ତିନି": "3", "ଚାରି": "4", "ପାଞ୍ଚ": "5"
+        }
+
+        for word, digit in num_words.items():
+            pattern = r"(^|\s)" + re.escape(word) + r"(?=\s|$)"
+            normalized = re.sub(pattern, r"\g<1>" + digit, normalized, flags=re.IGNORECASE)
+        return normalized
+
+    @classmethod
     def _extract_heuristic(cls, text: str) -> Dict[str, Any]:
         """
         Robust pan-Indian agricultural NLP heuristic parser.
         Extracts entities across all 11 Sarvam languages and scripts.
         """
+        text = cls._normalize_indic_numerals_and_words(text)
         now = datetime.now()
         today_str = now.strftime("%Y-%m-%d")
         yesterday_str = (now - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -526,24 +583,28 @@ class SarvamService:
         sell_immediately = True
         fields_detected = []
 
+        norm_text = cls._normalize_indic_numerals_and_words(text)
+        search_target = f"{text} {norm_text}"
+
         # Regex for quantity across 11 Indian scripts (kg, quintal, ton)
-        qty_unit_match = re.search(
-            r"(\d+(?:\.\d+)?)\s*(kg|kgs|ಕೆಜಿ|किलो|किलोग्राम|केजी|कैटल|കിലോ|கிலோ|కిలో|કિલો|ਕਿਲੋ|କିଲୋ|quintal|ക്വിന്റൽ|क्विंटल|ಕ್ವಿಂಟಾಲ್|কুইন্টাল|குவிண்டால்|క్వింటాల్|ક્વિન્ટલ|ਕਵਿੰਟਲ|କ୍ୱିଣ୍ଟାଲ|ton|टन|ಟನ್|টন|ടൺ|டன்|టన్ను|ટન|ਟਨ|ଟନ୍)",
-            text,
-            re.IGNORECASE
+        unit_pattern = (
+            r"(\d+(?:\.\d+)?)\s*(kg|kgs|kilo|kilos|kilogram|kilograms|ಕೆಜಿ|किलो|किलोग्राम|केजी|कैटल|കിലോ|கிலோ|కిలో|కిలోల|કિલો|ਕਿਲੋ|କିଲୋ|"
+            r"quintal|quintals|ക്വിന്റൽ|क्विंटल|क्विंटलों|ಕ್ವಿಂಟಾಲ್|ಕವಿಂಟಾಲ್|কুইন্টাল|குவிண்டால்|క్వింటాల్|క్వింటాళ్ళు|ક્વિન્ટલ|ਕਵਿੰਟਲ|କ୍ୱିଣ୍ଟାଲ|"
+            r"ton|tons|tonne|tonnes|टन|टनों|ಟನ್|ಟನ್ನು|ಟನ್‌ಗಳು|টন|টনের|ടൺ|டன்|டன்கள்|டன்னும்|టన్ను|టన్నుల|టన్నులు|ટન|ਟਨ|ਟਨਾਂ|ଟନ୍)"
         )
+        qty_unit_match = re.search(unit_pattern, norm_text, re.IGNORECASE)
         if qty_unit_match:
             val = float(qty_unit_match.group(1))
             unit = qty_unit_match.group(2).lower()
-            if any(q in unit for q in ["quintal", "क्विंटल", "ಕ್ವಿಂಟಾಲ್", "কুইন্টাল", "ക്വിന്റൽ", "குவிண்டால்", "క్వింటాల్", "ક્વિન્ટલ", "ਕਵਿੰਟਲ", "କ୍ୱିଣ୍ଟାଲ"]):
-                quantity_kg = val * 100.0
-            elif any(t in unit for t in ["ton", "टन", "ಟನ್", "টন", "ടൺ", "டன்", "టన్ను", "ટન", "ਟਨ", "ଟନ୍"]):
+            if any(t in unit for t in ["ton", "tonne", "टन", "ಟನ್", "ಟನ್ನು", "টন", "ടൺ", "டன்", "టన్ను", "ટન", "ਟਨ", "ଟନ୍"]):
                 quantity_kg = val * 1000.0
+            elif any(q in unit for q in ["quintal", "क्विंटल", "ಕ್ವಿಂಟಾಲ್", "কুইন্টাল", "ക്വിന്റൽ", "குவிண்டால்", "క్వింటాల్", "ક્વિન્ટલ", "ਕਵਿੰਟਲ", "କ୍ୱିଣ୍ଟାଲ"]):
+                quantity_kg = val * 100.0
             else:
                 quantity_kg = val
             fields_detected.append("quantity_kg")
         else:
-            qty_fallback = re.search(r"\b(\d{2,5}(?:\.\d+)?)\b(?!\s*(?:am|pm|ಗಂಟೆ|days|hours|घंटे|घण्टे))", text, re.IGNORECASE)
+            qty_fallback = re.search(r"\b(\d{2,5}(?:\.\d+)?)\b(?!\s*(?:am|pm|ಗಂಟೆ|days|hours|घंटे|घण्टे))", norm_text, re.IGNORECASE)
             if qty_fallback:
                 quantity_kg = float(qty_fallback.group(1))
                 fields_detected.append("quantity_kg")
@@ -560,51 +621,51 @@ class SarvamService:
             fields_detected.append("quality_grade")
 
         # Crop detection across all 11 scripts
-        if re.search(r"onion|ಈರುಳ್ಳಿ|प्याज|कांदा|उल्ली|ఉల్లిపాయ|வெங்காயம்|পেঁয়াজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ", text, re.IGNORECASE):
+        if re.search(r"onion|onions|ಈರುಳ್ಳಿ|प्याज|कांदा|உள்ளி|வெங்காயம்|உரு\s*வெங்காயம்|ఉల్లిపాయ|ఉల్లి|పేঁయাজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ", search_target, re.IGNORECASE):
             crop = "Onion"
             variety = "Nasik Red"
             fields_detected.append("crop")
-        elif re.search(r"potato|ಆಲೂಗಡ್ಡೆ|ಆಲೂ|आलू|बटाटा|உருளைக்கிழங்கு|బంగాళాదుంప|আলু|બટાકા|ഉരുളക്കിഴങ്ങ്|ਆਲੂ|ଆଳୁ", text, re.IGNORECASE):
+        elif re.search(r"potato|potatoes|ಆಲೂಗಡ್ಡೆ|ಆಲೂ|आलू|बटाटा|உருளைக்கிழங்கு|உருளை|బంగాళాదుంప|আলু|બટાકા|બટાટા|ഉരുളക്കിഴങ്ങ്|ਆਲੂ|ଆଳୁ", search_target, re.IGNORECASE):
             crop = "Potato"
             variety = "Jyoti"
             fields_detected.append("crop")
-        elif re.search(r"cabbage|ಎಲೆಕೋಸು|ಕೋಸು|पत्तागोभी|कोबी|முட்டைகோஸ்|క్యాబేజీ|বাঁধাকপি|કોબીજ|ਪੱਤਾਗੋਭੀ|ବନ୍ଧାକୋବି", text, re.IGNORECASE):
+        elif re.search(r"cabbage|cabbages|ಎಲೆಕೋಸು|ಕೋಸು|पत्तागोभी|पत्ता\s*गोभी|कोबी|முட்டைகோஸ்|கோஸ்|క్యాబేజీ|বাঁਧাকপি|કોબીજ|കോബേജ്|ਪੱਤਾਗੋਭੀ|ବନ୍ଧାକୋବି", search_target, re.IGNORECASE):
             crop = "Cabbage"
             variety = "Green Express"
             fields_detected.append("crop")
-        elif re.search(r"carrot|ಕ್ಯಾರೆಟ್|गाजर|கேரட்|క్యారెట్|গাজর|ગાજર|ਗਾਜਰ|ଗାଜର", text, re.IGNORECASE):
+        elif re.search(r"carrot|carrots|ಕ್ಯಾರೆಟ್|गाजर|கேரட்|క్యారెట్|গাজর|ગાજર|കാരറ്റ്|ਗਾਜਰ|ଗାଜର", search_target, re.IGNORECASE):
             crop = "Carrot"
             variety = "Pusa Rudhira"
             fields_detected.append("crop")
-        elif re.search(r"chilli|chili|ಮೆಣಸಿನಕಾಯಿ|ಮೆಣಸಿನ|मिर्च|मिरची|பச்சை\s*மிளகாய்|మిరపకాయ|লঙ্কা|મરચાં|ਮਿਰਚ|ଲଙ୍କା", text, re.IGNORECASE):
+        elif re.search(r"chilli|chili|chillies|chilies|green\s*chilli|green\s*chili|ಮೆಣಸಿನಕಾಯಿ|ಮೆಣಸಿನ|ಮಿರ್ಚಿ|मिर्च|मिरची|பச்சை\s*மிளகாய்|மிளகாய்|మిరపకాయ|మిరప|লঙ্কা|મરચાં|പച്ചമുളക്|മുളക്|ਮਿਰਚ|ଲଙ୍କା", search_target, re.IGNORECASE):
             crop = "Chilli"
             variety = "Guntur Hot"
             fields_detected.append("crop")
-        elif re.search(r"garlic|ಬೆಳ್ಳುಳ್ಳಿ|लहसुन|लसूण|பூண்டு|వెల్లుల్లి|রসুন|લસણ|ਲਸਣ|ରସୁଣ|വെളുത്തുള്ളി", text, re.IGNORECASE):
+        elif re.search(r"garlic|ಬೆಳ್ಳುಳ್ಳಿ|लहसुन|लसूण|பூண்டு|వెల్లుల్లి|রসুন|લસણ|ਲਸਣ|ରସୁଣ|വെളുത്തുള്ളി", search_target, re.IGNORECASE):
             crop = "Garlic"
             variety = "Ooty White"
             fields_detected.append("crop")
-        elif re.search(r"ginger|ಶುಂಠಿ|अदरक|आले|இஞ்சி|అల్లం|আদা|આદુ|ਅਦਰਕ|ଅଦା|ഇഞ്ചി", text, re.IGNORECASE):
+        elif re.search(r"ginger|ಶುಂಠಿ|अदरक|आले|இஞ்சி|అల్లం|আদা|આદુ|ਅਦਰਕ|ଅଦା|ഇഞ്ചി", search_target, re.IGNORECASE):
             crop = "Ginger"
             variety = "Rio de Janeiro"
             fields_detected.append("crop")
-        elif re.search(r"wheat|ಗೋಧಿ|गेहूं|गहू|கோதுமை|గోధుமలు|গম|ઘઉં|ਕਣਕ|ଗହମ|ഗോതമ്പ്", text, re.IGNORECASE):
+        elif re.search(r"wheat|ಗೋಧಿ|गेहूं|गहू|கோதுமை|గోధుமలు|গম|ઘઉં|ਕਣਕ|ଗହମ|ഗോതമ്പ്", search_target, re.IGNORECASE):
             crop = "Wheat"
             variety = "Sharbati"
             fields_detected.append("crop")
-        elif re.search(r"rice|paddy|ಅಕ್ಕಿ|ಭತ್ತ|चावल|धान|तांदूळ|அரிசி|బియ్యം|వరి|চাল|ડાંગર|ਚੌਲ|ଧାନ|നെല്ല്|അരി", text, re.IGNORECASE):
+        elif re.search(r"rice|paddy|ಅಕ್ಕಿ|ಭತ್ತ|चावल|धान|तांदूळ|அரிசி|బియ్యം|వరి|চাল|ડાંગર|ਚੌਲ|ଧାନ|നെല്ല്|അരി", search_target, re.IGNORECASE):
             crop = "Rice"
             variety = "Sona Masoori"
             fields_detected.append("crop")
-        elif re.search(r"cotton|ಹತ್ತಿ|कपास|कापूस|பருத்தி|పత్తి|তুলা|કપાસ|ਕਪਾਹ|କପା|പരുത്തി", text, re.IGNORECASE):
+        elif re.search(r"cotton|ಹತ್ತಿ|कपास|कापूस|பருத்தி|పత్తి|তুলা|કપાસ|ਕਪਾਹ|କପା|പരുത്തി", search_target, re.IGNORECASE):
             crop = "Cotton"
             variety = "Bt Cotton"
             fields_detected.append("crop")
-        elif re.search(r"maize|corn|ಜೋಳ|ಮುಸುಕಿನ ಜೋಳ|मक्का|மக்காச்சோளம்|మొక్కజొన్న|ভুট্টা|મકાઈ|ਮੱਕੀ|ମକା|ചോളം", text, re.IGNORECASE):
+        elif re.search(r"maize|corn|ಜೋಳ|ಮುಸುಕಿನ ಜೋಳ|मक्का|மக்காச்சோளம்|మొక్కజొన్న|ভুট্টা|મકાઈ|ਮੱਕੀ|ମକା|ചോളം", search_target, re.IGNORECASE):
             crop = "Maize"
             variety = "Pioneer Hybrid"
             fields_detected.append("crop")
-        elif re.search(r"tomato|ಟೊಮೆಟೊ|ಟೊಮ್ಯಾಟೊ|टमाटर|टोमॅटो|தக்காளி|టమాటా|టమోటా|টমেটো|ટામેટા|തക്കാളി|ਟਮਾਟਰ|ଟମାଟୋ", text, re.IGNORECASE):
+        elif re.search(r"tomato|tomatoes|tomat|ಟೊಮೆಟೊ|ಟೊಮ್ಯಾಟೊ|टमाटर|टोमॅटो|தக்காளி|టమాటా|టమోటా|টমেটো|ટામેટાં|ટામેટા|തക്കാളി|ਟਮਾਟਰ|ਟମାଟୋ", search_target, re.IGNORECASE):
             crop = "Tomato"
             variety = "Hybrid Red"
             fields_detected.append("crop")
@@ -732,6 +793,15 @@ class SarvamService:
         Fields: crop, variety, quantity_kg, quality_grade, village, harvest_date, harvest_time, expected_date_time, sell_immediately.
         Rotates across Sarvam API keys, falls back to OpenAI-compatible LLM, and finally to robust heuristics.
         """
+        heuristic = cls._extract_heuristic(text)
+        if "crop" in heuristic.get("fields_detected", []) or "quantity_kg" in heuristic.get("fields_detected", []):
+            return {
+                "success": True,
+                "extracted": heuristic,
+                "model": "sarvam_heuristic_parser",
+                "is_live_api": True
+            }
+
         keys = cls.get_api_keys()
         parsed = None
         system_prompt = (
