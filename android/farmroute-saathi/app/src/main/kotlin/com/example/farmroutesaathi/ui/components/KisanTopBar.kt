@@ -3,6 +3,7 @@ package com.example.farmroutesaathi.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,9 +18,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.farmroutesaathi.R
 import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.UserSession
 import com.example.farmroutesaathi.ui.theme.*
@@ -98,12 +102,19 @@ fun KisanTopBar(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = if (isDarkTheme) SoilCropGreen.copy(alpha = 0.25f) else SoilHarvestGold.copy(alpha = 0.20f),
+                        color = Color.White,
                         border = BorderStroke(1.5.dp, if (isDarkTheme) SoilFreshLeaf else SoilHarvestGold),
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(text = "🌾", fontSize = 21.sp)
+                            Image(
+                                painter = painterResource(id = R.drawable.app_logo),
+                                contentDescription = "FarmRoute Saathi Logo",
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Fit
+                            )
                         }
                     }
 

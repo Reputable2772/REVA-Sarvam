@@ -232,16 +232,23 @@ fun LoginScreen(
                         .padding(horizontal = 20.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Golden Sun & Sprout Circular Emblem
+                    // Golden Sun & Sprout Circular Emblem with Official Brand Logo
                     Surface(
                         shape = CircleShape,
                         color = Color.White,
                         border = BorderStroke(2.dp, SoilHarvestGold),
                         shadowElevation = 6.dp,
-                        modifier = Modifier.size(58.dp)
+                        modifier = Modifier.size(68.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text("🌾", fontSize = 28.sp)
+                            Image(
+                                painter = painterResource(id = R.drawable.app_logo),
+                                contentDescription = "FarmRoute Saathi Logo",
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Fit
+                            )
                         }
                     }
 
