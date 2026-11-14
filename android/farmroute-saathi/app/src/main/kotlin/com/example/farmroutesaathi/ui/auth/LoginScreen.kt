@@ -2,14 +2,21 @@ package com.example.farmroutesaathi.ui.auth
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,7 +35,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -36,6 +46,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.farmroutesaathi.R
 import com.example.farmroutesaathi.data.ApiClient
 import com.example.farmroutesaathi.data.AppLocalization
 import com.example.farmroutesaathi.data.FarmerProfile
@@ -110,55 +121,76 @@ fun LoginScreen(
         }
     }
 
+    var contentVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        contentVisible = true
+    }
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(SoilFieldPaper)
+        modifier = Modifier.fillMaxSize()
     ) {
-        Column(
+        // 1. Real authentic Indian Agricultural Landscape full-screen background
+        Image(
+            painter = painterResource(id = R.drawable.bg_agriculture_landscape),
+            contentDescription = "FarmRoute Agricultural Landscape",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        // 2. Subtle translucent warm cream & morning sunlight gradient overlay
+        // Preserves the breathtaking scenery while guaranteeing high contrast and readability
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            // ================================================================
-            // SECTION A: AGRICULTURAL VISUAL IDENTITY (HERO SECTION)
-            // Visual: Indian farmland landscape, morning sun, rich soil, crops
-            // ================================================================
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(260.dp)
-            ) {
-                // Canvas: Indian Farmland Landscape under Golden Morning Sun
-                FarmlandHeroLandscape(
-                    modifier = Modifier.fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.22f),     // Gentle dark veil at top for status bar & top navigation
+                            Color.Transparent,                   // Crisp sunlight & morning mist view
+                            SoilFieldPaper.copy(alpha = 0.45f),  // Warm organic rural haze
+                            SoilFieldPaper.copy(alpha = 0.90f)   // Grounding soft-cream backdrop behind the card & footer
+                        ),
+                        startY = 0f,
+                        endY = Float.POSITIVE_INFINITY
+                    )
                 )
+        )
 
+        // 3. Scrollable Foreground Content with smooth fade-in animation
+        AnimatedVisibility(
+            visible = contentVisible,
+            enter = fadeIn(animationSpec = tween(durationMillis = 600, easing = LinearOutSlowInEasing)),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 // Top Floating Bar: Brand & Language Selector
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Small Brand Sprout Pill
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = SoilFieldPaper.copy(alpha = 0.95f),
-                        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.2f)),
-                        shadowElevation = 2.dp
+                        color = Color.White.copy(alpha = 0.94f),
+                        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.15f)),
+                        shadowElevation = 3.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🌱", fontSize = 13.sp)
-                            Spacer(modifier = Modifier.width(5.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "FarmRoute",
                                 fontSize = 12.sp,
@@ -168,16 +200,16 @@ fun LoginScreen(
                         }
                     }
 
-                    // Section C: Dynamic Language Selector
+                    // Dynamic Language Selector Pill
                     Surface(
                         shape = RoundedCornerShape(20.dp),
-                        color = SoilFieldPaper.copy(alpha = 0.95f),
+                        color = Color.White.copy(alpha = 0.95f),
                         border = BorderStroke(1.2.dp, SoilCropGreen),
                         shadowElevation = 3.dp,
                         modifier = Modifier.clickable { showLanguageDialog = true }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("🌐 ", fontSize = 12.sp)
@@ -191,52 +223,66 @@ fun LoginScreen(
                     }
                 }
 
-                // Brand Emblem, Logo, Tagline Overlay
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Hero Branding Container: Circular Emblem + Brand Name + Tagline
                 Column(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 12.dp),
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Golden Sun & Sprout Circular Emblem
                     Surface(
                         shape = CircleShape,
-                        color = SoilFieldPaper,
+                        color = Color.White,
                         border = BorderStroke(2.dp, SoilHarvestGold),
                         shadowElevation = 6.dp,
-                        modifier = Modifier.size(56.dp)
+                        modifier = Modifier.size(58.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Text("🌾", fontSize = 28.sp)
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    Text(
-                        text = AppLocalization.t("app_name"),
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = SoilDeepEarth,
-                        letterSpacing = 0.5.sp
-                    )
+                    // Frosted soft-cream card for brand name & primary tagline
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.White.copy(alpha = 0.90f),
+                        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.10f)),
+                        shadowElevation = 3.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = AppLocalization.t("app_name"),
+                                fontSize = 23.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = SoilDeepEarth,
+                                letterSpacing = 0.5.sp
+                            )
 
-                    // Primary Slogan: "Your Land. Your Harvest. Your Better Tomorrow."
-                    Text(
-                        text = AppLocalization.t("tagline_long"),
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = SoilCropGreen,
-                        letterSpacing = 0.3.sp,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
+                            Text(
+                                text = AppLocalization.t("tagline_long"),
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SoilCropGreen,
+                                letterSpacing = 0.3.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
 
                     // Secondary Tagline: "FROM SOIL TO MARKET"
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = SoilHarvestGold.copy(alpha = 0.15f),
-                        border = BorderStroke(0.8.dp, SoilHarvestGold.copy(alpha = 0.35f)),
-                        modifier = Modifier.padding(top = 4.dp)
+                        color = SoilHarvestGold.copy(alpha = 0.22f),
+                        border = BorderStroke(1.dp, HarvestGoldDark.copy(alpha = 0.40f)),
+                        modifier = Modifier.padding(top = 6.dp)
                     ) {
                         Text(
                             text = AppLocalization.t("tagline"),
@@ -244,13 +290,12 @@ fun LoginScreen(
                             fontWeight = FontWeight.Bold,
                             color = HarvestGoldDark,
                             letterSpacing = 1.sp,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp)
                         )
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
             // ================================================================
             // SECTION B: AUTHENTICATION CONTAINER (STEP-BASED FLOW)
@@ -455,13 +500,14 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = SoilCropGreen.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.2f))
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.94f),
+                    border = BorderStroke(1.dp, SoilCropGreen.copy(alpha = 0.25f)),
+                    shadowElevation = 2.dp
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
@@ -480,16 +526,25 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                Text(
-                    text = AppLocalization.t("trust_footer"),
-                    fontSize = 10.sp,
-                    color = SoilDeepEarth.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White.copy(alpha = 0.88f),
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Text(
+                        text = AppLocalization.t("trust_footer"),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SoilDeepEarth.copy(alpha = 0.75f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
+    }
 
         if (showLanguageDialog) {
             LanguageSelectionDialog(
@@ -500,124 +555,6 @@ fun LoginScreen(
                 }
             )
         }
-    }
-}
-
-/**
- * Custom Compose Canvas painting an Indian Farmland Landscape:
- * - Natural Sky (#A9C5C9) with gentle morning clouds
- * - Golden morning sun (#D7A747) rising over distant hills
- * - Rolling green farmland terraces (#91A96D, #486B43)
- * - Rich fertile soil furrows (#493A2D) at the base
- */
-@Composable
-private fun FarmlandHeroLandscape(
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier) {
-        val width = size.width
-        val height = size.height
-
-        // 1. Natural Sky (#A9C5C9 to soft morning ivory)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(SoilNaturalSky, Color(0xFFD6E4E2), SoilFieldPaper),
-                startY = 0f,
-                endY = height * 0.55f
-            ),
-            size = Size(width, height * 0.55f)
-        )
-
-        // 2. Golden Morning Sun (#D7A747) rising over hills
-        val sunCenter = Offset(width * 0.74f, height * 0.28f)
-        val sunRadius = 40.dp.toPx()
-        // Sun halo / glow
-        drawCircle(
-            color = SoilHarvestGold.copy(alpha = 0.22f),
-            radius = sunRadius * 1.55f,
-            center = sunCenter
-        )
-        // Sun disk
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xFFFFE082), SoilHarvestGold),
-                center = sunCenter,
-                radius = sunRadius
-            ),
-            radius = sunRadius,
-            center = sunCenter
-        )
-
-        // 3. Distant Rolling Agricultural Terraces - Light Green (#91A96D)
-        val terrace1 = Path().apply {
-            moveTo(0f, height * 0.40f)
-            cubicTo(
-                width * 0.25f, height * 0.36f,
-                width * 0.55f, height * 0.44f,
-                width, height * 0.38f
-            )
-            lineTo(width, height)
-            lineTo(0f, height)
-            close()
-        }
-        drawPath(path = terrace1, color = SoilFreshLeaf.copy(alpha = 0.85f))
-
-        // 4. Middle Crop Fields - Deep Crop Green (#486B43)
-        val terrace2 = Path().apply {
-            moveTo(0f, height * 0.47f)
-            cubicTo(
-                width * 0.35f, height * 0.52f,
-                width * 0.70f, height * 0.45f,
-                width, height * 0.50f
-            )
-            lineTo(width, height)
-            lineTo(0f, height)
-            close()
-        }
-        drawPath(path = terrace2, color = SoilCropGreen)
-
-        // 5. Rich Fertile Soil Bed (#493A2D)
-        val soilBed = Path().apply {
-            moveTo(0f, height * 0.56f)
-            cubicTo(
-                width * 0.40f, height * 0.54f,
-                width * 0.75f, height * 0.59f,
-                width, height * 0.55f
-            )
-            lineTo(width, height)
-            lineTo(0f, height)
-            close()
-        }
-        drawPath(
-            path = soilBed,
-            brush = Brush.verticalGradient(
-                colors = listOf(SoilDeepEarth, Color(0xFF382A20)),
-                startY = height * 0.55f,
-                endY = height
-            )
-        )
-
-        // 6. Natural Agricultural Furrow Lines in fertile soil
-        val furrowColor = SoilHarvestGold.copy(alpha = 0.25f)
-        for (i in 1..4) {
-            val yOffset = height * (0.64f + i * 0.05f)
-            drawLine(
-                color = furrowColor,
-                start = Offset(0f, yOffset),
-                end = Offset(width, yOffset - 4.dp.toPx()),
-                strokeWidth = 2.dp.toPx()
-            )
-        }
-
-        // Soft bottom gradient blend into Field Paper
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Transparent, SoilFieldPaper),
-                startY = height * 0.82f,
-                endY = height
-            ),
-            size = Size(width, height)
-        )
     }
 }
 
@@ -632,14 +569,25 @@ private fun SoilPhoneEntryCard(
     errorMessage: String?,
     onContinue: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "phoneBtnScale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.10f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -672,7 +620,7 @@ private fun SoilPhoneEntryCard(
             // Mobile Number Input Field with EXPLICIT high-contrast colors
             OutlinedTextField(
                 value = phoneNumber,
-                onValueChange = onPhoneChange,
+                onPhoneChange = onPhoneChange,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = LocalTextStyle.current.copy(
                     color = Color(0xFF1B2A1E),
@@ -739,15 +687,25 @@ private fun SoilPhoneEntryCard(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43)
+            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43 with subtle tactile spring animation)
             Button(
                 onClick = onContinue,
+                interactionSource = interactionSource,
                 enabled = !isLoading && phoneNumber.length == 10,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                    },
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
+                    containerColor = SoilCropGreen,
+                    disabledContainerColor = SoilCropGreen.copy(alpha = 0.45f)
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+            )
                     containerColor = SoilCropGreen,
                     disabledContainerColor = SoilCropGreen.copy(alpha = 0.45f)
                 ),
@@ -793,14 +751,25 @@ private fun SoilMpinEntryCard(
     onChangePhone: () -> Unit,
     onLogin: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "mpinBtnScale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.10f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -932,19 +901,24 @@ private fun SoilMpinEntryCard(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43)
+            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43 with subtle tactile spring animation)
             Button(
                 onClick = onLogin,
+                interactionSource = interactionSource,
                 enabled = !isLoading && mpinInput.length == 4,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                    },
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = SoilCropGreen,
                     disabledContainerColor = SoilCropGreen.copy(alpha = 0.45f)
                 ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
@@ -1030,14 +1004,25 @@ private fun SoilOnboardingCard(
         fontSize = 15.sp
     )
 
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "regBtnScale"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.2.dp, SoilDeepEarth.copy(alpha = 0.12f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, SoilDeepEarth.copy(alpha = 0.10f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -1215,15 +1200,21 @@ private fun SoilOnboardingCard(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43)
+            // SECTION D: PRIMARY ACTION BUTTON (Crop Green #486B43 with subtle tactile spring animation)
             Button(
                 onClick = onRegister,
+                interactionSource = interactionSource,
                 enabled = !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                    },
                 shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen)
+                colors = ButtonDefaults.buttonColors(containerColor = SoilCropGreen),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
