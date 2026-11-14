@@ -528,7 +528,7 @@ class SarvamService:
             "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10",
             "half": "0.5",
             # Hindi / Marathi
-            "एक": "1", "दो": "2", "तीन": "3", "चार": "4", "पांच": "5", "पाँच": "5",
+            "एक": "1", "दो": "2", "दोन": "2", "तीन": "3", "चार": "4", "पांच": "5", "पाँच": "5", "पाच": "5",
             "छह": "6", "सात": "7", "आठ": "8", "नौ": "9", "दस": "10",
             "आधा": "0.5", "डेढ़": "1.5", "ढाई": "2.5",
             # Kannada
@@ -589,7 +589,7 @@ class SarvamService:
         # Regex for quantity across 11 Indian scripts (kg, quintal, ton)
         unit_pattern = (
             r"(\d+(?:\.\d+)?)\s*(kg|kgs|kilo|kilos|kilogram|kilograms|ಕೆಜಿ|किलो|किलोग्राम|केजी|कैटल|കിലോ|கிலோ|కిలో|కిలోల|કિલો|ਕਿਲੋ|କିଲୋ|"
-            r"quintal|quintals|ക്വിന്റൽ|क्विंटल|क्विंटलों|ಕ್ವಿಂಟಾಲ್|ಕವಿಂಟಾಲ್|কুইন্টাল|குவிண்டால்|క్వింటాల్|క్వింటాళ్ళు|ક્વિન્ટલ|ਕਵਿੰਟਲ|କ୍ୱିଣ୍ଟାଲ|"
+            r"quintal|quintals|ക്വിന്റൽ|क्विंटल|क्विंटलों|ಕ್ವಿಂಟಾಲ್|ಕವಿಂಟಾಲ್|ಕೈಂಟಾಲ್|কুইন্টাল|குவிண்டால்|குவிண்டால்கள்|క్వింటాల్|క్వింటాళ్ళు|క్వింటాళ్ల|ક્વિન્ટલ|ਕਵਿੰਟਲ|ਕੁਇੰਟਲ|ਕੁੰਟਲ|କ୍ୱିଣ୍ਟାଲ|"
             r"ton|tons|tonne|tonnes|टन|टनों|ಟನ್|ಟನ್ನು|ಟನ್‌ಗಳು|টন|টনের|ടൺ|டன்|டன்கள்|டன்னும்|టన్ను|టన్నుల|టన్నులు|ટન|ਟਨ|ਟਨਾਂ|ଟନ୍)"
         )
         qty_unit_match = re.search(unit_pattern, norm_text, re.IGNORECASE)
@@ -598,7 +598,7 @@ class SarvamService:
             unit = qty_unit_match.group(2).lower()
             if any(t in unit for t in ["ton", "tonne", "टन", "ಟನ್", "ಟನ್ನು", "টন", "ടൺ", "டன்", "టన్ను", "ટન", "ਟਨ", "ଟନ୍"]):
                 quantity_kg = val * 1000.0
-            elif any(q in unit for q in ["quintal", "क्विंटल", "ಕ್ವಿಂಟಾಲ್", "কুইন্টাল", "ക്വിന്റൽ", "குவிண்டால்", "క్వింటాల్", "ક્વિન્ટલ", "ਕਵਿੰਟਲ", "କ୍ୱିଣ୍ଟାଲ"]):
+            elif any(q in unit for q in ["quintal", "क्विंटल", "ಕ್ವಿಂಟಾಲ್", "ಕವಿಂಟಾಲ್", "ಕೈಂಟಾಲ್", "কুইন্টাল", "ക്വിന്റൽ", "குவிண்டால்", "క్వింటాల్", "క్వింటాళ్ళు", "క్వింటాళ్ల", "ક્વિન્ટલ", "ਕਵਿੰਟਲ", "ਕੁਇੰਟਲ", "ਕੁੰਟਲ", "କ୍ୱିଣ୍ଟାଲ"]):
                 quantity_kg = val * 100.0
             else:
                 quantity_kg = val
@@ -621,7 +621,7 @@ class SarvamService:
             fields_detected.append("quality_grade")
 
         # Crop detection across all 11 scripts
-        if re.search(r"onion|onions|ಈರುಳ್ಳಿ|प्याज|कांदा|உள்ளி|வெங்காயம்|உரு\s*வெங்காயம்|ఉల్లిపాయ|ఉల్లి|పేঁయাজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ", search_target, re.IGNORECASE):
+        if re.search(r"onion|onions|ಈರುಳ್ಳಿ|प्याज|कांदा|உள்ளி|வெங்காயம்|உரு\s*வெங்காயம்|ఉల్లిపాయ|ఉల్లి|పేঁయাজ|ડુંગળી|ਪਿਆਜ਼|ପିଆଜ|পিয়াঁজ|পেঁয়াজ|পেয়াজ|পিয়াজ|ഉള്ളി|സവാള|ചുവന്നുള്ളി", search_target, re.IGNORECASE):
             crop = "Onion"
             variety = "Nasik Red"
             fields_detected.append("crop")
