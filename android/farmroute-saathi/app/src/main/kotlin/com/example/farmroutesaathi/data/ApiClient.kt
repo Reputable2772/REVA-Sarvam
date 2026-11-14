@@ -279,12 +279,27 @@ object ApiClient {
         if (res.contains("\"simulated_ok\"") || res.contains("Failed to connect") || res.contains("Connection refused")) {
             // Intelligent fallback parsing in mock mode
             val isKn = "kn" in languageCode.lowercase()
-            val crop = if (text.contains("ಈರುಳ್ಳಿ") || text.contains("onion", ignoreCase = true)) "Onion" else "Tomato"
+            val crop = if (text.contains("ಈರುಳ್ಳಿ") || text.contains("onion", ignoreCase = true)) "Onion"
+                       else if (text.contains("ಆಲೂ") || text.contains("potato", ignoreCase = true)) "Potato"
+                       else if (text.contains("ಟೊಮೆಟೊ") || text.contains("tomato", ignoreCase = true)) "Tomato"
+                       else if (text.contains("ಮೆಣಸಿನ") || text.contains("chilli", ignoreCase = true)) "Chilli"
+                       else null
             val qty = if (text.contains("100")) 100.0 else if (text.contains("300")) 300.0 else 200.0
             val imm = !text.contains("cold", ignoreCase = true) && !text.contains("ಶೀತಲ")
-            val msgEn = "Updated: ${qty.toInt()}kg $crop, sell immediately: $imm."
-            val msgKn = "ನವೀಕರಿಸಲಾಗಿದೆ: ${qty.toInt()} ಕೆಜಿ $crop."
-            "{\"success\":true,\"transcript\":\"$escapedText\",\"action\":\"UPDATE_HARVEST\",\"entities\":{\"crop\":\"$crop\",\"quantity_kg\":$qty,\"harvest_date\":\"2026-11-13\",\"harvest_time\":\"07:00 AM\",\"expected_date_time\":\"2026-11-14 09:00 AM\",\"sell_immediately\":$imm},\"message_en\":\"$msgEn\",\"message_kn\":\"$msgKn\",\"spoken_feedback\":\"${if (isKn) msgKn else msgEn}\"}"
+            val isWeather = text.contains("weather", ignoreCase = true) || text.contains("ಮಳೆ") || text.contains("ಹವಾಮಾನ") || text.contains("मौसम") || text.contains("వర్షం")
+            val isRates = text.contains("rate", ignoreCase = true) || text.contains("mandi", ignoreCase = true) || text.contains("ದರ") || text.contains("ಬೆಲೆ") || text.contains("भाव") || text.contains("ధర")
+
+            val action = if (isWeather) "NAVIGATE_WEATHER" else if (isRates) "NAVIGATE_MARKETPLACE" else if (crop != null) "UPDATE_HARVEST" else "CHAT_RESPONSE"
+            val msgEn = if (isWeather) "Vijayapura Farmland Weather: 26°C, Partly Cloudy, 30% rain chance. Harvest in morning dry window."
+                        else if (isRates) "Market Analysis: APMC rates are leading with ₹8,375 estimated net take-home via Virtual FPO Direct Buyer."
+                        else if (crop != null) "Updated: ${qty.toInt()}kg $crop, sell immediately: $imm."
+                        else "FarmRoute Saathi: I can assist you with live APMC mandi prices, weather forecasts, cold storage, and government schemes."
+            val msgKn = if (isWeather) "ವಿಜಯಪುರ ಕೃಷಿ ಹವಾಮಾನ: 26°C, ಭಾಗಶಃ ಮೋಡ, 30% ಮಳೆ ಸಾಧ್ಯತೆ. ಬೆಳಗಿನ ಒಣ ಸಮಯದಲ್ಲಿ ಕೊಯ್ಲು ಮಾಡಿ."
+                        else if (isRates) "ಮಾರುಕಟ್ಟೆ ವಿಶ್ಲೇಷಣೆ: ವರ್ಚುವಲ್ ಎಫ್‌ಪಿಒ ಮೂಲಕ ₹8,375 ನಿವ್ವಳ ಲಾಭ ಪಡೆಯಬಹುದು."
+                        else if (crop != null) "ನವೀಕರಿಸಲಾಗಿದೆ: ${qty.toInt()} ಕೆಜಿ $crop."
+                        else "ಫಾರ್ಮ್‌ರೂಟ್ ಸಾಥಿ: ಲೈವ್ ಮಂಡಿ ದರಗಳು, ಹವಾಮಾನ ಮುನ್ಸೂಚನೆ, ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಮತ್ತು ಸರ್ಕಾರಿ ಯೋಜನೆಗಳಿಗೆ ನಾನು ನೆರವಾಗಬಲ್ಲೆ."
+            val entitiesJson = if (crop != null) "{\"crop\":\"$crop\",\"quantity_kg\":$qty,\"harvest_date\":\"2026-11-13\",\"harvest_time\":\"07:00 AM\",\"expected_date_time\":\"2026-11-14 09:00 AM\",\"sell_immediately\":$imm}" else "{}"
+            "{\"success\":true,\"transcript\":\"$escapedText\",\"action\":\"$action\",\"entities\":$entitiesJson,\"message_en\":\"$msgEn\",\"message_kn\":\"$msgKn\",\"spoken_feedback\":\"${if (isKn) msgKn else msgEn}\"}"
         } else {
             res
         }

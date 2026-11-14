@@ -70,7 +70,7 @@ fun SarvamVoiceAssistantDialog(
     val selectedLang = UserSession.selectedLanguage
     val sarvamLangCode = selectedLang.sarvamCode
     val activeHarvest = UserSession.activeHarvest
-    val harvestCrop = activeHarvest?.crop ?: "Tomato"
+    val harvestCrop = activeHarvest?.crop
     val harvestQty = (activeHarvest?.quantityKg ?: 200.0).toInt()
     val harvestId = UserSession.activeHarvestId
 
@@ -229,7 +229,8 @@ fun SarvamVoiceAssistantDialog(
             try {
                 val dist = UserSession.currentFarmer?.district ?: "Local"
                 val state = UserSession.currentFarmer?.state ?: ""
-                val promptText = "$dist $state farmland weather conditions and harvest protection advisory for $harvestCrop"
+                val cropSuffix = if (!harvestCrop.isNullOrBlank()) " for $harvestCrop" else ""
+                val promptText = "Current weather forecast and farm advisory for $dist $state$cropSuffix"
                 val res = ApiClient.processVoiceCommand(promptText, sarvamLangCode)
                 val jsonObj = JSONObject(res)
                 val feedback = jsonObj.optString("spoken_feedback", jsonObj.optString("message_en", "Weather advisory retrieved."))
@@ -252,22 +253,23 @@ fun SarvamVoiceAssistantDialog(
 
         scope.launch {
             try {
-                val res = ApiClient.getMandiVoiceExplanation(harvestId, sarvamLangCode)
+                val cropText = if (!harvestCrop.isNullOrBlank()) " for $harvestCrop" else ""
+                val promptText = "Compare APMC mandi rates and net take-home$cropText"
+                val res = if (!harvestCrop.isNullOrBlank() && !harvestId.isNullOrBlank()) {
+                    try {
+                        ApiClient.getMandiVoiceExplanation(harvestId, sarvamLangCode)
+                    } catch (_: Exception) {
+                        ApiClient.processVoiceCommand(promptText, sarvamLangCode)
+                    }
+                } else {
+                    ApiClient.processVoiceCommand(promptText, sarvamLangCode)
+                }
                 val jsonObj = JSONObject(res)
-                val summary = jsonObj.optString("summary_text", "Comparing live mandi rates.")
+                val summary = jsonObj.optString("spoken_feedback", jsonObj.optString("summary_text", jsonObj.optString("message_en", "Comparing live mandi rates.")))
                 val audioB64 = jsonObj.optString("audio_base64", "")
                 handleAssistantResponse(summary, audioB64, "NAVIGATE_MARKETPLACE")
             } catch (e: Exception) {
-                // Fallback via general process command
-                try {
-                    val fallbackRes = ApiClient.processVoiceCommand("Compare APMC mandi rates for $harvestCrop", sarvamLangCode)
-                    val jsonObj = JSONObject(fallbackRes)
-                    val feedback = jsonObj.optString("spoken_feedback", "Mandi rates evaluated.")
-                    val audioB64 = jsonObj.optString("audio_base64", "")
-                    handleAssistantResponse(feedback, audioB64, "NAVIGATE_MARKETPLACE")
-                } catch (err: Exception) {
-                    handleAssistantResponse("Unable to retrieve mandi comparison right now.", null)
-                }
+                handleAssistantResponse("Unable to retrieve mandi comparison right now.", null)
             } finally {
                 isProcessing = false
             }
@@ -277,20 +279,33 @@ fun SarvamVoiceAssistantDialog(
     fun executeQuickHarvest() {
         if (isProcessing) return
         stopAudioPlayback()
-        val userPrompt = AppLocalization.t("quick_harvest", "qty" to "$harvestQty", "crop" to harvestCrop)
+        val userPrompt = if (!harvestCrop.isNullOrBlank()) {
+            AppLocalization.t("quick_harvest", "qty" to "$harvestQty", "crop" to harvestCrop)
+        } else {
+            "🌾 ${AppLocalization.t("quick_my_crops")}"
+        }
         messages.add(AssistantChatMessage(text = userPrompt, isUser = true))
         isProcessing = true
 
         scope.launch {
             try {
-                val promptText = "What is the status and next step for active harvest $harvestCrop $harvestQty kg"
+                val promptText = if (!harvestCrop.isNullOrBlank()) {
+                    "What is the status and next step for active harvest $harvestCrop $harvestQty kg"
+                } else {
+                    "Check my registered harvest lots and available crops"
+                }
                 val res = ApiClient.processVoiceCommand(promptText, sarvamLangCode)
                 val jsonObj = JSONObject(res)
                 val feedback = jsonObj.optString("spoken_feedback", "Active harvest details retrieved.")
                 val audioB64 = jsonObj.optString("audio_base64", "")
                 handleAssistantResponse(feedback, audioB64)
             } catch (e: Exception) {
-                handleAssistantResponse("Active harvest lot: $harvestQty kg Grade-A $harvestCrop. Ready for Mandi sale or cold storage.", null)
+                val fallbackMsg = if (!harvestCrop.isNullOrBlank()) {
+                    "Active harvest lot: $harvestQty kg Grade-A $harvestCrop. Ready for Mandi sale or cold storage."
+                } else {
+                    "No active harvest declared yet. Tap 'Register Harvest Lot' to record your produce."
+                }
+                handleAssistantResponse(fallbackMsg, null)
             } finally {
                 isProcessing = false
             }
@@ -633,7 +648,7 @@ fun SarvamVoiceAssistantDialog(
                         onClick = { executeQuickHarvest() },
                         label = {
                             Text(
-                                text = "🌾 ${harvestQty}kg $harvestCrop",
+                                text = if (!harvestCrop.isNullOrBlank()) "🌾 ${harvestQty}kg $harvestCrop" else "🌾 ${AppLocalization.t("quick_my_crops")}",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold
                             )
