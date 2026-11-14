@@ -620,7 +620,7 @@ private fun SoilPhoneEntryCard(
             // Mobile Number Input Field with EXPLICIT high-contrast colors
             OutlinedTextField(
                 value = phoneNumber,
-                onPhoneChange = onPhoneChange,
+                onValueChange = onPhoneChange,
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = LocalTextStyle.current.copy(
                     color = Color(0xFF1B2A1E),
@@ -705,11 +705,6 @@ private fun SoilPhoneEntryCard(
                     disabledContainerColor = SoilCropGreen.copy(alpha = 0.45f)
                 ),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
-            )
-                    containerColor = SoilCropGreen,
-                    disabledContainerColor = SoilCropGreen.copy(alpha = 0.45f)
-                ),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
