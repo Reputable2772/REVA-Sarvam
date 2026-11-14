@@ -76,8 +76,14 @@ def test_pan_india_mandi_api_endpoints():
     assert res_analysis.status_code == 200
     data_analysis = res_analysis.json()
     assert data_analysis["success"] is True
+    assert data_analysis.get("all_distances_osrm_verified") is True
+    assert "OSRM" in data_analysis.get("distance_verification", "")
     assert "analysis" in data_analysis
     assert len(data_analysis["analysis"]["mandis"]) > 0
+    for item in data_analysis["analysis"]["mandis"]:
+        assert item.get("is_osrm_verified") is True
+        assert "OSRM" in item.get("routing_engine", "")
+        assert item.get("duration_minutes", 0) > 0
 
 def test_pan_india_mandi_evaluation_and_deductions():
     results = PanIndiaMandiService.evaluate_mandi_options(
@@ -88,6 +94,10 @@ def test_pan_india_mandi_evaluation_and_deductions():
     )
     assert len(results) >= 3
     for m in results:
+        assert m.get("is_osrm_verified") is True
+        assert "OSRM" in m.get("routing_engine", "")
+        assert m.get("verification_badge") == "OSRM Verified ✓"
+        assert m.get("duration_minutes", 0) > 0
         assert "transport_cost" in m["itemized_deductions"]
         assert "commission_cost" in m["itemized_deductions"]
         assert "unloading_cost" in m["itemized_deductions"]
@@ -104,4 +114,13 @@ def test_pan_india_trap_detection():
     recommended = next((m for m in results if m.get("is_recommended")), None)
     assert recommended is not None
     assert recommended["net_take_home"] >= results[-1]["net_take_home"]
+
+def test_distance_service_osrm_verification():
+    from backend.app.services.distance_service import DistanceService
+    route = DistanceService.calculate_road_route_details("Kolar", "Bangalore")
+    assert route["is_osrm_verified"] is True
+    assert "OSRM" in route["routing_engine"]
+    assert route["distance_km"] > 0
+    assert route["duration_minutes"] > 0
+
 

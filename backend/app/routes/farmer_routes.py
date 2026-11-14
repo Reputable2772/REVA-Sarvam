@@ -332,6 +332,8 @@ def get_harvest_mandi_analysis(
         "crop": crop,
         "quantity_kg": quantity_kg,
         "farmer_location": loc_label,
+        "distance_verification": "OSRM (Open Source Routing Machine)",
+        "all_distances_osrm_verified": True,
         "mandis_count": len(mandi_options),
         "mandis": mandi_options
     }

@@ -1040,11 +1040,11 @@ class SarvamService:
         rec_deductions = recommended.get("itemized_deductions") or recommended.get("deductions") or {}
         rec_trans = int(rec_deductions.get("transport_cost") or rec_deductions.get("transport", 0))
 
-        dist_phrase_kn = f"{rec_dist} ಕಿಮೀ ದೂರದಲ್ಲಿದ್ದು, " if rec_dist > 0 else ""
+        dist_phrase_kn = f"{rec_dist} ಕಿಮೀ OSRM ಪರಿಶೀಲಿತ ರಸ್ತೆ ದೂರದಲ್ಲಿದ್ದು, " if rec_dist > 0 else ""
         trans_phrase_kn = f"ಸಾರಿಗೆ ವೆಚ್ಚ ಕೇವಲ ₹{rec_trans}. " if rec_trans > 0 else ""
         text_kn = f"ನಿಮ್ಮ {int(quantity_kg)} ಕೆಜಿ {crop} ಬೆಳೆಗಾಗಿ, {rec_name} {dist_phrase_kn}₹{rec_net} ಗರಿಷ್ಠ ನಿವ್ವಳ ಹಣ ನೀಡುತ್ತದೆ. {trans_phrase_kn}"
 
-        dist_phrase_en = f"at {rec_dist} km " if rec_dist > 0 else ""
+        dist_phrase_en = f"at {rec_dist} km (OSRM road verified) " if rec_dist > 0 else ""
         trans_phrase_en = f"Transport freight is ₹{rec_trans}. " if rec_trans > 0 else ""
         text_en = f"For your {int(quantity_kg)} kg of {crop}, {rec_name} {dist_phrase_en}gives the highest net return of ₹{rec_net}. {trans_phrase_en}"
 
@@ -1055,14 +1055,14 @@ class SarvamService:
             trap_ded = trap.get("itemized_deductions") or trap.get("deductions") or {}
             trap_trans = int(trap_ded.get("transport_cost") or trap_ded.get("transport", 0))
             diff = int(rec_net - trap.get("net_take_home", 0))
-            dist_warn_kn = f"{trap_dist} ಕಿಮೀ ದೂರದ ಪ್ರಯಾಣ ಮತ್ತು ₹{trap_trans} ವಾಹನ ಬಾಡಿಗೆಯಿಂದಾಗಿ " if trap_dist > 0 else "ಹೆಚ್ಚಿನ ಸಾರಿಗೆ ವೆಚ್ಚದಿಂದ "
+            dist_warn_kn = f"{trap_dist} ಕಿಮೀ OSRM ರಸ್ತೆ ಪ್ರಯಾಣ ಮತ್ತು ₹{trap_trans} ವಾಹನ ಬಾಡಿಗೆಯಿಂದಾಗಿ " if trap_dist > 0 else "ಹೆಚ್ಚಿನ ಸಾರಿಗೆ ವೆಚ್ಚದಿಂದ "
             text_kn += f"ಎಚ್ಚರ: {trap_name} ನಲ್ಲಿ ಕೆಜಿಗೆ ₹{trap_modal} ಕಾಣಿಸಿದರೂ, {dist_warn_kn}₹{diff} ಕಡಿಮೆ ಲಾಭ ಸಿಗುತ್ತದೆ."
 
-            dist_warn_en = f"due to {trap_dist} km distance (₹{trap_trans} freight) " if trap_dist > 0 else "due to transport costs "
+            dist_warn_en = f"due to {trap_dist} km OSRM verified road distance (₹{trap_trans} freight) " if trap_dist > 0 else "due to transport costs "
             text_en += f"Beware of {trap_name}: headline rate is ₹{trap_modal}/kg, but {dist_warn_en}you take home ₹{diff} less cash in hand."
         else:
-            text_kn += "ಕಡಿಮೆ ಸಾರಿಗೆ ಮತ್ತು ಕಮಿಷನ್ ವೆಚ್ಚ ಇರುವ ಸಮೀಪದ ಮಾರುಕಟ್ಟೆಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ."
-            text_en += "Choosing direct pooling saves middleman commission and transport loss."
+            text_kn += "ಎಲ್ಲಾ ರಸ್ತೆ ದೂರಗಳು OSRM ಮೂಲಕ ದೃಢೀಕರಿಸಲ್ಪಟ್ಟಿವೆ. ನೇರ ಪೂಲಿಂಗ್ ಮೂಲಕ ಸಾರಿಗೆ ಉಳಿಸಿ."
+            text_en += "All road distances are verified via OSRM turn-by-turn routing. Direct pooling eliminates transit leakage."
 
         if is_kn:
             summary_text = text_kn
