@@ -46,7 +46,8 @@ fun MandiComparisonScreen(
     var isLoading by remember { mutableStateOf(true) }
     var crop by remember { mutableStateOf("Tomato") }
     var quantityKg by remember { mutableStateOf(200.0) }
-    var farmerLocation by remember { mutableStateOf("Kolar, Karnataka") }
+    val initialLoc = UserSession.farmerLocationText
+    var farmerLocation by remember { mutableStateOf(if (initialLoc.isNotBlank()) initialLoc else "Local, India") }
     var mandisList by remember { mutableStateOf<List<MandiCardData>>(emptyList()) }
     var searchQuery by remember { mutableStateOf("") }
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -126,7 +127,8 @@ fun MandiComparisonScreen(
 
                 val json = JSONObject(responseStr)
                 if (json.optBoolean("success", false) || json.has("mandis")) {
-                    farmerLocation = json.optString("farmer_location", "Kolar, Karnataka")
+                    val locFromUser = UserSession.farmerLocationText
+                    farmerLocation = json.optString("farmer_location", if (locFromUser.isNotBlank()) locFromUser else "Local, India")
                     val arr = json.optJSONArray("mandis") ?: JSONArray()
                     val list = mutableListOf<MandiCardData>()
                     for (i in 0 until arr.length()) {
@@ -867,17 +869,20 @@ fun CostItemRow(label: String, amount: String, isBold: Boolean = false) {
 
 fun getDefaultMandiData(crop: String, quantityKg: Double): List<MandiCardData> {
     val q = if (quantityKg > 0) quantityKg else 200.0
-    val kolarGross = q * 24.0
-    val kolarComm = kolarGross * 0.065
-    val kolarDed = 350.0 + kolarComm + 40.0 + 30.0
+    val dist = UserSession.currentFarmer?.district?.ifBlank { "Local" } ?: "Local"
+    val state = UserSession.currentFarmer?.state?.ifBlank { "Karnataka" } ?: "Karnataka"
 
-    val bangarGross = q * 27.50
-    val bangarComm = bangarGross * 0.08
-    val bangarDed = 620.0 + bangarComm + 64.0 + 50.0
+    val localGross = q * 24.0
+    val localComm = localGross * 0.065
+    val localDed = 350.0 + localComm + 40.0 + 30.0
 
-    val chintGross = q * 22.0
-    val chintComm = chintGross * 0.05
-    val chintDed = 480.0 + chintComm + 40.0 + 30.0
+    val nearbyGross = q * 27.50
+    val nearbyComm = nearbyGross * 0.08
+    val nearbyDed = 620.0 + nearbyComm + 64.0 + 50.0
+
+    val regionalGross = q * 22.0
+    val regionalComm = regionalGross * 0.05
+    val regionalDed = 480.0 + regionalComm + 40.0 + 30.0
 
     val azadGross = q * 42.0
     val azadDed = 5800.0 + (azadGross * 0.08) + 200.0 + 100.0
@@ -888,8 +893,8 @@ fun getDefaultMandiData(crop: String, quantityKg: Double): List<MandiCardData> {
     return listOf(
         MandiCardData(
             mandiName = "Virtual FPO Direct Buyer (Aggregated Pool)",
-            district = "Kolar",
-            state = "Karnataka",
+            district = dist,
+            state = state,
             distanceKm = 5.0,
             modalPricePerKg = 25.0,
             grossRevenue = fpoGross,
@@ -906,58 +911,58 @@ fun getDefaultMandiData(crop: String, quantityKg: Double): List<MandiCardData> {
             isRecommended = true
         ),
         MandiCardData(
-            mandiName = "Kolar APMC Mandi",
-            district = "Kolar",
-            state = "Karnataka",
+            mandiName = "$dist APMC Mandi",
+            district = dist,
+            state = state,
             distanceKm = 12.0,
             modalPricePerKg = 24.0,
-            grossRevenue = kolarGross,
+            grossRevenue = localGross,
             transportCost = 350.0,
-            commissionCost = kolarComm,
+            commissionCost = localComm,
             commissionPct = 6.5,
             unloadingCost = 40.0,
             weighingFee = 30.0,
-            totalDeductions = kolarDed,
-            netTakeHome = kolarGross - kolarDed,
-            effectiveRatePerKg = (kolarGross - kolarDed) / q,
+            totalDeductions = localDed,
+            netTakeHome = localGross - localDed,
+            effectiveRatePerKg = (localGross - localDed) / q,
             isTrap = false,
             trapReason = "",
             isRecommended = false
         ),
         MandiCardData(
-            mandiName = "Bangarapet APMC Mandi",
-            district = "Kolar",
-            state = "Karnataka",
+            mandiName = "Sub-Division APMC Market",
+            district = dist,
+            state = state,
             distanceKm = 24.0,
             modalPricePerKg = 27.50,
-            grossRevenue = bangarGross,
+            grossRevenue = nearbyGross,
             transportCost = 620.0,
-            commissionCost = bangarComm,
+            commissionCost = nearbyComm,
             commissionPct = 8.0,
             unloadingCost = 64.0,
             weighingFee = 50.0,
-            totalDeductions = bangarDed,
-            netTakeHome = bangarGross - bangarDed,
-            effectiveRatePerKg = (bangarGross - bangarDed) / q,
+            totalDeductions = nearbyDed,
+            netTakeHome = nearbyGross - nearbyDed,
+            effectiveRatePerKg = (nearbyGross - nearbyDed) / q,
             isTrap = false,
             trapReason = "",
             isRecommended = false
         ),
         MandiCardData(
-            mandiName = "Chintamani APMC Mandi",
-            district = "Chikkaballapura",
-            state = "Karnataka",
+            mandiName = "Adjacent Regional APMC",
+            district = "$dist Sub-market",
+            state = state,
             distanceKm = 42.0,
             modalPricePerKg = 22.0,
-            grossRevenue = chintGross,
+            grossRevenue = regionalGross,
             transportCost = 480.0,
-            commissionCost = chintComm,
+            commissionCost = regionalComm,
             commissionPct = 5.0,
             unloadingCost = 40.0,
             weighingFee = 30.0,
-            totalDeductions = chintDed,
-            netTakeHome = chintGross - chintDed,
-            effectiveRatePerKg = (chintGross - chintDed) / q,
+            totalDeductions = regionalDed,
+            netTakeHome = regionalGross - regionalDed,
+            effectiveRatePerKg = (regionalGross - regionalDed) / q,
             isTrap = false,
             trapReason = "",
             isRecommended = false

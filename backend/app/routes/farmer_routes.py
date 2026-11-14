@@ -53,9 +53,15 @@ def register_harvest(
 
         if existing_by_phone:
             farmer = existing_by_phone
+            if req.district and not farmer.district:
+                farmer.district = req.district
+            if req.state and not farmer.state:
+                farmer.state = req.state
         else:
+            from backend.app.services.distance_service import DistanceService
             f_dist = req.district or req.village or ""
             f_state = req.state or "Karnataka"
+            f_lat, f_lon = DistanceService.resolve_coordinates(f_dist or f_state, f_dist, f_state)
             farmer = Farmer(
                 farmer_id=clean_id,
                 name=f"Farmer {clean_id}",
@@ -63,13 +69,25 @@ def register_harvest(
                 district=f_dist,
                 state=f_state,
                 pincode="",
-                phone=target_phone
+                phone=target_phone,
+                latitude=f_lat,
+                longitude=f_lon
             )
             db.add(farmer)
             db.commit()
 
+        if not farmer.latitude or not farmer.longitude:
+            from backend.app.services.distance_service import DistanceService
+            farmer.latitude, farmer.longitude = DistanceService.resolve_coordinates(farmer.district or farmer.state, farmer.district, farmer.state)
+            db.commit()
+
     # Generate dynamic unique Lot ID: FR-{DIST}-{YYYYMMDD}-{XXXX}
-    dist_map = {"kolar": "KLR", "bangalore": "BLR", "bengaluru": "BLR", "mysore": "MYS", "mysuru": "MYS", "belgaum": "BEL", "belagavi": "BEL", "tumkur": "TUM", "mandya": "MDY", "hassan": "HAS"}
+    dist_map = {
+        "kolar": "KLR", "bangalore": "BLR", "bengaluru": "BLR", "mysore": "MYS", "mysuru": "MYS",
+        "belgaum": "BEL", "belagavi": "BEL", "tumkur": "TUM", "mandya": "MDY", "hassan": "HAS",
+        "chengalpet": "CHE", "chengalpattu": "CHE", "chennai": "CHN", "kanchipuram": "KNC", "kancheepuram": "KNC",
+        "nashik": "NSK", "pune": "PUN", "mumbai": "MUM"
+    }
     d_clean = (farmer.district or "").lower().strip()
     dist_code = dist_map.get(d_clean, (farmer.district[:3] if farmer and farmer.district else "KLR").upper())
     date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
@@ -123,7 +141,7 @@ def register_harvest(
         from backend.app.services.harvest_alignment_service import HarvestAlignmentService
         pooling_opportunity = HarvestAlignmentService.evaluate_alignment_opportunity(
             lot=new_lot,
-            target_mandi=req.village or "Kolar APMC",
+            target_mandi=req.village or (f"{farmer.district} APMC" if farmer and farmer.district else "Local APMC"),
             db=db
         )
     except Exception:
@@ -272,6 +290,8 @@ def list_farmer_harvests(
 def get_harvest_mandi_analysis(
     harvest_id: str,
     target_mandi: Optional[str] = None,
+    origin_district: Optional[str] = None,
+    origin_state: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -279,6 +299,7 @@ def get_harvest_mandi_analysis(
     transparently analyzing all costs, transport, APMC commissions, and net cash in hand.
     """
     from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
+    from backend.app.services.distance_service import DistanceService
 
     lot = db.query(HarvestLot).filter(HarvestLot.lot_id == harvest_id).first()
     farmer = db.query(Farmer).filter(Farmer.farmer_id == lot.farmer_id).first() if lot else None
@@ -286,9 +307,12 @@ def get_harvest_mandi_analysis(
     crop = lot.crop if lot and lot.crop else "Produce"
     quantity_kg = lot.quantity_kg if lot else 200.0
     farmer_village = farmer.village if farmer and farmer.village else None
-    farmer_district = farmer.district if farmer and farmer.district else ""
-    farmer_state = farmer.state if farmer and farmer.state else ""
+    farmer_district = (farmer.district if farmer and farmer.district else "") or origin_district or ""
+    farmer_state = (farmer.state if farmer and farmer.state else "") or origin_state or ""
     farmer_coords = (farmer.latitude, farmer.longitude) if farmer and farmer.latitude and farmer.longitude else None
+
+    if not farmer_coords and (farmer_district or farmer_state):
+        farmer_coords = DistanceService.resolve_coordinates(farmer_district or farmer_state, farmer_district, farmer_state)
 
     mandi_options = PanIndiaMandiService.evaluate_mandi_options(
         crop=crop,

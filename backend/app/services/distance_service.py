@@ -61,15 +61,46 @@ DISTRICT_COORDINATES: Dict[str, Tuple[float, float]] = {
     "visakhapatnam": (17.6868, 83.2185),
 
     # Tamil Nadu
+    "chengalpet": (12.6937, 79.9757),
+    "chengalpattu": (12.6937, 79.9757),
+    "kancheepuram": (12.8342, 79.7036),
+    "kanchipuram": (12.8342, 79.7036),
+    "thiruvallur": (13.1432, 79.9074),
+    "tiruvallur": (13.1432, 79.9074),
+    "chennai": (13.0827, 80.2707),
+    "koyambedu": (13.0694, 80.1948),
+    "vellore": (12.9165, 79.1325),
+    "ranipet": (12.9298, 79.3330),
+    "tirupathur": (12.4958, 78.5678),
+    "thirupathur": (12.4958, 78.5678),
+    "villupuram": (11.9401, 79.4861),
+    "cuddalore": (11.7480, 79.7714),
+    "tiruvannamalai": (12.2253, 79.0747),
+    "thiruvannamalai": (12.2253, 79.0747),
     "krishnagiri": (12.5186, 78.2137),
     "hosur": (12.7409, 77.8253),
     "dharmapuri": (12.1211, 78.1582),
     "salem": (11.6643, 78.1460),
+    "namakkal": (11.2189, 78.1674),
+    "erode": (11.3410, 77.7172),
     "coimbatore": (11.0168, 76.9558),
-    "chennai": (13.0827, 80.2707),
-    "koyambedu": (13.0694, 80.1948),
+    "tiruppur": (11.1085, 77.3411),
+    "thiruppur": (11.1085, 77.3411),
+    "dindigul": (10.3673, 77.9803),
     "madurai": (9.9252, 78.1198),
+    "theni": (10.0104, 77.4768),
     "tiruchirappalli": (10.7905, 78.7047),
+    "thanjavur": (10.7870, 79.1378),
+    "perambalur": (11.2342, 78.8817),
+    "ariyalur": (11.1396, 79.0764),
+    "karur": (10.9601, 78.0766),
+    "pudukkottai": (10.3797, 78.8208),
+    "sivagangai": (9.8433, 78.4809),
+    "virudhunagar": (9.5680, 77.9624),
+    "tirunelveli": (8.7139, 77.7567),
+    "thoothukudi": (8.7642, 78.1348),
+    "tuticorin": (8.7642, 78.1348),
+    "kanyakumari": (8.0883, 77.5385),
 
     # Maharashtra
     "mumbai": (19.0760, 72.8777),
@@ -591,7 +622,14 @@ class DistanceService:
                         markets.append(m)
 
         if not markets:
-            markets = ["Kolar", "Bangarpet", "Malur"]
+            if state_cand:
+                markets = [r[0] for r in db.query(MandiPriceRecord.market_name).filter(
+                    MandiPriceRecord.state.ilike(f"%{state_cand}%")
+                ).distinct().limit(limit).all()]
+            if not markets and clean_dist:
+                markets = [f"{clean_dist.title()} APMC", f"Regional {clean_dist.title()} Mandi", "District Agricultural Market"]
+            elif not markets:
+                markets = ["Local APMC Mandi", "Sub-Division APMC", "Direct Buyer Hub"]
 
         f_lat = farmer_lat if farmer_lat is not None else lat
         f_lon = farmer_lon if farmer_lon is not None else lon

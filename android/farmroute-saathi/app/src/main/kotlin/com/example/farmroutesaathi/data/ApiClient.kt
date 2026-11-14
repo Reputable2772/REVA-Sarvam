@@ -44,7 +44,9 @@ object ApiClient {
                 "9845012348" -> "Ramesh Babu"
                 else -> "Farmer"
             }
-            "{\"exists\":$isKnown,\"phone\":\"$phone\",\"name\":\"$name\",\"district\":\"Kolar\",\"state\":\"Karnataka\"}"
+            val dist = UserSession.currentFarmer?.district ?: "Local"
+            val state = UserSession.currentFarmer?.state ?: "Karnataka"
+            "{\"exists\":$isKnown,\"phone\":\"$phone\",\"name\":\"$name\",\"district\":\"$dist\",\"state\":\"$state\"}"
         } else {
             res
         }
@@ -60,7 +62,10 @@ object ApiClient {
                     "9845012346" -> "Venkatamma"
                     else -> "Demo Farmer"
                 }
-                "{\"status\":\"authenticated\",\"token\":\"sim-token-$phone\",\"farmer\":{\"name\":\"$name\",\"phone\":\"$phone\",\"district\":\"Kolar\",\"state\":\"Karnataka\",\"pincode\":\"563101\"}}"
+                val dist = UserSession.currentFarmer?.district ?: "Local"
+                val state = UserSession.currentFarmer?.state ?: "Karnataka"
+                val pin = UserSession.currentFarmer?.pincode ?: "560001"
+                "{\"status\":\"authenticated\",\"token\":\"sim-token-$phone\",\"farmer\":{\"name\":\"$name\",\"phone\":\"$phone\",\"district\":\"$dist\",\"state\":\"$state\",\"pincode\":\"$pin\"}}"
             } else {
                 "{\"error\":\"Invalid MPIN (Mock: Use 1234)\"}"
             }
@@ -141,6 +146,8 @@ object ApiClient {
 
     private fun defaultDistricts(state: String): List<String> = when (state) {
         "Karnataka" -> listOf("Kolar", "Chikkaballapura", "Bangalore Rural", "Tumkur", "Mandya", "Ramanagara")
+        "Tamil Nadu" -> listOf("Chengalpet", "Kancheepuram", "Chennai", "Thiruvallur", "Salem", "Coimbatore", "Madurai", "Dharmapuri", "Krishnagiri")
+        "Maharashtra" -> listOf("Nashik", "Pune", "Ahmednagar", "Solapur", "Nagpur", "Mumbai")
         "Andhra Pradesh" -> listOf("Prakasam", "Chittoor", "Anantapur", "Kurnool")
         else -> listOf("District 1", "District 2", "District 3")
     }
@@ -158,11 +165,14 @@ object ApiClient {
         expectedDateTime: String,
         sellImmediately: Boolean
     ): String = withContext(Dispatchers.IO) {
-        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"variety\":\"Hybrid Red\",\"quantity_kg\":$quantityKg,\"quality_grade\":\"Grade A\",\"harvest_date\":\"$harvestDate\",\"harvest_time\":\"$harvestTime\",\"expected_date_time\":\"$expectedDateTime\",\"sell_immediately\":$sellImmediately}"
+        val dist = UserSession.currentFarmer?.district ?: ""
+        val st = UserSession.currentFarmer?.state ?: ""
+        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"variety\":\"Hybrid Red\",\"quantity_kg\":$quantityKg,\"quality_grade\":\"Grade A\",\"harvest_date\":\"$harvestDate\",\"harvest_time\":\"$harvestTime\",\"expected_date_time\":\"$expectedDateTime\",\"sell_immediately\":$sellImmediately,\"district\":\"$dist\",\"state\":\"$st\"}"
         val res = postJson("$BASE_URL/api/farmer/register", jsonBody)
         if (res.contains("\"simulated_ok\"") || res.contains("Failed to connect") || res.contains("Connection refused")) {
             val dateStr = harvestDate.replace("-", "")
-            "{\"success\":true,\"harvest_id\":\"FR-KLR-$dateStr-0001\",\"lot\":{\"lot_id\":\"FR-KLR-$dateStr-0001\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"harvest_date\":\"$harvestDate\",\"harvest_time\":\"$harvestTime\",\"expected_date_time\":\"$expectedDateTime\",\"sell_immediately\":$sellImmediately}}"
+            val lotPrefix = UserSession.currentFarmer?.district?.take(3)?.uppercase() ?: "LOT"
+            "{\"success\":true,\"harvest_id\":\"FR-$lotPrefix-$dateStr-0001\",\"lot\":{\"lot_id\":\"FR-$lotPrefix-$dateStr-0001\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"harvest_date\":\"$harvestDate\",\"harvest_time\":\"$harvestTime\",\"expected_date_time\":\"$expectedDateTime\",\"sell_immediately\":$sellImmediately}}"
         } else {
             res
         }
@@ -257,8 +267,12 @@ object ApiClient {
     }
 
     suspend fun getMandiAnalysis(harvestId: String, targetMandi: String? = null): String = withContext(Dispatchers.IO) {
-        val queryParam = if (targetMandi != null) "?target_mandi=${URLEncoder.encode(targetMandi, "UTF-8")}" else ""
-        getJson("$BASE_URL/api/farmer/harvests/$harvestId/mandi-analysis$queryParam")
+        val dist = UserSession.currentFarmer?.district ?: ""
+        val state = UserSession.currentFarmer?.state ?: ""
+        val targetQ = if (targetMandi != null) "&target_mandi=${URLEncoder.encode(targetMandi, "UTF-8")}" else ""
+        val encDist = URLEncoder.encode(dist, "UTF-8")
+        val encState = URLEncoder.encode(state, "UTF-8")
+        getJson("$BASE_URL/api/farmer/harvests/$harvestId/mandi-analysis?origin_district=$encDist&origin_state=$encState$targetQ")
     }
 
     suspend fun getMandiVoiceExplanation(harvestId: String, languageCode: String = "kn-IN"): String = withContext(Dispatchers.IO) {
@@ -337,17 +351,21 @@ object ApiClient {
         farmerId: String = "FARMER-01",
         crop: String = "Tomato",
         quantityKg: Double = 500.0,
-        latitude: Double = 13.133,
-        longitude: Double = 78.133,
+        latitude: Double = 0.0,
+        longitude: Double = 0.0,
         farmerLat: Double = latitude,
         farmerLon: Double = longitude,
-        locationText: String = "Kolar, Karnataka",
+        locationText: String = "",
         radiusKm: Double = 50.0,
         language: String = "en-IN"
     ): String = withContext(Dispatchers.IO) {
-        val lat = if (farmerLat != 13.133) farmerLat else latitude
-        val lon = if (farmerLon != 78.133) farmerLon else longitude
-        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"latitude\":$lat,\"longitude\":$lon,\"location_text\":\"$locationText\",\"radius_km\":$radiusKm,\"language\":\"$language\"}"
+        val effectiveLoc = if (locationText.isNotBlank()) locationText else UserSession.farmerLocationText
+        val dist = effectiveLoc.substringBefore(",").trim().ifBlank { "Local" }
+        val st = if (effectiveLoc.contains(",")) effectiveLoc.substringAfter(",").trim() else ""
+        val defaultCoords = UserSession.getDistrictCoordinates(dist, st)
+        val lat = if (farmerLat != 0.0 && farmerLat != 13.133) farmerLat else if (latitude != 0.0 && latitude != 13.133) latitude else defaultCoords.first
+        val lon = if (farmerLon != 0.0 && farmerLon != 78.133) farmerLon else if (longitude != 0.0 && longitude != 78.133) longitude else defaultCoords.second
+        val jsonBody = "{\"farmer_id\":\"$farmerId\",\"crop\":\"$crop\",\"quantity_kg\":$quantityKg,\"latitude\":$lat,\"longitude\":$lon,\"location_text\":\"$effectiveLoc\",\"radius_km\":$radiusKm,\"language\":\"$language\"}"
         val res = postJson("$BASE_URL/api/cold-storage/discover", jsonBody)
         if (res.contains("\"simulated_ok\"") || res.contains("404") || res.contains("Failed to connect") || res.contains("Connection refused")) {
             """
@@ -359,10 +377,10 @@ object ApiClient {
               "radius_km": $radiusKm,
               "facilities": [
                 {
-                  "facility_id": "CS-KLR-001",
-                  "name": "Kolar APMC Agro Cold Chain Hub",
-                  "district": "Kolar",
-                  "address": "APMC Yard, Bangarpet Road, Kolar",
+                  "facility_id": "CS-001",
+                  "name": "$dist APMC Agro Cold Chain Hub",
+                  "district": "$dist",
+                  "address": "APMC Yard, $dist",
                   "latitude": 13.1367,
                   "longitude": 78.1291,
                   "total_capacity_mt": 150.0,
@@ -376,24 +394,22 @@ object ApiClient {
                   "travel_time_min": 12,
                   "route_type": "ROAD",
                   "mandi_distances": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 8.5},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 14.0},
-                    {"mandi_name": "Malur APMC", "distance_km": 21.0}
+                    {"mandi_name": "$dist APMC", "distance_km": 8.5},
+                    {"mandi_name": "Regional APMC", "distance_km": 14.0}
                   ],
                   "direct_farmer_to_mandi": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 10.2},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 16.5},
-                    {"mandi_name": "Malur APMC", "distance_km": 22.0}
+                    {"mandi_name": "$dist APMC", "distance_km": 10.2},
+                    {"mandi_name": "Regional APMC", "distance_km": 16.5}
                   ],
                   "ranking_score": 94.5,
-                  "recommendation_reason": "Nearest verified facility with active tomato-compatible multi-chamber bays and shortest haul to Kolar APMC.",
+                  "recommendation_reason": "Nearest verified facility with active horticulture bays and shortest haul to $dist APMC.",
                   "status": "OPERATIONAL"
                 },
                 {
-                  "facility_id": "CS-KLR-002",
-                  "name": "Mulbagal Cooperative Cold Storage",
-                  "district": "Kolar",
-                  "address": "NH-75 Bypass, Mulbagal",
+                  "facility_id": "CS-002",
+                  "name": "$dist Cooperative Cold Storage",
+                  "district": "$dist",
+                  "address": "Main Bypass, $dist",
                   "latitude": 13.1642,
                   "longitude": 78.3962,
                   "total_capacity_mt": 80.0,
@@ -407,24 +423,20 @@ object ApiClient {
                   "travel_time_min": 38,
                   "route_type": "ROAD",
                   "mandi_distances": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 29.1},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 36.5},
-                    {"mandi_name": "Malur APMC", "distance_km": 48.0}
+                    {"mandi_name": "$dist APMC", "distance_km": 29.1}
                   ],
                   "direct_farmer_to_mandi": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 10.2},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 16.5},
-                    {"mandi_name": "Malur APMC", "distance_km": 22.0}
+                    {"mandi_name": "$dist APMC", "distance_km": 10.2}
                   ],
                   "ranking_score": 71.0,
-                  "recommendation_reason": "Secondary alternative on NH-75 corridor. Availability unverified.",
+                  "recommendation_reason": "Secondary alternative on highway corridor. Availability unverified.",
                   "status": "OPERATIONAL"
                 },
                 {
-                  "facility_id": "CS-KLR-003",
-                  "name": "Malur Precision Controlled Atmosphere Store",
-                  "district": "Kolar",
-                  "address": "KIADB Industrial Area, Malur",
+                  "facility_id": "CS-003",
+                  "name": "$dist Precision CA Store",
+                  "district": "$dist",
+                  "address": "Industrial Area, $dist",
                   "latitude": 13.0044,
                   "longitude": 77.9392,
                   "total_capacity_mt": 200.0,
@@ -438,17 +450,13 @@ object ApiClient {
                   "travel_time_min": 45,
                   "route_type": "ROAD",
                   "mandi_distances": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 31.0},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 24.5},
-                    {"mandi_name": "Malur APMC", "distance_km": 4.5}
+                    {"mandi_name": "$dist APMC", "distance_km": 31.0}
                   ],
                   "direct_farmer_to_mandi": [
-                    {"mandi_name": "Kolar APMC", "distance_km": 10.2},
-                    {"mandi_name": "Bangarpet APMC", "distance_km": 16.5},
-                    {"mandi_name": "Malur APMC", "distance_km": 22.0}
+                    {"mandi_name": "$dist APMC", "distance_km": 10.2}
                   ],
                   "ranking_score": 82.0,
-                  "recommendation_reason": "High-tech CA facility with 110T verified vacancy, optimal if selling at Malur APMC.",
+                  "recommendation_reason": "High-tech CA facility with 110T verified vacancy.",
                   "status": "OPERATIONAL"
                 }
               ]
@@ -471,26 +479,29 @@ object ApiClient {
     suspend fun getWeatherHarvestAlerts(farmerId: String): String = withContext(Dispatchers.IO) {
         val res = getJson("$BASE_URL/api/weather/harvest-alerts?farmer_id=$farmerId")
         if (res.contains("\"simulated_ok\"") || res.contains("404") || res.contains("Failed to connect") || res.contains("Connection refused")) {
+            val dist = UserSession.currentFarmer?.district?.ifBlank { "Local" } ?: "Local"
+            val crop = UserSession.activeHarvest?.crop ?: "Produce"
+            val lotId = UserSession.activeHarvestId
             """
             {
               "has_active_alert": true,
-              "warning_id": "IMD-KLR-20261113-RAIN",
-              "district": "Kolar",
+              "warning_id": "IMD-${dist.take(3).uppercase()}-20261113-RAIN",
+              "district": "$dist",
               "alert_type": "HEAVY_RAINFALL",
               "severity": "ORANGE",
-              "headline": "Official IMD Alert: Moderate to Heavy Rainfall forecast in Kolar district over the next 48 hours.",
-              "headline_kannada": "ಅಧಿಕೃತ ಐಎಂಡಿ ಮುನ್ಸೂಚನೆ: ಮುಂದಿನ 48 ಗಂಟೆಗಳಲ್ಲಿ ಕೋಲಾರ ಜಿಲ್ಲೆಯಲ್ಲಿ ಭಾರೀ ಮಳೆಯಾಗುವ ಸಾಧ್ಯತೆ.",
+              "headline": "Official IMD Alert: Moderate to Heavy Rainfall forecast in $dist district over the next 48 hours.",
+              "headline_kannada": "ಅಧಿಕೃತ ಐಎಂಡಿ ಮುನ್ಸೂಚನೆ: ಮುಂದಿನ 48 ಗಂಟೆಗಳಲ್ಲಿ $dist ಜಿಲ್ಲೆಯಲ್ಲಿ ಭಾರೀ ಮಳೆಯಾಗುವ ಸಾಧ್ಯತೆ.",
               "valid_until": "2026-11-15T18:00:00Z",
               "affected_harvest": {
-                "harvest_id": "FR-KLR-20261113-0001",
-                "crop": "Tomato",
+                "harvest_id": "$lotId",
+                "crop": "$crop",
                 "quantity_kg": 500.0,
                 "status": "AWAITING_SALE",
                 "vulnerability": "High moisture and waterlogging risk leading to premature rotting and skin cracking within 24-36 hrs."
               },
-              "recommended_action": "Move harvested tomatoes to the nearest covered cold storage facility immediately to prevent loss.",
-              "recommended_facility_id": "CS-KLR-001",
-              "recommended_facility_name": "Kolar APMC Agro Cold Chain Hub (4.2 km)"
+              "recommended_action": "Move harvested $crop to the nearest covered cold storage facility immediately to prevent loss.",
+              "recommended_facility_id": "CS-001",
+              "recommended_facility_name": "$dist APMC Agro Cold Chain Hub (4.2 km)"
             }
             """.trimIndent()
         } else {
@@ -500,17 +511,23 @@ object ApiClient {
 
     suspend fun getColdStorageVoiceExplanation(
         facilityId: String,
-        farmerLat: Double = 13.133,
-        farmerLon: Double = 78.133,
+        farmerLat: Double = 0.0,
+        farmerLon: Double = 0.0,
         languageCode: String = "kn-IN"
     ): String = withContext(Dispatchers.IO) {
-        val jsonBody = "{\"facility_id\":\"$facilityId\",\"farmer_lat\":$farmerLat,\"farmer_lon\":$farmerLon,\"language\":\"$languageCode\"}"
+        val dist = UserSession.currentFarmer?.district ?: "Local"
+        val state = UserSession.currentFarmer?.state ?: ""
+        val coords = UserSession.getDistrictCoordinates(dist, state)
+        val lat = if (farmerLat != 0.0) farmerLat else coords.first
+        val lon = if (farmerLon != 0.0) farmerLon else coords.second
+        val jsonBody = "{\"facility_id\":\"$facilityId\",\"farmer_lat\":$lat,\"farmer_lon\":$lon,\"language\":\"$languageCode\"}"
         val res = postJson("$BASE_URL/api/voice/cold-storage-explanation", jsonBody)
         if (res.contains("\"simulated_ok\"") || res.contains("404") || res.contains("Failed to connect") || res.contains("Connection refused")) {
+            val dist = UserSession.currentFarmer?.district?.ifBlank { "Local" } ?: "Local"
             val transcript = if (languageCode.startsWith("kn")) {
-                "ಸೂಕ್ತವಾದ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಸೌಲಭ್ಯ 'ಕೋಲಾರ ಎಪಿಎಂಸಿ ಆಗ್ರೋ ಕೋಲ್ಡ್ ಚೈನ್ ಹಬ್' ನಿಮ್ಮ ಸ್ಥಳದಿಂದ 4.2 ಕಿಲೋಮೀಟರ್ ದೂರದಲ್ಲಿದೆ. ಇದು ಕೋಲಾರ ಎಪಿಎಂಸಿಯಿಂದ 8.5 ಕಿ.ಮೀ, ಬಂಗಾರಪೇಟೆಯಿಂದ 14 ಕಿ.ಮೀ ಮತ್ತು ಮಾಲೂರು ಮಾರುಕಟ್ಟೆಯಿಂದ 21 ಕಿಲೋಮೀಟರ್ ದೂರದಲ್ಲಿದೆ. ಲಭ್ಯವಿರುವ ಸಾಮರ್ಥ್ಯ 65 ಟನ್ ದೃಢೀಕರಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಸೌಲಭ್ಯವನ್ನು ಸಂಪರ್ಕಿಸಿ ಬುಕಿಂಗ್ ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ."
+                "ಸೂಕ್ತವಾದ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್ ಸೌಲಭ್ಯ '$dist ಎಪಿಎಂಸಿ ಆಗ್ರೋ ಕೋಲ್ಡ್ ಚೈನ್ ಹಬ್' ನಿಮ್ಮ ಸ್ಥಳದಿಂದ 4.2 ಕಿಲೋಮೀಟರ್ ದೂರದಲ್ಲಿದೆ. ಇದು ಸಮೀಪದ ಎಪಿಎಂಸಿಯಿಂದ 8.5 ಕಿ.ಮೀ ದೂರದಲ್ಲಿದೆ. ಲಭ್ಯವಿರುವ ಸಾಮರ್ಥ್ಯ 65 ಟನ್ ದೃಢೀಕರಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಸೌಲಭ್ಯವನ್ನು ಸಂಪರ್ಕಿಸಿ ಬುಕಿಂಗ್ ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ."
             } else {
-                "A verified cold-storage facility, Kolar APMC Agro Cold Chain Hub, is 4.2 kilometres from your location. It is 8.5 kilometres from Kolar APMC, 14 kilometres from Bangarpet Mandi, and 21 kilometres from Malur APMC. Verified available space is 65 tonnes. Please contact the facility to confirm your crates."
+                "A verified cold-storage facility, $dist APMC Agro Cold Chain Hub, is 4.2 kilometres from your location and 8.5 kilometres from $dist APMC. Verified available space is 65 tonnes. Please contact the facility to confirm your crates."
             }
             "{\"audio_base64\":\"\",\"transcript\":\"$transcript\",\"language\":\"$languageCode\"}"
         } else {

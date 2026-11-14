@@ -227,7 +227,9 @@ fun SarvamVoiceAssistantDialog(
 
         scope.launch {
             try {
-                val promptText = "Kolar farmland weather conditions and harvest protection advisory"
+                val dist = UserSession.currentFarmer?.district ?: "Local"
+                val state = UserSession.currentFarmer?.state ?: ""
+                val promptText = "$dist $state farmland weather conditions and harvest protection advisory for $harvestCrop"
                 val res = ApiClient.processVoiceCommand(promptText, sarvamLangCode)
                 val jsonObj = JSONObject(res)
                 val feedback = jsonObj.optString("spoken_feedback", jsonObj.optString("message_en", "Weather advisory retrieved."))

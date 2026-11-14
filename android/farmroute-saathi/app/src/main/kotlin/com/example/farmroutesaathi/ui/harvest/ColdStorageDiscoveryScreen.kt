@@ -32,6 +32,7 @@ import com.example.farmroutesaathi.ui.theme.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 data class MandiDistanceItem(
     val mandiName: String,
@@ -76,17 +77,26 @@ data class WeatherRiskAlert(
 
 @Composable
 fun ColdStorageDiscoveryScreen(
-    harvestId: String = "FR-KLR-20261113-0001",
-    crop: String = "Tomato",
-    quantityKg: Double = 500.0,
-    farmerLat: Double = 13.133,
-    farmerLon: Double = 78.133,
-    locationText: String = "Kolar, Karnataka",
+    harvestId: String = "",
+    crop: String = "Produce",
+    quantityKg: Double = 200.0,
+    farmerLat: Double = 0.0,
+    farmerLon: Double = 0.0,
+    locationText: String = "",
     onBackClick: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val isDark = UserSession.isDarkTheme
+
+    val defaultFarmerDistrict = UserSession.currentFarmer?.district ?: "Local"
+    val defaultFarmerState = UserSession.currentFarmer?.state ?: ""
+    val defaultCoords = UserSession.getDistrictCoordinates(defaultFarmerDistrict, defaultFarmerState)
+    val resolvedLocationText = locationText.ifBlank {
+        if (defaultFarmerState.isNotBlank()) "$defaultFarmerDistrict, $defaultFarmerState" else defaultFarmerDistrict
+    }
+    val resolvedFarmerLat = if (farmerLat != 0.0) farmerLat else (UserSession.activeHarvest?.farmerLatitude ?: defaultCoords.first)
+    val resolvedFarmerLon = if (farmerLon != 0.0) farmerLon else (UserSession.activeHarvest?.farmerLongitude ?: defaultCoords.second)
 
     var isKannada by remember { mutableStateOf(UserSession.isKannadaPreferred) }
     var selectedRadiusKm by remember { mutableStateOf(50.0) }
@@ -96,15 +106,15 @@ fun ColdStorageDiscoveryScreen(
     var voiceTranscript by remember { mutableStateOf<String?>(null) }
     var isSpeakingAudio by remember { mutableStateOf(false) }
     var useGpsLocation by remember { mutableStateOf(true) }
-    var manualLocationText by remember { mutableStateOf(locationText) }
+    var manualLocationText by remember { mutableStateOf(resolvedLocationText) }
     var showLanguageDialog by remember { mutableStateOf(false) }
 
     fun loadData() {
         isLoading = true
         scope.launch {
             try {
-                val lat = if (useGpsLocation) 13.133 else 13.133
-                val lon = if (useGpsLocation) 78.133 else 78.133
+                val lat = resolvedFarmerLat
+                val lon = resolvedFarmerLon
                 val langCode = if (isKannada) "kn-IN" else "en-IN"
 
                 val res = ApiClient.discoverColdStorage(
@@ -113,6 +123,7 @@ fun ColdStorageDiscoveryScreen(
                     farmerLon = lon,
                     crop = crop,
                     quantityKg = quantityKg,
+                    locationText = manualLocationText,
                     radiusKm = selectedRadiusKm,
                     language = langCode
                 )
@@ -140,10 +151,10 @@ fun ColdStorageDiscoveryScreen(
                         ColdStorageItem(
                             facilityId = obj.optString("facility_id", "FAC-$i"),
                             name = obj.optString("name", "Cold Storage"),
-                            district = obj.optString("district", "Kolar"),
+                            district = obj.optString("district", defaultFarmerDistrict),
                             address = obj.optString("address", "NHB Registered Facility"),
-                            latitude = obj.optDouble("latitude", 13.14),
-                            longitude = obj.optDouble("longitude", 78.14),
+                            latitude = obj.optDouble("latitude", lat + 0.01),
+                            longitude = obj.optDouble("longitude", lon + 0.01),
                             totalCapacityMt = obj.optDouble("total_capacity_mt", 5000.0),
                             availableCapacityMt = obj.optDouble("available_capacity_mt", 120.0),
                             capacityVerified = obj.optBoolean("capacity_verified", true),
@@ -170,13 +181,13 @@ fun ColdStorageDiscoveryScreen(
                     weatherAlert = WeatherRiskAlert(
                         hasActiveAlert = true,
                         warningId = wJson.optString("warning_id", "IMD-001"),
-                        district = wJson.optString("district", "Kolar"),
+                        district = wJson.optString("district", defaultFarmerDistrict),
                         severity = wJson.optString("severity", "ORANGE WARNING"),
                         headline = wJson.optString("headline", "Heavy Unseasonal Rainfall Warning"),
                         headlineKannada = wJson.optString("headline_kn", "ಭಾರಿ ಅಕಾಲಿಕ ಮಳೆ ಎಚ್ಚರಿಕೆ: ಕೊಯ್ಲು ತಕ್ಷಣ ರಕ್ಷಿಸಿ"),
                         vulnerability = wJson.optString("vulnerability", "Harvested Solanaceous crop susceptible to damp rot"),
                         recommendedAction = wJson.optString("recommended_action", "Move harvest to nearest cold storage within 24 hours"),
-                        recommendedFacilityName = wJson.optString("recommended_facility_name", "Kolar APMC Cold Chain")
+                        recommendedFacilityName = wJson.optString("recommended_facility_name", "$defaultFarmerDistrict Agro Cold Chain")
                     )
                 }
             } catch (e: Exception) {
@@ -329,8 +340,11 @@ fun ColdStorageDiscoveryScreen(
                                     fontSize = 13.5.sp,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
+                                val latFmt = String.format(Locale.US, "%.3f", resolvedFarmerLat)
+                                val lonFmt = String.format(Locale.US, "%.3f", resolvedFarmerLon)
+                                val farmerPin = UserSession.currentFarmer?.pincode?.ifBlank { "560001" } ?: "560001"
                                 Text(
-                                    text = if (useGpsLocation) "$manualLocationText (13.133° N, 78.133° E)" else "$manualLocationText (PIN: 563101)",
+                                    text = if (useGpsLocation) "$manualLocationText ($latFmt° N, $lonFmt° E)" else "$manualLocationText (PIN: $farmerPin)",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -564,8 +578,8 @@ fun ColdStorageDiscoveryScreen(
                                         try {
                                             val res = ApiClient.getColdStorageVoiceExplanation(
                                                 facilityId = topFac.facilityId,
-                                                farmerLat = farmerLat,
-                                                farmerLon = farmerLon,
+                                                farmerLat = resolvedFarmerLat,
+                                                farmerLon = resolvedFarmerLon,
                                                 languageCode = if (isKannada) "kn-IN" else "en-IN"
                                             )
                                             val obj = JSONObject(res)

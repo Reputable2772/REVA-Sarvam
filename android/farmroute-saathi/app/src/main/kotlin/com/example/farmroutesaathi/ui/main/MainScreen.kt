@@ -266,9 +266,9 @@ fun FarmerDashboardView(
     val isDark = UserSession.isDarkTheme
     val currentLot = UserSession.activeHarvestId
     val farmerProfile = UserSession.currentFarmer
-    val farmerName = farmerProfile?.name ?: "Manjunatha Gowda"
-    val farmerLocation = farmerProfile?.district ?: "Kolar"
-    val farmerState = farmerProfile?.state ?: "Karnataka"
+    val farmerName = farmerProfile?.name ?: "Farmer"
+    val farmerLocation = farmerProfile?.district?.ifBlank { "Local" } ?: "Local"
+    val farmerState = farmerProfile?.state?.ifBlank { "Karnataka" } ?: "Karnataka"
     val activeHarvest = UserSession.activeHarvest
     val activeCrop = activeHarvest?.crop ?: "Tomato"
     val activeQty = activeHarvest?.quantityKg ?: 200.0
@@ -796,6 +796,11 @@ private fun FarmerPoolingDialog(
                     )
                 }
 
+                val dist = UserSession.currentFarmer?.district ?: "Local"
+                val cropName = UserSession.activeHarvest?.crop ?: "Produce"
+                val myName = UserSession.currentFarmer?.name?.ifBlank { "You" } ?: "You"
+                val myQty = "${UserSession.activeHarvest?.quantityKg?.toInt() ?: 200} kg"
+
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = SoilCropGreen.copy(alpha = 0.1f),
@@ -803,7 +808,7 @@ private fun FarmerPoolingDialog(
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text(
-                            text = if (isKannada) "ಮುಳುಬಾಗಿಲು ➔ ಕೋಲಾರ ಎಪಿಎಂಸಿ ಕಾರಿಡಾರ್ (32 ಕಿ.ಮೀ)" else "Route: Mulbagal ➔ Kolar APMC Corridor (32 km)",
+                            text = if (isKannada) "$dist ಕ್ಲಸ್ಟರ್ ➔ $dist ಎಪಿಎಂಸಿ ಕಾರಿಡಾರ್ (28 ಕಿ.ಮೀ)" else "Route: $dist Cluster ➔ $dist APMC Corridor (28 km)",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = SoilCropGreen
@@ -824,9 +829,9 @@ private fun FarmerPoolingDialog(
                 )
 
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PoolingFarmerRow("1. Manjunatha Gowda (You)", "200 kg Tomato", "₹180 (Shared)")
-                    PoolingFarmerRow("2. Venkatamma R.", "350 kg Tomato", "₹220 (Shared)")
-                    PoolingFarmerRow("3. K. Narayanaswamy", "450 kg Potato", "₹250 (Shared)")
+                    PoolingFarmerRow("1. $myName (You)", "$myQty $cropName", "₹180 (Shared)")
+                    PoolingFarmerRow("2. Regional Cluster Farmer 1", "350 kg $cropName", "₹220 (Shared)")
+                    PoolingFarmerRow("3. Regional Cluster Farmer 2", "450 kg Mixed Produce", "₹250 (Shared)")
                 }
 
                 HorizontalDivider(color = SoilDeepEarth.copy(alpha = 0.1f))
@@ -935,6 +940,9 @@ private fun WeatherAdvisoryDialog(
                     )
                 }
 
+                val dist = UserSession.currentFarmer?.district ?: "Local"
+                val cropName = UserSession.activeHarvest?.crop ?: "Produce"
+
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = Color(0xFFFFF3E0),
@@ -949,7 +957,7 @@ private fun WeatherAdvisoryDialog(
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = if (isKannada) "ಕೋಲಾರ, ಮುಳುಬಾಗಿಲು ಮತ್ತು ಮಾಲೂರು ತಾಲೂಕುಗಳಲ್ಲಿ ತೇವಾಂಶ ಹಾನಿ ಸಂಭವ." else "Moisture and skin spotting risk for harvested tomatoes across Kolar & Mulbagal.",
+                            text = if (isKannada) "$dist ಜಿಲ್ಲಾ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ತೇವಾಂಶ ಮತ್ತು ಹವಾಮಾನ ಹಾನಿ ಸಂಭವ." else "Moisture and skin spotting risk for harvested $cropName across $dist region.",
                             fontSize = 11.sp,
                             color = Color(0xFF5D4037)
                         )
@@ -965,9 +973,9 @@ private fun WeatherAdvisoryDialog(
 
                 Text(
                     text = if (isKannada)
-                        "1. ತಕ್ಷಣ ಸಮೀಪದ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್‌ಗೆ (4.2 ಕಿ.ಮೀ) ಸಾಗಿಸಿ ಅಥವಾ ಇಂದೇ ಮಾರುಕಟ್ಟೆಗೆ ರವಾನಿಸಿ.\n2. ಬಯಲು ಹೊಲದಲ್ಲಿ ಹಣ್ಣುಗಳನ್ನು ತೆರೆದಿಡಬೇಡಿ."
+                        "1. ತಕ್ಷಣ ಸಮೀಪದ ಕೋಲ್ಡ್ ಸ್ಟೋರೇಜ್‌ಗೆ ಸಾಗಿಸಿ ಅಥವಾ ಇಂದೇ ಮಾರುಕಟ್ಟೆಗೆ ರವಾನಿಸಿ.\n2. ಬಯಲು ಹೊಲದಲ್ಲಿ ಬೆಳೆಗಳನ್ನು ತೆರೆದಿಡಬೇಡಿ."
                     else
-                        "1. Move ripe tomatoes to verified cold storage (4.2 km) or dispatch to APMC mandi immediately.\n2. Avoid open field storage under plastic sheets.",
+                        "1. Move ripe $cropName to verified local cold storage or dispatch to APMC mandi immediately.\n2. Avoid open field storage under plastic sheets.",
                     fontSize = 11.5.sp,
                     lineHeight = 16.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant

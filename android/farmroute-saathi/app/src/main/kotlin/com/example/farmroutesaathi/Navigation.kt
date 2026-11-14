@@ -34,8 +34,21 @@ fun MainNavigation() {
             onHarvestSubmitted = { harvestId, needsStorage, crop, qty ->
               backStack.clear()
               backStack.add(Main)
+              val district = UserSession.currentFarmer?.district ?: "Local"
+              val state = UserSession.currentFarmer?.state ?: ""
+              val locText = if (state.isNotBlank()) "$district, $state" else district
+              val coords = UserSession.getDistrictCoordinates(district, state)
+              val lat = UserSession.activeHarvest?.farmerLatitude ?: coords.first
+              val lon = UserSession.activeHarvest?.farmerLongitude ?: coords.second
               if (needsStorage) {
-                backStack.add(ColdStorageDiscovery(harvestId = harvestId, crop = crop, quantityKg = qty))
+                backStack.add(ColdStorageDiscovery(
+                  harvestId = harvestId,
+                  crop = crop,
+                  quantityKg = qty,
+                  farmerLat = lat,
+                  farmerLon = lon,
+                  locationText = locText
+                ))
               } else {
                 backStack.add(MandiComparison(harvestId))
               }
@@ -47,19 +60,29 @@ fun MainNavigation() {
           )
         }
         entry<MandiComparison> { key ->
+          val effectiveHarvestId = key.harvestId.ifBlank { UserSession.activeHarvestId }
           MandiComparisonScreen(
-            harvestId = key.harvestId,
+            harvestId = effectiveHarvestId,
             onBackClick = { backStack.removeLastOrNull() }
           )
         }
         entry<ColdStorageDiscovery> { key ->
+          val district = UserSession.currentFarmer?.district ?: "Local"
+          val state = UserSession.currentFarmer?.state ?: ""
+          val defaultLoc = if (state.isNotBlank()) "$district, $state" else district
+          val effectiveHarvestId = key.harvestId.ifBlank { UserSession.activeHarvestId }
+          val effectiveCrop = key.crop.ifBlank { UserSession.activeHarvest?.crop ?: "Produce" }
+          val coords = UserSession.getDistrictCoordinates(district, state)
+          val effectiveLat = if (key.farmerLat != 0.0) key.farmerLat else (UserSession.activeHarvest?.farmerLatitude ?: coords.first)
+          val effectiveLon = if (key.farmerLon != 0.0) key.farmerLon else (UserSession.activeHarvest?.farmerLongitude ?: coords.second)
+          val effectiveLoc = key.locationText.ifBlank { defaultLoc }
           ColdStorageDiscoveryScreen(
-            harvestId = key.harvestId,
-            crop = key.crop,
+            harvestId = effectiveHarvestId,
+            crop = effectiveCrop,
             quantityKg = key.quantityKg,
-            farmerLat = key.farmerLat,
-            farmerLon = key.farmerLon,
-            locationText = key.locationText,
+            farmerLat = effectiveLat,
+            farmerLon = effectiveLon,
+            locationText = effectiveLoc,
             onBackClick = { backStack.removeLastOrNull() }
           )
         }
@@ -69,7 +92,20 @@ fun MainNavigation() {
             onDeclareHarvestClick = { backStack.add(HarvestQuestionnaire) },
             onMandiComparisonClick = { hId -> backStack.add(MandiComparison(hId)) },
             onColdStorageClick = { hId, crop, qty ->
-              backStack.add(ColdStorageDiscovery(harvestId = hId, crop = crop, quantityKg = qty))
+              val district = UserSession.currentFarmer?.district ?: "Local"
+              val state = UserSession.currentFarmer?.state ?: ""
+              val locText = if (state.isNotBlank()) "$district, $state" else district
+              val coords = UserSession.getDistrictCoordinates(district, state)
+              val lat = UserSession.activeHarvest?.farmerLatitude ?: coords.first
+              val lon = UserSession.activeHarvest?.farmerLongitude ?: coords.second
+              backStack.add(ColdStorageDiscovery(
+                harvestId = hId,
+                crop = crop,
+                quantityKg = qty,
+                farmerLat = lat,
+                farmerLon = lon,
+                locationText = locText
+              ))
             },
             onLogout = {
               UserSession.logout()

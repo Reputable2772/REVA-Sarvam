@@ -52,7 +52,7 @@ fun HarvestQuestionnaireScreen(
     var expectedDateTime by remember { mutableStateOf("2026-11-14 09:00 AM") }
     var sellImmediately by remember { mutableStateOf(true) } // true: Sell Now, false: Find Cold Storage
     var quantityKg by remember { mutableStateOf("200") }
-    val locationPinCode by remember { mutableStateOf("563101") }
+    val locationPinCode by remember { mutableStateOf(UserSession.currentFarmer?.pincode?.ifBlank { "560001" } ?: "560001") }
     val isGpsGranted by remember { mutableStateOf(true) }
 
     // Voice / STT Recording State
@@ -271,13 +271,20 @@ fun HarvestQuestionnaireScreen(
                     sellImmediately = sellImmediately
                 )
 
+                val farmerDist = farmer?.district ?: "Local"
+                val farmerState = farmer?.state ?: ""
+                val distPrefix = (farmerDist.take(3).ifBlank { "LOT" }).uppercase()
+                val dateCode = harvestDate.replace("-", "")
+                val defaultGeneratedLot = "FR-$distPrefix-$dateCode-0001"
+                val farmerCoords = UserSession.getDistrictCoordinates(farmerDist, farmerState)
+
                 // Extract Unique Harvest ID from response
                 val uniqueHarvestId = if (res.contains("\"harvest_id\":\"")) {
                     res.substringAfter("\"harvest_id\":\"").substringBefore("\"")
                 } else if (res.contains("\"lot_id\":\"")) {
                     res.substringAfter("\"lot_id\":\"").substringBefore("\"")
                 } else {
-                    "FR-KLR-20261113-0001"
+                    defaultGeneratedLot
                 }
 
                 val needsStorage = !sellImmediately
@@ -294,8 +301,8 @@ fun HarvestQuestionnaireScreen(
                         quantityKg = qVal,
                         hasStorageAccess = !needsStorage,
                         storageRequirementNeeded = needsStorage,
-                        farmerLatitude = 13.133,
-                        farmerLongitude = 78.133,
+                        farmerLatitude = farmerCoords.first,
+                        farmerLongitude = farmerCoords.second,
                         locationSource = if (isGpsGranted) "GPS (Verified)" else "PIN: $locationPinCode"
                     )
                 )
@@ -303,7 +310,12 @@ fun HarvestQuestionnaireScreen(
                 // Navigate with needsStorage parameter
                 onHarvestSubmitted(uniqueHarvestId, needsStorage, crop, qVal)
             } catch (e: Exception) {
-                val fallbackLot = "FR-KLR-20261113-0001"
+                val farmerDist = farmer?.district ?: "Local"
+                val farmerState = farmer?.state ?: ""
+                val distPrefix = (farmerDist.take(3).ifBlank { "LOT" }).uppercase()
+                val dateCode = harvestDate.replace("-", "")
+                val fallbackLot = "FR-$distPrefix-$dateCode-0001"
+                val farmerCoords = UserSession.getDistrictCoordinates(farmerDist, farmerState)
                 val qVal = quantityKg.toDoubleOrNull() ?: 200.0
                 val needsStorage = !sellImmediately
                 UserSession.setHarvest(
@@ -316,7 +328,9 @@ fun HarvestQuestionnaireScreen(
                         sellImmediately = sellImmediately,
                         quantityKg = qVal,
                         hasStorageAccess = !needsStorage,
-                        storageRequirementNeeded = needsStorage
+                        storageRequirementNeeded = needsStorage,
+                        farmerLatitude = farmerCoords.first,
+                        farmerLongitude = farmerCoords.second
                     )
                 )
                 onHarvestSubmitted(fallbackLot, needsStorage, crop, qVal)
@@ -1178,8 +1192,11 @@ fun HarvestQuestionnaireScreen(
                             Text("📍", fontSize = 18.sp)
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
+                                val dist = UserSession.currentFarmer?.district ?: "Local"
+                                val state = UserSession.currentFarmer?.state ?: ""
+                                val locationLabel = if (state.isNotBlank()) "$dist Corridor, $state (GPS Verified)" else "$dist Corridor (GPS Verified)"
                                 Text(
-                                    text = "Kolar Corridor (13.133° N, 78.133° E)",
+                                    text = locationLabel,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = SoilDeepEarth

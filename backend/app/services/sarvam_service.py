@@ -641,7 +641,7 @@ class SarvamService:
             fields_detected.append("sell_immediately")
 
         # Village detection
-        if re.search(r"bangarpet|ಬಂಗಾರಪೇಟೆ|बांगरपेट", text, re.IGNORECASE):
+        if re.search(r"bangar[a-z]*pet[a-z]*|ಬಂಗಾರಪೇಟೆ|बांगरपेट", text, re.IGNORECASE):
             village = "Bangarpet"
             fields_detected.append("village")
         elif re.search(r"mulbagal|ಮುಳಬಾಗಿಲು|मुलबागल", text, re.IGNORECASE):
@@ -842,12 +842,30 @@ class SarvamService:
             # Normalize quality grade to standard Grade A / Grade B / Grade C across all 11 languages
             if "quality_grade" in normalized and normalized["quality_grade"]:
                 qg = str(normalized["quality_grade"]).strip().upper()
-                if any(a in qg for a in ["A", "GRADE A", "GRADE-A", "ಗ್ರೇಡ್ ಎ", "ಗ್ರೇಡ್ A", "ग्रेड ए", "గ్రేడ్ ఎ", "கிரேடு ஏ", "গ্রেড এ", "ગ્રેડ એ", "ਗ੍ਰੇਡ ਏ", "ഗ്രേഡ് എ", "ଗ୍ରେଡ୍ ଏ"]):
-                    normalized["quality_grade"] = "Grade A"
-                elif any(b in qg for b in ["B", "GRADE B", "GRADE-B", "ಗ್ರೇಡ್ ಬಿ", "ಗ್ರೇಡ್ B", "ग्रेड बी", "గ్రేడ్ బి", "கிரேடு பி", "গ্রেড বি", "ગ્રેડ બી", "ਗ੍ਰੇਡ ਬੀ", "ഗ്രേഡ് ബി", "ଗ୍ରେଡ୍ ବି"]):
+                if any(b in qg for b in ["GRADE B", "GRADE-B", "ಗ್ರೇಡ್ ಬಿ", "ಗ್ರೇಡ್ B", "ग्रेड बी", "గ్రేడ్ బి", "கிரேடு பி", "গ্রেড বি", "ગ્રેડ બી", "ਗ੍ਰੇਡ ਬੀ", "ഗ്രേഡ് ബി", "ଗ୍ରେଡ୍ ବି"]) or qg in ["B", "GRADE B"]:
                     normalized["quality_grade"] = "Grade B"
-                elif any(c in qg for c in ["C", "GRADE C", "GRADE-C", "ಗ್ರೇಡ್ ಸಿ", "ಗ್ರೇಡ್ C", "ग्रेड सी", "గ్రేಡ್ సి", "கிரேடு சி", "গ্রেড সি", "ગ્રેડ સી", "ਗ੍ਰੇਡ ਸੀ", "ഗ്രേഡ് സി", "ଗ୍ରେଡ୍ ସି"]):
+                elif any(c in qg for c in ["GRADE C", "GRADE-C", "ಗ್ರೇಡ್ ಸಿ", "ಗ್ರೇಡ್ C", "ग्रेड सी", "గ్రేಡ್ సి", "கிரேடு சி", "গ্রেড সি", "ગ્રેડ ਸੀ", "ਗ੍ਰੇਡ ਸੀ", "ഗ്രೇಡ್ ಸಿ", "ଗ୍ରେଡ୍ ସି"]) or qg in ["C", "GRADE C"]:
                     normalized["quality_grade"] = "Grade C"
+                elif any(a in qg for a in ["GRADE A", "GRADE-A", "ಗ್ರೇಡ್ ಎ", "ಗ್ರೇಡ್ A", "ग्रेड ए", "గ్రేಡ್ ఎ", "கிரேடு ஏ", "গ্রেড এ", "ગ્રેડ એ", "ਗ੍ਰੇਡ ਏ", "ഗ്രೇಡ್ എ", "ଗ୍ରେଡ୍ ଏ"]) or qg in ["A", "GRADE A"]:
+                    normalized["quality_grade"] = "Grade A"
+
+            # If user explicitly specifies selling intent and not cold storage, ensure sell_immediately is True
+            if re.search(r"ಮಾರಾಟ|sell|sale|बेचना|बिक्री|అమ్మకం|விற்பனை|বিক্রি", text, re.IGNORECASE) and not re.search(r"cold storage|warehouse|store|ಶೀತಲ|कोल्ड स्टोरेज|भंडारण", text, re.IGNORECASE):
+                normalized["sell_immediately"] = True
+
+            # Normalize village name across regional scripts
+            if "village" in normalized and normalized["village"]:
+                v_str = str(normalized["village"]).strip()
+                if re.search(r"bangar[a-z]*pet[a-z]*|ಬಂಗಾರಪೇಟೆ|बांगरपेट", v_str, re.IGNORECASE):
+                    normalized["village"] = "Bangarpet"
+                elif re.search(r"mulbagal|ಮುಳಬಾಗಿಲು|मुलबागल", v_str, re.IGNORECASE):
+                    normalized["village"] = "Mulbagal"
+                elif re.search(r"malur|ಮಾಲೂರು|मालूर", v_str, re.IGNORECASE):
+                    normalized["village"] = "Malur"
+                elif re.search(r"kolar|ಕೋಲಾರ|कोलार", v_str, re.IGNORECASE):
+                    normalized["village"] = "Kolar"
+                elif re.search(r"srinivaspur|ಶ್ರೀನಿವಾಸಪುರ|श्रीनिवासपुर", v_str, re.IGNORECASE):
+                    normalized["village"] = "Srinivaspur"
 
             # Fill in any missing or null fields from heuristic
             for key, h_val in heuristic.items():
@@ -886,37 +904,49 @@ class SarvamService:
             action = "NAVIGATE_MARKETPLACE"
             crop_name = entities.get("crop", "Tomato")
             qty_val = float(entities.get("quantity_kg", 200.0) or 200.0)
+            target_dist = entities.get("district") or entities.get("village") or ""
+            target_state = entities.get("state") or ""
             try:
                 from backend.app.services.pan_india_mandi_service import PanIndiaMandiService
-                mandis = PanIndiaMandiService.evaluate_mandi_options(crop=crop_name, quantity_kg=qty_val)
+                mandis = PanIndiaMandiService.evaluate_mandi_options(
+                    crop=crop_name,
+                    quantity_kg=qty_val,
+                    farmer_district=target_dist,
+                    farmer_state=target_state
+                )
                 if mandis:
                     best = mandis[0]
-                    rec_name = best.get("mandi_name", "Kolar APMC")
+                    rec_name = best.get("mandi_name", f"{target_dist.title()} APMC" if target_dist else "Local APMC")
                     net_ret = int(best.get("net_profit_inr", 8375))
                     eff_rate = best.get("effective_net_price_per_kg", 41.88)
                     headline_p = best.get("price_per_kg", 42.16)
                     msg_en = f"Market Analysis for {int(qty_val)}kg {crop_name}: Best net return is {rec_name} with ₹{net_ret} final take-home (₹{eff_rate}/kg effective) after transport and commission. Headline price is ₹{headline_p}/kg."
                     msg_kn = f"{int(qty_val)} ಕೆಜಿ {crop_name} ಮಾರುಕಟ್ಟೆ ವಿಶ್ಲೇಷಣೆ: ಸಾಗಾಟ ಮತ್ತು ಕಡಿತಗಳ ನಂತರ {rec_name} ಅತ್ಯುತ್ತಮವಾಗಿದ್ದು, ₹{net_ret} ಅಂತಿಮ ಕೈಸೇರುವ ಲಾಭ (ಪ್ರತಿ ಕೆಜಿಗೆ ₹{eff_rate}) ನೀಡುತ್ತದೆ."
                 else:
-                    msg_en = f"Live rates for {crop_name}: Kolar APMC is currently leading with ₹8,375 estimated net take-home."
-                    msg_kn = f"{crop_name} ಲೈವ್ ದರಗಳು: ಕೋಲಾರ ಎಪಿಎಂಸಿಯು ₹8,375 ನಿವ್ವಳ ಲಾಭ ನೀಡುತ್ತದೆ."
+                    default_mandi = f"{target_dist.title()} APMC" if target_dist else "Local APMC"
+                    msg_en = f"Live rates for {crop_name}: {default_mandi} is currently leading with ₹8,375 estimated net take-home."
+                    msg_kn = f"{crop_name} ಲೈವ್ ದರಗಳು: {default_mandi} ₹8,375 ನಿವ್ವಳ ಲಾಭ ನೀಡುತ್ತದೆ."
             except Exception:
-                msg_en = f"Live rates for {crop_name}: Kolar APMC is recommended with ₹8,375 estimated net take-home."
-                msg_kn = f"{crop_name} ಲೈವ್ ದರಗಳು: ಕೋಲಾರ ಎಪಿಎಂಸಿಯು ₹8,375 ನಿವ್ವಳ ಲಾಭ ನೀಡುತ್ತದೆ."
+                default_mandi = f"{target_dist.title()} APMC" if target_dist else "Local APMC"
+                msg_en = f"Live rates for {crop_name}: {default_mandi} is recommended with ₹8,375 estimated net take-home."
+                msg_kn = f"{crop_name} ಲೈವ್ ದರಗಳು: {default_mandi} ₹8,375 ನಿವ್ವಳ ಲಾಭ ನೀಡುತ್ತದೆ."
         elif re.search(r"weather|rain|forecast|climate|ಮಳೆ|ಹವಾಮಾನ|मौसम|बारिश|वर्षा|వర్షం|వాతావరణం|வானிலை|மழை|আবহাওয়া|વરસાદ|ਮੀਂਹ|ਪାଣିପಾਗ|മഴ", text, re.IGNORECASE):
             action = "NAVIGATE_WEATHER"
+            target_loc = entities.get("village") or entities.get("district") or entities.get("location") or ""
             try:
                 from backend.app.services.weather_service import WeatherService
-                w_data = WeatherService.get_weather("Kolar")
+                w_data = WeatherService.get_weather(target_loc)
+                resolved_loc = w_data.get("location") or (target_loc.title() if target_loc else "Farmland")
                 temp = w_data.get("temperature_c", 26)
                 cond = w_data.get("condition", "Partly cloudy")
                 rain_pct = w_data.get("rainfall_probability_pct", 30)
                 advisory = w_data.get("agricultural_advisory", {}).get("action", "Harvest in morning window and move produce to shaded or cold storage.")
-                msg_en = f"Kolar Farmland Weather: {temp}°C, {cond} with {rain_pct}% rain probability. IMD Advisory: {advisory}"
-                msg_kn = f"ಕೋಲಾರ ಕೃಷಿ ಹವಾಮಾನ: {temp}°C, {cond}, {rain_pct}% ಮಳೆ ಸಾಧ್ಯತೆ. ಕೃಷಿ ಸಲಹೆ: {advisory}"
+                msg_en = f"{resolved_loc} Farmland Weather: {temp}°C, {cond} with {rain_pct}% rain probability. IMD Advisory: {advisory}"
+                msg_kn = f"{resolved_loc} ಕೃಷಿ ಹವಾಮಾನ: {temp}°C, {cond}, {rain_pct}% ಮಳೆ ಸಾಧ್ಯತೆ. ಕೃಷಿ ಸಲಹೆ: {advisory}"
             except Exception:
-                msg_en = "Kolar Farmland Weather: 26°C, Partly Cloudy, 30% rain probability. Harvest in morning dry window."
-                msg_kn = "ಕೋಲಾರ ಕೃಷಿ ಹವಾಮಾನ: 26°C, ಭಾಗಶಃ ಮೋಡ, 30% ಮಳೆ ಸಾಧ್ಯತೆ. ಬೆಳಗಿನ ಒಣ ಸಮಯದಲ್ಲಿ ಕೊಯ್ಲು ಮಾಡಿ."
+                resolved_loc = target_loc.title() if target_loc else "Local"
+                msg_en = f"{resolved_loc} Farmland Weather: 26°C, Partly Cloudy, 30% rain probability. Harvest in morning dry window."
+                msg_kn = f"{resolved_loc} ಕೃಷಿ ಹವಾಮಾನ: 26°C, ಭಾಗಶಃ ಮೋಡ, 30% ಮಳೆ ಸಾಧ್ಯತೆ. ಬೆಳಗಿನ ಒಣ ಸಮಯದಲ್ಲಿ ಕೊಯ್ಲು ಮಾಡಿ."
         elif re.search(r"harvest|lot|crop|200kg|200 kg|my harvest|active lot|ಕೊಯ್ಲು|ಲಾಟ್|ಬೆಳೆ|फसल|लॉट|పంట|లాట్|அறுவடை|ফসল|ਫਸਲ", text, re.IGNORECASE):
             action = "UPDATE_HARVEST"
             crop = entities.get('crop', 'Tomato')
@@ -1142,13 +1172,13 @@ class SarvamService:
 
         elif re.search(r"enam|e-nam|ಮಾರುಕಟ್ಟೆ|ಆನ್‌ಲೈನ್ ಮಾರಾಟ|trading|bidding|ई-नाम|मंडी ट्रेडिंग", query_lower):
             ans_kn = (
-                "e-NAM (ರಾಷ್ಟ್ರೀಯ ಕೃಷಿ ಮಾರುಕಟ್ಟೆ) ಮೂಲಕ ನೀವು ಕೋಲಾರ ಅಥವಾ ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿಗೆ ತರುವ ಬೆಳೆಯನ್ನು "
+                "e-NAM (ರಾಷ್ಟ್ರೀಯ ಕೃಷಿ ಮಾರುಕಟ್ಟೆ) ಮೂಲಕ ನೀವು ನೋಂದಾಯಿತ ಎಪಿಎಂಸಿಗೆ ತರುವ ಬೆಳೆಯನ್ನು "
                 "ದೇಶಾದ್ಯಂತದ ವ್ಯಾಪಾರಿಗಳು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸ್ಪರ್ಧಾತ್ಮಕ ದರಕ್ಕೆ ಬಿಡ್ ಮಾಡುತ್ತಾರೆ. "
                 "ಯಾವುದೇ ಅನಧಿಕೃತ ಕಮಿಷನ್ ಕಡಿತವಿಲ್ಲ, ಸರಿಯಾದ ಎಲೆಕ್ಟ್ರಾನಿಕ್ ತೂಕ, ಮತ್ತು 24 ಗಂಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಬ್ಯಾಂಕ್ ಖಾತೆಗೆ ನೇರ ಹಣ ಬರುತ್ತದೆ. "
                 "ನೋಂದಣಿಗೆ ಆಧಾರ್ ಮತ್ತು ಬ್ಯಾಂಕ್ ಪಾಸ್‌ಬುಕ್ ಸಾಕು. ಅಧಿಕೃತ ಪೋರ್ಟಲ್: enam.gov.in."
             )
             ans_en = (
-                "e-NAM provides pan-India electronic price discovery at integrated APMCs (like Kolar and Bangarpet). "
+                "e-NAM provides pan-India electronic price discovery at integrated APMCs across all major agricultural corridors. "
                 "Produce is assayed for quality, and verified buyers bid electronically with zero unauthorized commission "
                 "and direct online payment to your bank within 24 hours. "
                 "Register free with Aadhaar and bank details at the APMC gate or on enam.gov.in."

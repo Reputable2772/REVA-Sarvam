@@ -245,7 +245,7 @@ object AppLocalization {
             "cold_storage_desc" to "Discover nearby cold storage facilities and compare distances to Mandis.",
             "btn_confirm_sell_now" to "⚡ CONFIRM & COMPARE SELLING ROUTES ➔",
             "btn_confirm_cold_storage" to "❄️ CONFIRM & FIND COLD STORAGE ➔",
-            "skip_questionnaire" to "Skip for now (Use default lot FR-KLR-20261113-0001)",
+            "skip_questionnaire" to "Skip for now (Use active lot)",
             "select_crop_title" to "1. Select Crop",
             "harvest_date_title" to "2. Harvest Date",
             "harvest_time_title" to "3. Harvest Time",

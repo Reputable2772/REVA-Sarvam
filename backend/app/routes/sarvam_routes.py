@@ -151,6 +151,7 @@ def process_voice_command(req: VoiceCommandRequest):
         language_code=req.language_code or "kn-IN"
     )
     result["audio_base64"] = tts.get("audio_base64", "")
+    result["summary_text"] = result.get("spoken_feedback", "")
     return result
 
 @router.post("/process-audio")
@@ -209,6 +210,7 @@ async def process_voice_audio(
         language_code=detected_lang
     )
     result["audio_base64"] = tts.get("audio_base64", "")
+    result["summary_text"] = result.get("spoken_feedback", "")
     return result
 
 @router.post("/register-by-voice")
@@ -391,17 +393,27 @@ def get_cold_storage_voice_explanation(
     ).first()
 
     if not facility:
-        facility = db.query(ColdStorageFacility).first()
+        all_facs = db.query(ColdStorageFacility).all()
+        if all_facs:
+            f_lat = req.farmer_lat or 13.133
+            f_lon = req.farmer_lon or 78.133
+            all_facs.sort(key=lambda f: DistanceService.haversine_distance_km(f_lat, f_lon, f.latitude or 0, f.longitude or 0))
+            facility = all_facs[0]
 
-    fac_name = facility.name if facility else "Kolar APMC Agro Cold Chain Hub"
-    district = facility.district if facility else "Kolar"
+    fac_name = facility.name if facility else "Regional Agro Cold Chain Hub"
+    district = facility.district if facility else "Local"
     fac_lat = facility.latitude if facility else 13.1367
     fac_lon = facility.longitude if facility else 78.1291
     avail_mt = facility.available_capacity_tonnes if facility else 65.0
     rate_q = facility.daily_rate_per_quintal if facility else 16.50
 
-    farmer_lat = req.farmer_lat or 13.133
-    farmer_lon = req.farmer_lon or 78.133
+    farmer_lat = req.farmer_lat
+    farmer_lon = req.farmer_lon
+    if not farmer_lat or not farmer_lon or (abs((farmer_lat or 0) - 13.133) < 0.005 and abs((farmer_lon or 0) - 78.133) < 0.005 and facility and facility.district and "kolar" not in facility.district.lower()):
+        farmer_lat = facility.latitude
+        farmer_lon = facility.longitude
+    farmer_lat = farmer_lat or 13.133
+    farmer_lon = farmer_lon or 78.133
 
     dist_km = DistanceService.haversine_distance_km(farmer_lat, farmer_lon, fac_lat, fac_lon)
     if dist_km <= 0.05:

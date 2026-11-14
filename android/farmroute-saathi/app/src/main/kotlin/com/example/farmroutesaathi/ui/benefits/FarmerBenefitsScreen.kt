@@ -265,8 +265,9 @@ fun FarmerBenefitsScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp
                         )
+                        val locText = UserSession.farmerLocationText
                         Text(
-                            text = "📍 Kolar, Karnataka • Verified Government Intelligence",
+                            text = "📍 $locText • Verified Government Intelligence",
                             color = if (isDark) SoilFreshLeaf else SoilCropGreen,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium
@@ -518,11 +519,12 @@ fun FarmerBenefitsScreen(
                     fontSize = 13.5.sp,
                     color = if (isDark) SoilFreshLeaf else SoilCropGreen
                 )
+                val dist = UserSession.currentFarmer?.district ?: "local"
                 Text(
                     text = if (isKannada)
                         "SFAC ಮತ್ತು ನಬಾರ್ಡ್‌ನ ₹15 ಲಕ್ಷ ಈಕ್ವಿಟಿ ಅನುದಾನವು ನೋಂದಾಯಿತ FPO ಕಂಪನಿಗೆ ಮಾತ್ರ ಸಿಗುತ್ತದೆ, ವೈಯಕ್ತಿಕ ರೈತರ ಖಾತೆಗಲ್ಲ. ನೀವು FPO ಸದಸ್ಯರಾಗುವುದರಿಂದ ಸಾಮೂಹಿಕ ಖರೀದಿ ಮತ್ತು ಸಾರಿಗೆ ವೆಚ್ಚ ಉಳಿತಾಯವಾಗುತ್ತದೆ."
                     else
-                        "Institutional grants (SFAC/NABARD up to ₹15 Lakhs) are deposited directly into registered Farmer Producer Companies for infrastructure & procurement, not paid to individual farmers. Joining your local Kolar FPO gives you aggregated market power.",
+                        "Institutional grants (SFAC/NABARD up to ₹15 Lakhs) are deposited directly into registered Farmer Producer Companies for infrastructure & procurement, not paid to individual farmers. Joining your local $dist FPO gives you aggregated market power.",
                     fontSize = 12.sp,
                     color = if (isDark) SoilFieldPaper else SoilDeepEarth,
                     lineHeight = 17.sp
@@ -1171,10 +1173,10 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             lastVerifiedDate = "2026-11-13",
             freshnessLabel = "Active 2026 Direct Benefit",
             matchStatus = "LIKELY_ELIGIBLE",
-            relevanceReasonEn = "Matches your smallholder family profile in Kolar, Karnataka.",
-            relevanceReasonKn = "ಕೋಲಾರದ ನಿಮ್ಮ ರೈತ ಕುಟುಂಬಕ್ಕೆ ನೇರವಾಗಿ ಅನ್ವಯಿಸುತ್ತದೆ.",
+            relevanceReasonEn = "Matches your smallholder family profile in ${UserSession.currentFarmer?.district ?: "your region"}, ${UserSession.currentFarmer?.state ?: "your state"}.",
+            relevanceReasonKn = "${UserSession.currentFarmer?.district ?: "ನಿಮ್ಮ"} ಭಾಗದ ರೈತ ಕುಟುಂಬಕ್ಕೆ ನೇರವಾಗಿ ಅನ್ವಯಿಸುತ್ತದೆ.",
             missingFields = emptyList(),
-            matchedRules = listOf("Geographic eligibility confirmed for Karnataka, Kolar")
+            matchedRules = listOf("Geographic eligibility confirmed for ${UserSession.currentFarmer?.state ?: "Karnataka"}, ${UserSession.currentFarmer?.district ?: "Local"}")
         ),
         SchemeCardData(
             schemeId = "SCHEME-KA-RAITHA-SIRI",
@@ -1199,10 +1201,10 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             lastVerifiedDate = "2026-11-13",
             freshnessLabel = "Active Karnataka State Guideline",
             matchStatus = "LIKELY_ELIGIBLE",
-            relevanceReasonEn = "Matches your Tomato / Horticulture crop in Kolar district.",
-            relevanceReasonKn = "ಕೋಲಾರದ ನಿಮ್ಮ ಟೊಮೆಟೊ / ತೋಟಗಾರಿಕೆ ಬೆಳೆಗೆ ಅನ್ವಯಿಸುತ್ತದೆ.",
+            relevanceReasonEn = "Matches your ${UserSession.activeHarvest?.crop ?: "Horticulture"} crop in ${UserSession.currentFarmer?.district ?: "local"} district.",
+            relevanceReasonKn = "${UserSession.currentFarmer?.district ?: "ಸ್ಥಳೀಯ"} ಜಿಲ್ಲೆಯ ನಿಮ್ಮ ${UserSession.activeHarvest?.crop ?: "ತೋಟಗಾರಿಕೆ"} ಬೆಳೆಗೆ ಅನ್ವಯಿಸುತ್ತದೆ.",
             missingFields = emptyList(),
-            matchedRules = listOf("Crop match confirmed: Tomato", "Smallholder ceiling satisfied")
+            matchedRules = listOf("Crop match confirmed: ${UserSession.activeHarvest?.crop ?: "Horticulture"}", "Smallholder ceiling satisfied")
         ),
         SchemeCardData(
             schemeId = "SCHEME-PMFBY-SAMRAKSHANE",
@@ -1227,10 +1229,10 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             lastVerifiedDate = "2026-11-13",
             freshnessLabel = "Active Crop Insurance Season",
             matchStatus = "LIKELY_ELIGIBLE",
-            relevanceReasonEn = "Notified crop (Tomato) in Kolar district covered under Samrakshane.",
-            relevanceReasonKn = "ಕೋಲಾರ ಜಿಲ್ಲೆಯಲ್ಲಿ ಅಧಿಸೂಚಿತ ಟೊಮೆಟೊ ಬೆಳೆಗೆ ಸಂರಕ್ಷಣೆ ವಿಮೆ ಲಭ್ಯ.",
+            relevanceReasonEn = "Notified crop (${UserSession.activeHarvest?.crop ?: "Horticulture"}) in ${UserSession.currentFarmer?.district ?: "local"} district covered under Samrakshane.",
+            relevanceReasonKn = "${UserSession.currentFarmer?.district ?: "ಸ್ಥಳೀಯ"} ಜಿಲ್ಲೆಯಲ್ಲಿ ಅಧಿಸೂಚಿತ ${UserSession.activeHarvest?.crop ?: "ಬೆಳೆಗೆ"} ಸಂರಕ್ಷಣೆ ವಿಮೆ ಲಭ್ಯ.",
             missingFields = emptyList(),
-            matchedRules = listOf("Crop match confirmed: Tomato")
+            matchedRules = listOf("Crop match confirmed: ${UserSession.activeHarvest?.crop ?: "Horticulture"}")
         ),
         SchemeCardData(
             schemeId = "SCHEME-SFAC-10K-FPO",
@@ -1255,8 +1257,8 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             lastVerifiedDate = "2026-11-13",
             freshnessLabel = "Active Central Sector FPO Guideline",
             matchStatus = "POTENTIALLY_RELEVANT",
-            relevanceReasonEn = "Institutional FPO grant (Paid to FPO company, not individual farmers). Join your local Kolar FPO to benefit.",
-            relevanceReasonKn = "ಸಾಂಸ್ಥಿಕ FPO ಅನುದಾನ (ವೈಯಕ್ತಿಕ ರೈತರಿಗಲ್ಲ). ಸ್ಥಳೀಯ FPO ಗುಂಪಿಗೆ ಸೇರಿ ಲಾಭ ಪಡೆಯಿರಿ.",
+            relevanceReasonEn = "Institutional FPO grant (Paid to FPO company, not individual farmers). Join your local ${UserSession.currentFarmer?.district ?: "regional"} FPO to benefit.",
+            relevanceReasonKn = "ಸಾಂಸ್ಥಿಕ FPO ಅನುದಾನ (ವೈಯಕ್ತಿಕ ರೈತರಿಗಲ್ಲ). ಸ್ಥಳೀಯ ${UserSession.currentFarmer?.district ?: "ಪ್ರಾದೇಶಿಕ"} FPO ಗುಂಪಿಗೆ ಸೇರಿ ಲಾಭ ಪಡೆಯಿರಿ.",
             missingFields = emptyList(),
             matchedRules = listOf("Institutional Producer Company eligibility rule evaluated")
         ),
@@ -1268,10 +1270,10 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             targetLevel = "INDIVIDUAL_FARMER",
             issuingDepartment = "Directorate of Marketing & Inspection, MoA&FW",
             benefitAmountSpec = "Zero unauthorized commission + Direct online payment in 24 hours",
-            benefitDescEn = "Pan-India online bidding at integrated APMC mandis (Kolar & Bangarpet). Assayed produce, electronic weighing, direct bank settlement.",
+            benefitDescEn = "Pan-India online bidding at integrated APMC mandis in ${UserSession.currentFarmer?.district ?: "local area"} & regional hubs. Assayed produce, electronic weighing, direct bank settlement.",
             benefitDescKn = "ಎಪಿಎಂಸಿ ಮಾರುಕಟ್ಟೆಗಳಲ್ಲಿ ಆನ್‌ಲೈನ್ ಬಿಡ್ಡಿಂಗ್, ಸರಿಯಾದ ತೂಕ, ಮತ್ತು 24 ಗಂಟೆಗಳಲ್ಲಿ ನೇರ ಬ್ಯಾಂಕ್ ಜಮೆ.",
             eligibilityEn = "Any farmer bringing produce to e-NAM integrated APMC mandis.",
-            eligibilityKn = "ಕೋಲಾರ, ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿ ಮಾರುಕಟ್ಟೆಗಳಿಗೆ ಬೆಳೆ ತರುವ ಯಾವುದೇ ರೈತರು.",
+            eligibilityKn = "${UserSession.currentFarmer?.district ?: "ಸ್ಥಳೀಯ"} ಎಪಿಎಂಸಿ ಮಾರುಕಟ್ಟೆಗಳಿಗೆ ಬೆಳೆ ತರುವ ಯಾವುದೇ ರೈತರು.",
             exclusionEn = "Produce failing basic food safety norms.",
             exclusionKn = "ಗುಣಮಟ್ಟ ಪರೀಕ್ಷೆಯಲ್ಲಿ ತಿರಸ್ಕರಿಸಲ್ಪಟ್ಟ ಬೆಳೆಗಳು.",
             requiredDocuments = listOf("Aadhaar Card", "Bank Account Passbook", "Farmer Mandi Registration"),
@@ -1283,10 +1285,10 @@ private fun getDefaultSchemes(): List<SchemeCardData> {
             lastVerifiedDate = "2026-11-13",
             freshnessLabel = "Active Daily Electronic Trading",
             matchStatus = "LIKELY_ELIGIBLE",
-            relevanceReasonEn = "Direct electronic market access at nearby Kolar & Bangarpet APMC mandis.",
-            relevanceReasonKn = "ಕೋಲಾರ ಮತ್ತು ಬಂಗಾರಪೇಟೆ ಎಪಿಎಂಸಿಗಳಲ್ಲಿ ನೇರ ಆನ್‌ಲೈನ್ ಮಾರಾಟ ಲಭ್ಯ.",
+            relevanceReasonEn = "Direct electronic market access at nearby ${UserSession.currentFarmer?.district ?: "local"} APMC mandis.",
+            relevanceReasonKn = "${UserSession.currentFarmer?.district ?: "ಸ್ಥಳೀಯ"} ಎಪಿಎಂಸಿಗಳಲ್ಲಿ ನೇರ ಆನ್‌ಲೈನ್ ಮಾರಾಟ ಲಭ್ಯ.",
             missingFields = emptyList(),
-            matchedRules = listOf("Market access confirmed for Kolar APMC")
+            matchedRules = listOf("Market access confirmed for ${UserSession.currentFarmer?.district ?: "Local"} APMC")
         )
     )
 }

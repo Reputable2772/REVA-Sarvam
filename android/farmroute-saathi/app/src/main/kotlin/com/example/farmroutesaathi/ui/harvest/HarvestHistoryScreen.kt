@@ -75,7 +75,7 @@ fun HarvestHistoryScreen(
                         list.add(
                             HarvestHistoryItem(
                                 harvestId = obj.optString("harvest_id", obj.optString("lot_id")),
-                                lotId = obj.optString("lot_id", "FR-KLR-001"),
+                                lotId = obj.optString("lot_id", "FR-LOT-001"),
                                 farmerId = obj.optString("farmer_id", "FARMER-01"),
                                 crop = obj.optString("crop", "Tomato"),
                                 variety = obj.optString("variety", "Hybrid"),

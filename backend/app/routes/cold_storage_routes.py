@@ -48,14 +48,54 @@ INITIAL_COLD_STORAGE_FACILITIES = [
         "daily_rate_per_quintal": 18.00,
         "temperature_celsius": 10.5,
         "contact_phone": "+91 98450 22003"
+    },
+    {
+        "facility_id": "CS-TN-001",
+        "name": "Chengalpattu Agro Cold Logistics Hub",
+        "district": "Chengalpet",
+        "location": "GST Road, Industrial Corridor, Chengalpattu, Tamil Nadu",
+        "latitude": 12.6937,
+        "longitude": 79.9757,
+        "total_capacity_tonnes": 250.0,
+        "available_capacity_tonnes": 115.0,
+        "daily_rate_per_quintal": 16.00,
+        "temperature_celsius": 11.0,
+        "contact_phone": "+91 98450 33001"
+    },
+    {
+        "facility_id": "CS-TN-002",
+        "name": "Kanchipuram Horticulture Cold Store",
+        "district": "Kancheepuram",
+        "location": "NH-48 Bypass, Kanchipuram, Tamil Nadu",
+        "latitude": 12.8342,
+        "longitude": 79.7036,
+        "total_capacity_tonnes": 180.0,
+        "available_capacity_tonnes": 80.0,
+        "daily_rate_per_quintal": 15.50,
+        "temperature_celsius": 11.5,
+        "contact_phone": "+91 98450 33002"
+    },
+    {
+        "facility_id": "CS-TN-003",
+        "name": "Koyambedu Perishable Cargo Cold Chain",
+        "district": "Chennai",
+        "location": "Koyambedu Wholesale Market Complex, Chennai, Tamil Nadu",
+        "latitude": 13.0694,
+        "longitude": 80.1948,
+        "total_capacity_tonnes": 300.0,
+        "available_capacity_tonnes": 140.0,
+        "daily_rate_per_quintal": 18.00,
+        "temperature_celsius": 10.5,
+        "contact_phone": "+91 98450 33003"
     }
 ]
 
 def ensure_seeded_facilities(db: Session):
-    if db.query(ColdStorageFacility).count() == 0:
-        for f in INITIAL_COLD_STORAGE_FACILITIES:
+    existing_ids = {f.facility_id for f in db.query(ColdStorageFacility.facility_id).all()}
+    for f in INITIAL_COLD_STORAGE_FACILITIES:
+        if f["facility_id"] not in existing_ids:
             db.add(ColdStorageFacility(**f))
-        db.commit()
+    db.commit()
 
     # Automatically ingest national cold storage facilities from datasets if only seed facilities are present
     if db.query(ColdStorageFacility).count() <= len(INITIAL_COLD_STORAGE_FACILITIES):
@@ -89,9 +129,19 @@ def discover_cold_storage(
     """
     ensure_seeded_facilities(db)
     from backend.app.services.distance_service import DistanceService
+    from backend.app.models.models import Farmer
 
-    farmer_lat = req.latitude or 13.133
-    farmer_lon = req.longitude or 78.133
+    farmer_lat = req.latitude
+    farmer_lon = req.longitude
+    farmer_obj = db.query(Farmer).filter((Farmer.farmer_id == req.farmer_id) | (Farmer.phone == req.farmer_id)).first() if req.farmer_id else None
+
+    # Dynamically resolve if coordinates missing or defaulted to old Kolar coordinates
+    loc_text = req.location_text or (f"{farmer_obj.district}, {farmer_obj.state}" if farmer_obj and farmer_obj.district else "")
+    if loc_text and (not farmer_lat or not farmer_lon or (abs((farmer_lat or 0) - 13.133) < 0.005 and abs((farmer_lon or 0) - 78.133) < 0.005 and "kolar" not in loc_text.lower())):
+        farmer_lat, farmer_lon = DistanceService.resolve_coordinates(loc_text, district=farmer_obj.district if farmer_obj else None, state=farmer_obj.state if farmer_obj else None)
+
+    farmer_lat = farmer_lat or 13.133
+    farmer_lon = farmer_lon or 78.133
     radius = req.radius_km or 50.0
 
     all_facilities = db.query(ColdStorageFacility).all()

@@ -64,19 +64,19 @@ fun LoginScreen(
     var phoneNumber by remember { mutableStateOf("") }
     var mpinInput by remember { mutableStateOf("") }
     var detectedFarmerName by remember { mutableStateOf("") }
-    var detectedDistrict by remember { mutableStateOf("Kolar") }
+    var detectedDistrict by remember { mutableStateOf("Local") }
     var detectedState by remember { mutableStateOf("Karnataka") }
 
     // Onboarding form state
     var regName by remember { mutableStateOf("") }
     var regState by remember { mutableStateOf("Karnataka") }
-    var regDistrict by remember { mutableStateOf("Kolar") }
-    var regPincode by remember { mutableStateOf("563101") }
+    var regDistrict by remember { mutableStateOf("Local") }
+    var regPincode by remember { mutableStateOf("560001") }
     var regMpin by remember { mutableStateOf("") }
     var regConfirmMpin by remember { mutableStateOf("") }
 
     var statesList by remember { mutableStateOf(listOf("Karnataka", "Andhra Pradesh", "Tamil Nadu", "Maharashtra")) }
-    var districtsList by remember { mutableStateOf(listOf("Kolar", "Chikkaballapura", "Bangalore Rural", "Hassan", "Mandya")) }
+    var districtsList by remember { mutableStateOf(listOf("Bangalore Urban", "Bangalore Rural", "Tumkur", "Mandya", "Hassan", "Kolar")) }
     var stateDropdownExpanded by remember { mutableStateOf(false) }
     var districtDropdownExpanded by remember { mutableStateOf(false) }
 
@@ -287,19 +287,17 @@ fun LoginScreen(
                                         isLoading = false
                                         val isRegistered = checkRes.contains("\"exists\":true")
                                         if (isRegistered) {
-                                            detectedFarmerName = if (checkRes.contains("\"name\":\"")) {
-                                                checkRes.substringAfter("\"name\":\"").substringBefore("\"")
-                                            } else "Manjunatha Gowda"
-                                            detectedState = if (checkRes.contains("\"state\":\"")) {
-                                                checkRes.substringAfter("\"state\":\"").substringBefore("\"")
-                                            } else "Karnataka"
-                                            detectedDistrict = if (checkRes.contains("\"district\":\"")) {
-                                                checkRes.substringAfter("\"district\":\"").substringBefore("\"")
-                                            } else "Kolar"
+                                            val checkJson = try { org.json.JSONObject(checkRes) } catch (e: Exception) { null }
+                                            detectedFarmerName = checkJson?.optString("name")?.ifBlank { null }
+                                                ?: (if (checkRes.contains("\"name\":\"")) checkRes.substringAfter("\"name\":\"").substringBefore("\"") else "Farmer")
+                                            detectedState = checkJson?.optString("state")?.ifBlank { null }
+                                                ?: (if (checkRes.contains("\"state\":\"")) checkRes.substringAfter("\"state\":\"").substringBefore("\"") else "Karnataka")
+                                            detectedDistrict = checkJson?.optString("district")?.ifBlank { null }
+                                                ?: (if (checkRes.contains("\"district\":\"")) checkRes.substringAfter("\"district\":\"").substringBefore("\"") else "Local")
                                             currentStep = AuthStep.MPIN_ENTRY
                                         } else {
                                             regName = ""
-                                            regPincode = "563101"
+                                            regPincode = ""
                                             regMpin = ""
                                             regConfirmMpin = ""
                                             currentStep = AuthStep.ONBOARDING
@@ -348,14 +346,21 @@ fun LoginScreen(
                                     val loginRes = ApiClient.login(phoneNumber, mpinInput)
                                     isLoading = false
                                     if (loginRes.contains("\"status\":\"authenticated\"") || loginRes.contains("\"token\"")) {
+                                        val loginJson = try { org.json.JSONObject(loginRes) } catch (e: Exception) { null }
+                                        val farmerObj = loginJson?.optJSONObject("farmer")
+                                        val fName = farmerObj?.optString("name")?.ifBlank { null } ?: detectedFarmerName.ifBlank { "Farmer" }
+                                        val fState = farmerObj?.optString("state")?.ifBlank { null } ?: detectedState
+                                        val fDistrict = farmerObj?.optString("district")?.ifBlank { null } ?: detectedDistrict
+                                        val fPincode = farmerObj?.optString("pincode")?.ifBlank { null } ?: "560001"
+                                        val fToken = loginJson?.optString("token")?.ifBlank { null } ?: "token-$phoneNumber"
                                         UserSession.login(
                                             FarmerProfile(
                                                 phone = phoneNumber,
-                                                name = detectedFarmerName.ifBlank { "Manjunatha Gowda" },
-                                                state = detectedState,
-                                                district = detectedDistrict,
-                                                pincode = "563101",
-                                                token = "token-$phoneNumber"
+                                                name = fName,
+                                                state = fState,
+                                                district = fDistrict,
+                                                pincode = fPincode,
+                                                token = fToken
                                             )
                                         )
                                         onLoginSuccess()
